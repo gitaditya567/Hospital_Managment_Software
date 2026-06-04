@@ -81,14 +81,14 @@ const seedDatabase = async () => {
     // 3. Create default Super Admin user
     const superAdmin = new User({
       name: 'Super Operator',
-      email: 'super@med.com',
-      password: 'demo1234',
+      email: process.env.ADMIN_EMAIL || 'super@med.com',
+      password: process.env.ADMIN_PASSWORD || 'demo1234',
       role: 'SUPER_ADMIN',
       hospitalId: null,
       isActivated: true
     });
     await superAdmin.save();
-    console.log('✓ Default Super Admin user seeded (super@med.com).');
+    console.log(`✓ Default Super Admin user seeded (${superAdmin.email}).`);
 
     // 4. Create Staff Directory
     await Staff.insertMany([

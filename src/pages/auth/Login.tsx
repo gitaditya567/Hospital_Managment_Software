@@ -6,8 +6,8 @@ import { Mail, Lock, LogIn, Sparkles, Eye, EyeOff } from 'lucide-react';
 
 
 export function Login() {
-  const [email, setEmail] = useState('super@med.com');
-  const [password, setPassword] = useState('demo1234');
+  const [email, setEmail] = useState('admin@hospital.com');
+  const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
