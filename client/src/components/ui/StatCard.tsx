@@ -17,7 +17,7 @@ export function StatCard({ title, value, icon, trend, trendUp, className }: Stat
       className
     )}>
       <div className="space-y-1.5">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</p>
+        <p className="text-[10px] font-extrabold text-slate-600 uppercase tracking-widest">{title}</p>
         <h3 className="text-3xl font-extrabold text-slate-800 tracking-tight leading-none">{value}</h3>
         {trend && (
           <div className="pt-1">
@@ -33,7 +33,7 @@ export function StatCard({ title, value, icon, trend, trendUp, className }: Stat
           </div>
         )}
       </div>
-      <div className="h-13 w-13 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/50 text-blue-600 flex items-center justify-center border border-blue-100/30 shadow-[0_2px_8px_-2px_rgba(37,99,235,0.08)] shrink-0">
+      <div className="h-13 w-13 rounded-2xl bg-gradient-to-br from-teal-50 to-cyan-50/50 text-teal-600 flex items-center justify-center border border-teal-100/30 shadow-[0_2px_8px_-2px_rgba(13,148,136,0.08)] shrink-0">
         {icon}
       </div>
     </div>

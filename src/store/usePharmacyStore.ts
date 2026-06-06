@@ -57,7 +57,7 @@ interface PharmacyState {
   bills: PharmacyBill[];
   loading: boolean;
   transactionLogs: string[];
-  
+
   // Actions
   fetchPharmacyData: (hospitalId: string) => Promise<void>;
   addMedicine: (med: Omit<Medicine, 'id'>) => Promise<{ success: boolean; error?: string }>;
@@ -68,7 +68,7 @@ interface PharmacyState {
     expiryDate: string;
     qty: number;
   }) => Promise<{ success: boolean; error?: string }>;
-  
+
   dispensePrescription: (data: {
     rxCode: string;
     patientNo?: string;
@@ -80,10 +80,10 @@ interface PharmacyState {
     total: number;
     paymentMode: 'Cash' | 'Card' | 'UPI';
   }) => Promise<{ success: boolean; error?: string; bill?: PharmacyBill }>;
-  
+
   updateMedicine: (id: string, updates: Partial<Medicine>) => Promise<{ success: boolean; error?: string }>;
   deleteMedicine: (id: string) => Promise<void>;
-  
+
   clearLogs: () => void;
 }
 
@@ -231,7 +231,7 @@ export const usePharmacyStore = create<PharmacyState>((set, get) => ({
       });
 
       const resData = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(resData.message || 'Checkout failed.');
       }
@@ -266,7 +266,7 @@ export const usePharmacyStore = create<PharmacyState>((set, get) => ({
     } catch (err: any) {
       newLogs.push(`[ERROR] Transaction aborted: ${err.message}`);
       newLogs.push('[ROLLBACK] session.abortTransaction() - MongoDB rolled back safely.');
-      
+
       set((state) => ({
         transactionLogs: [...newLogs, ...state.transactionLogs]
       }));

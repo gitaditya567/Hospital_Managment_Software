@@ -6,14 +6,14 @@ import { Modal } from '../../components/ui/Modal';
 import { Key, AlertTriangle, Trash2, ShieldX, Clipboard } from 'lucide-react';
 
 export function SuperAdminLicenses() {
-  const { 
-    licenses, 
-    plans, 
-    tenants, 
-    searchQuery, 
-    generateLicense, 
-    revokeLicense, 
-    deleteLicense 
+  const {
+    licenses,
+    plans,
+    tenants,
+    searchQuery,
+    generateLicense,
+    revokeLicense,
+    deleteLicense
   } = useSuperAdminStore();
 
   const [isModalOpen, setModalOpen] = useState(false);
@@ -41,25 +41,25 @@ export function SuperAdminLicenses() {
   const filteredLicenses = licenses.filter(lic => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
-    
+
     const planName = plans.find(p => p.id === lic.planId)?.name.toLowerCase() || '';
-    const hospitalName = lic.activatedByHospitalId 
+    const hospitalName = lic.activatedByHospitalId
       ? tenants.find(t => t.id === lic.activatedByHospitalId)?.hospitalName.toLowerCase() || ''
       : '';
 
-    return lic.code.toLowerCase().includes(query) || 
-           planName.includes(query) || 
-           hospitalName.includes(query);
+    return lic.code.toLowerCase().includes(query) ||
+      planName.includes(query) ||
+      hospitalName.includes(query);
   });
 
   const columns = [
-    { 
-      key: 'code', 
+    {
+      key: 'code',
       header: 'License Code',
       render: (item: LicenseCode) => (
         <div className="flex items-center gap-2 font-mono font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg w-fit text-xs">
           <span>{item.code}</span>
-          <button 
+          <button
             onClick={() => copyCode(item.code)}
             className="text-slate-400 hover:text-blue-600 transition-colors"
             title="Copy Code"
@@ -69,8 +69,8 @@ export function SuperAdminLicenses() {
         </div>
       )
     },
-    { 
-      key: 'planId', 
+    {
+      key: 'planId',
       header: 'Plan Type',
       render: (item: LicenseCode) => {
         const plan = plans.find(p => p.id === item.planId);
@@ -82,8 +82,8 @@ export function SuperAdminLicenses() {
         );
       }
     },
-    { 
-      key: 'status', 
+    {
+      key: 'status',
       header: 'License Status',
       render: (item: LicenseCode) => {
         const styles = {
@@ -98,8 +98,8 @@ export function SuperAdminLicenses() {
         );
       }
     },
-    { 
-      key: 'activatedByHospitalId', 
+    {
+      key: 'activatedByHospitalId',
       header: 'Assigned Hospital / Tenant',
       render: (item: LicenseCode) => {
         if (!item.isUsed || !item.activatedByHospitalId) {
@@ -116,14 +116,14 @@ export function SuperAdminLicenses() {
         );
       }
     },
-    { 
-      key: 'actions', 
+    {
+      key: 'actions',
       header: 'Administration Actions',
       render: (item: LicenseCode) => (
         <div className="flex items-center gap-1">
           {item.status === 'Active' && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 if (confirm(`CRITICAL: Revoking license ${item.code} will immediately suspend the associated hospital and cut off login access for all their doctors, receptionist and clinical staff. Proceed?`)) {
                   revokeLicense(item.code);
@@ -134,8 +134,8 @@ export function SuperAdminLicenses() {
               <ShieldX size={13} /> Revoke / Suspend
             </Button>
           )}
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => {
               if (confirm('Permanently delete this license record from the MongoDB store?')) {
                 deleteLicense(item.code);
@@ -160,8 +160,8 @@ export function SuperAdminLicenses() {
           </h1>
           <p className="text-slate-500">Generate secure offline cryptographic license keys for manual hospital registrations</p>
         </div>
-        <Button onClick={() => setModalOpen(true)} className="shadow-lg shadow-blue-500/10">
-          + Generate New License
+        <Button onClick={() => setModalOpen(true)} className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center">
+          <span className="text-base leading-none">+</span> Generate New License
         </Button>
       </div>
 
@@ -193,7 +193,7 @@ export function SuperAdminLicenses() {
         <form onSubmit={handleGenerate} className="space-y-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Select Subscription Tier</label>
-            <select 
+            <select
               value={selectedPlanId}
               onChange={(e) => setSelectedPlanId(e.target.value)}
               className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -208,7 +208,7 @@ export function SuperAdminLicenses() {
 
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Validity Duration (Months)</label>
-            <select 
+            <select
               value={validityMonths}
               onChange={(e) => setValidityMonths(Number(e.target.value))}
               className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -240,16 +240,16 @@ export function SuperAdminLicenses() {
               </div>
 
               <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => copyCode(newCodeGenerated)}
                   className="flex-1 text-xs"
                 >
                   Copy String
                 </Button>
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={handleClose}
                   className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700"
                 >

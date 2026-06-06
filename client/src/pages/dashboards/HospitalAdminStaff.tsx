@@ -115,9 +115,9 @@ export function HospitalAdminStaff() {
             Provision user accounts and control clinical/administrative node permissions.
           </p>
         </div>
-        <Button 
+        <Button
           onClick={handleOpenDrawer}
-          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md shadow-blue-500/10 px-5 py-2.5 font-semibold text-sm transition-all"
+          className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center"
         >
           <UserPlus size={16} /> Add New Staff
         </Button>
@@ -199,7 +199,7 @@ export function HospitalAdminStaff() {
                     <td className="px-6 py-4 text-right flex justify-end gap-1">
                       <button
                         onClick={() => handleOpenEditDrawer(member)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                         title="Edit Employee Credentials"
                       >
                         <Edit size={16} />
@@ -210,7 +210,7 @@ export function HospitalAdminStaff() {
                             deleteStaff(member.id);
                           }
                         }}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
                         title="Revoke Credentials"
                       >
                         <Trash2 size={16} />
@@ -229,8 +229,8 @@ export function HospitalAdminStaff() {
         <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
           <div className="absolute inset-0 overflow-hidden">
             {/* Backdrop slide-in */}
-            <div 
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out" 
+            <div
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
               onClick={() => setIsDrawerOpen(false)}
             />
 
@@ -238,7 +238,7 @@ export function HospitalAdminStaff() {
               {/* Drawer content sliding panel */}
               <div className="pointer-events-auto w-screen max-w-md transform transition-all duration-300 ease-in-out translate-x-0">
                 <div className="flex h-full flex-col overflow-y-scroll bg-white py-6 shadow-2xl border-l border-slate-200 animate-in slide-in-from-right duration-300">
-                  
+
                   {/* Header */}
                   <div className="px-6 border-b border-slate-100 pb-5 flex justify-between items-center">
                     <div className="space-y-1">
@@ -247,9 +247,9 @@ export function HospitalAdminStaff() {
                       </h2>
                       <p className="text-xs text-slate-400">{editingStaffId ? 'Modify active staff permissions and metadata.' : 'Generate fresh access credentials instantly.'}</p>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setIsDrawerOpen(false)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                      className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
                     >
                       <X size={20} />
                     </button>
@@ -339,7 +339,7 @@ export function HospitalAdminStaff() {
                       {/* Role Dropdown */}
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider font-sans">Access Permission Role</label>
-                        <select 
+                        <select
                           value={role}
                           onChange={(e) => setRole(e.target.value as any)}
                           className="w-full h-10 border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
@@ -357,7 +357,7 @@ export function HospitalAdminStaff() {
                           <label className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
                             <Stethoscope size={14} className="text-blue-600" /> Specialty Department
                           </label>
-                          <select 
+                          <select
                             value={specialization}
                             onChange={(e) => setSpecialization(e.target.value)}
                             className="w-full h-10 border border-blue-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all mt-1.5"
@@ -374,9 +374,9 @@ export function HospitalAdminStaff() {
                       )}
 
                       <div className="pt-6">
-                        <Button 
-                          type="submit" 
-                          className="w-full h-11 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 hover:translate-y-[-1px] transition-all"
+                        <Button
+                          type="submit"
+                          className="w-full h-11 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold text-sm shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 hover:translate-y-[-1px] transition-all"
                         >
                           {editingStaffId ? 'Update Credentials & Save' : 'Save & Send Credentials'}
                         </Button>

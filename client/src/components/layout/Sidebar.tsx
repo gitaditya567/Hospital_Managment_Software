@@ -78,7 +78,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Mobile Backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
+          className="fixed inset-0 z-40 bg-black/50 md:hidden animate-fade-in" 
           onClick={onClose}
         />
       )}
@@ -86,13 +86,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside 
         className={cn(
-          "fixed top-0 left-0 z-50 h-screen w-64 bg-white text-slate-600 border-r border-slate-100/90 shadow-[4px_0_24px_rgba(0,0,0,0.015)] transition-transform duration-300 ease-in-out md:translate-x-0 md:static flex flex-col",
+          "fixed top-0 left-0 z-50 h-screen w-64 bg-gradient-to-b from-teal-50/80 via-white to-blue-50/50 text-slate-700 border-r border-teal-100/60 shadow-[4px_0_24px_rgba(13,148,136,0.02)] backdrop-blur-md transition-transform duration-300 ease-in-out md:translate-x-0 md:static flex flex-col",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="h-16 flex items-center px-6 bg-white text-slate-800 font-extrabold tracking-tight border-b border-slate-100/60">
-          <span className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white h-8 w-8 rounded-xl flex items-center justify-center font-extrabold text-base shadow-md shadow-blue-500/20 mr-3">✚</span>
-          <span className="bg-gradient-to-r from-slate-800 to-slate-950 bg-clip-text text-transparent text-lg font-black tracking-tight">MediSaaS</span>
+        <div className="h-16 flex items-center px-6 bg-white border-b border-teal-50 text-slate-800 font-extrabold tracking-tight">
+          <span className="bg-gradient-to-br from-teal-400 to-cyan-500 text-white h-9 w-9 rounded-2xl flex items-center justify-center font-extrabold text-base shadow-[0_0_15px_rgba(20,184,166,0.3)] animate-heartbeat mr-3">✚</span>
+          <span className="bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent text-lg font-black tracking-tight text-glow-teal">MediSaaS</span>
         </div>
         <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1.5">
           {links.map((link) => {
@@ -106,17 +106,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 className={({ isActive }) => cn(
                   "flex items-center px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 group border border-transparent",
                   isActive 
-                    ? "bg-gradient-to-r from-blue-50 to-indigo-50/50 text-blue-600 border-blue-100/40 shadow-sm" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-[2px]"
+                    ? "bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/20 border-teal-400/20" 
+                    : "text-slate-600 hover:bg-teal-50/50 hover:text-teal-700 hover:translate-x-[4px]"
                 )}
               >
-                <Icon size={18} className="mr-3 opacity-70 group-hover:opacity-100 transition-opacity" />
+                <Icon size={18} className="mr-3 opacity-70 group-hover:opacity-100 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300" />
                 {link.label}
               </NavLink>
             );
           })}
         </nav>
-        <div className="p-4 bg-white border-t border-slate-100/60 flex items-center justify-center">
+        <div className="p-4 bg-white/60 border-t border-teal-50/60 flex flex-col gap-2 items-center justify-center">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-[9px] text-emerald-800 font-extrabold justify-center w-full shadow-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+            <span>CLINICAL CONNECTED</span>
+          </div>
           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider bg-slate-50 border border-slate-100 px-3 py-1 rounded-full">v1.0.0 Premium</div>
         </div>
       </aside>

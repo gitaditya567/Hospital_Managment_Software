@@ -34,13 +34,13 @@ export function PharmacyOrders() {
     { key: 'rxCode', header: 'RX Code' },
     { key: 'patientName', header: 'Patient Name' },
     { key: 'patientPhone', header: 'Patient Phone' },
-    { 
-      key: 'total', 
+    {
+      key: 'total',
       header: 'Total Bill',
       render: (item: PharmacyBill) => <span className="font-extrabold text-blue-600 font-mono">₹{item.total.toFixed(2)}</span>
     },
-    { 
-      key: 'paymentMode', 
+    {
+      key: 'paymentMode',
       header: 'Payment Mode',
       render: (item: PharmacyBill) => (
         <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded text-[9px] uppercase font-mono">
@@ -49,18 +49,18 @@ export function PharmacyOrders() {
       )
     },
     { key: 'date', header: 'Date Processed' },
-    { 
-      key: 'action', 
+    {
+      key: 'action',
       header: 'Receipt',
       render: (item: PharmacyBill) => (
-        <Button 
-          size="sm" 
-          variant="outline" 
+        <Button
+          size="sm"
+          variant="outline"
           onClick={() => {
             setSelectedBill(item);
             setIsModalOpen(true);
           }}
-          className="h-7 text-[10px] rounded-lg flex items-center gap-1 font-bold"
+          className="h-7 text-[10px] rounded-full flex items-center gap-1 font-bold"
         >
           <FileText size={12} /> Reprint Slip
         </Button>
@@ -70,7 +70,7 @@ export function PharmacyOrders() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      
+
       {/* Title */}
       <div className="flex justify-between items-center">
         <div>
@@ -97,10 +97,10 @@ export function PharmacyOrders() {
       {isModalOpen && selectedBill && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Thermal Bill Receipt Reprint">
           <div className="p-4 flex flex-col items-center">
-            
+
             {/* 3-inch Print Slip Mock */}
-            <div 
-              id="pharmacy-thermal-slip" 
+            <div
+              id="pharmacy-thermal-slip"
               className="bg-white border shadow-sm text-slate-800 transition-all duration-250 max-h-[380px] overflow-y-auto"
               style={{
                 width: printSettings.paperSize === 'A4' ? '260px' : '190px',
@@ -120,7 +120,7 @@ export function PharmacyOrders() {
                   <p className="text-[7px] text-slate-400">DUPLICATE RECEIPT</p>
                 </div>
               )}
-              
+
               <div className="space-y-1 mb-2 text-[8px] text-slate-600 border-b border-dashed border-slate-350 pb-1.5 mt-2">
                 <div>BILL ID: <span className="text-slate-800 font-bold">{selectedBill.id}</span></div>
                 <div>RX CODE: <span className="text-slate-800 font-bold">{selectedBill.rxCode}</span></div>
@@ -176,92 +176,93 @@ export function PharmacyOrders() {
 
             <div className="mt-6 flex justify-end gap-3 w-full border-t border-slate-100 pt-4">
               <Button variant="outline" onClick={() => setIsModalOpen(false)}>Close Slip</Button>
-              <Button 
-                className="flex gap-2" 
+              <Button
+                className="flex gap-2"
                 onClick={() => {
-                  const headerTitle = printSettings.showHeader 
+                  const headerTitle = printSettings.showHeader
                     ? `<div class="text-center pb-2 dashed-divider">
-                         ${printSettings.logoUrl ? `<div style="text-align: center; margin-bottom: 6px;"><img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
-                         <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || 'MediSaaS Pharmacy Wing'}</h3>
-                         <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Pharmacy Checkout Invoice</p>
-                         <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">DUPLICATE RECEIPT</p>
-                       </div>`
-                    : '';
+                         ${printSettings.logoUrl ? `< div style = "text-align: center; margin-bottom: 6px;" > <img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
+            <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || 'MediSaaS Pharmacy Wing'}</h3>
+            <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Pharmacy Checkout Invoice</p>
+            <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">DUPLICATE RECEIPT</p>
+          </div>`
+          : '';
 
-                  const footerContent = printSettings.showFooter
-                    ? `<div class="text-center pt-3 dashed-divider">
-                         <div class="barcode-container brand-accent-bg">||||| ${selectedBill.id} |||||</div>
-                         <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase;">
-                           ${printSettings.customFooterText || 'Reprinted duplicate slip. Powered by MediSaaS.'}
-                         </p>
-                       </div>`
-                    : '';
+          const footerContent = printSettings.showFooter
+          ? `<div class="text-center pt-3 dashed-divider">
+            <div class="barcode-container brand-accent-bg">||||| ${selectedBill.id} |||||</div>
+            <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase;">
+              ${printSettings.customFooterText || 'Reprinted duplicate slip. Powered by MediSaaS.'}
+            </p>
+          </div>`
+          : '';
 
                   const itemsHtml = selectedBill.items.map((item: any) => `
-                    <tr style="border-bottom: 1px solid #e2e8f0; font-size: 0.9em;">
-                      <td style="padding: 4px 0; text-align: left; font-weight: bold;">${item.name}</td>
-                      <td style="padding: 4px 0; text-align: center;">${item.qty}</td>
-                      <td style="padding: 4px 0; text-align: right; font-weight: bold;">₹${(item.qty * item.price).toFixed(2)}</td>
-                    </tr>
-                  `).join('');
+          <tr style="border-bottom: 1px solid #e2e8f0; font-size: 0.9em;">
+            <td style="padding: 4px 0; text-align: left; font-weight: bold;">${item.name}</td>
+            <td style="padding: 4px 0; text-align: center;">${item.qty}</td>
+            <td style="padding: 4px 0; text-align: right; font-weight: bold;">₹${(item.qty * item.price).toFixed(2)}</td>
+          </tr>
+          `).join('');
 
-                  const slipHtml = `
-                    <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
-                      ${headerTitle}
+          const slipHtml = `
+          <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
+            ${headerTitle}
 
-                      <div style="font-size: 0.85em; margin-bottom: 6px;">
-                        <div>BILL ID: <strong>${selectedBill.id}</strong></div>
-                        <div>RX CODE: <strong>${selectedBill.rxCode}</strong></div>
-                        <div>PATIENT: <strong>${selectedBill.patientName}</strong></div>
-                        <div>PHONE: <strong>${selectedBill.patientPhone}</strong></div>
-                        <div>DOCTOR: <strong>Dr. ${selectedBill.doctorName}</strong></div>
-                        <div>DATE/TIME: <strong>${selectedBill.date}</strong></div>
-                      </div>
-
-                      <div class="dashed-divider"></div>
-
-                      <table>
-                        <thead>
-                          <tr>
-                            <th style="text-align: left;">Item</th>
-                            <th style="text-align: center; width: 40px;">Qty</th>
-                            <th style="text-align: right; width: 80px;">Subtotal</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          ${itemsHtml}
-                        </tbody>
-                      </table>
-
-                      <div class="dashed-divider"></div>
-
-                      <div style="font-size: 0.9em; font-weight: bold;">
-                        <div class="flex justify-between" style="font-size: 1.1em; font-weight: 900; margin-top: 4px;">
-                          <span>GRAND TOTAL:</span>
-                          <span class="brand-accent-text">₹${selectedBill.total.toFixed(2)}</span>
-                        </div>
-                        <div class="flex justify-between" style="font-size: 0.85em; color: #475569; margin-top: 4px;">
-                          <span>PAYMENT MODE:</span>
-                          <span>${selectedBill.paymentMode}</span>
-                        </div>
-                      </div>
-
-                      ${footerContent}
-                    </div>
-                  `;
-
-                  printIsolatedHtml("Pharmacy Bill Receipt", slipHtml);
-                  setIsModalOpen(false);
-                }}
-              >
-                <Printer size={16} /> Execute Print
-              </Button>
+            <div style="font-size: 0.85em; margin-bottom: 6px;">
+              <div>BILL ID: <strong>${selectedBill.id}</strong></div>
+              <div>RX CODE: <strong>${selectedBill.rxCode}</strong></div>
+              <div>PATIENT: <strong>${selectedBill.patientName}</strong></div>
+              <div>PHONE: <strong>${selectedBill.patientPhone}</strong></div>
+              <div>DOCTOR: <strong>Dr. ${selectedBill.doctorName}</strong></div>
+              <div>DATE/TIME: <strong>${selectedBill.date}</strong></div>
             </div>
 
-          </div>
-        </Modal>
-      )}
+            <div class="dashed-divider"></div>
 
-    </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align: left;">Item</th>
+                  <th style="text-align: center; width: 40px;">Qty</th>
+                  <th style="text-align: right; width: 80px;">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div class="dashed-divider"></div>
+
+            <div style="font-size: 0.9em; font-weight: bold;">
+              <div class="flex justify-between" style="font-size: 1.1em; font-weight: 900; margin-top: 4px;">
+                <span>GRAND TOTAL:</span>
+                <span class="brand-accent-text">₹${selectedBill.total.toFixed(2)}</span>
+              </div>
+              <div class="flex justify-between" style="font-size: 0.85em; color: #475569; margin-top: 4px;">
+                <span>PAYMENT MODE:</span>
+                <span>${selectedBill.paymentMode}</span>
+              </div>
+            </div>
+
+            ${footerContent}
+          </div>
+          `;
+
+          printIsolatedHtml("Pharmacy Bill Receipt", slipHtml);
+          setIsModalOpen(false);
+                }}
+              >
+          <Printer size={16} /> Execute Print
+        </Button>
+            </div>
+
+          </div >
+        </Modal >
+      )
+}
+
+    </div >
   );
 }

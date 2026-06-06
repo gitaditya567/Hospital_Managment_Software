@@ -90,16 +90,16 @@ export function SuperAdminPlans() {
           </h1>
           <p className="text-slate-500">Configure SaaS pricing tiers, limits, and feature flags</p>
         </div>
-        <Button onClick={openAddModal} className="shadow-lg shadow-blue-500/10">
-          + Create New Tier
+        <Button onClick={openAddModal} className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center">
+          <span className="text-base leading-none">+</span> Create New Tier
         </Button>
       </div>
 
       {/* Plan Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => (
-          <div 
-            key={plan.id} 
+          <div
+            key={plan.id}
             className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between group"
           >
             {/* Header */}
@@ -109,23 +109,23 @@ export function SuperAdminPlans() {
                   {plan.durationMonths === 12 ? 'Annual' : plan.durationMonths === 1 ? 'Monthly' : `${plan.durationMonths} Months`}
                 </span>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
+                  <button
                     onClick={() => openEditModal(plan)}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-full transition-colors"
                     title="Edit Plan"
                   >
                     <Edit size={16} />
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDelete(plan.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-50 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-50 rounded-full transition-colors"
                     title="Delete Plan"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
               </div>
-              
+
               <h3 className="text-xl font-bold text-slate-800 mb-1">{plan.name}</h3>
               <div className="flex items-baseline gap-1 my-3">
                 <span className="text-3xl font-extrabold text-slate-900">₹{plan.price.toLocaleString('en-IN')}</span>
@@ -136,7 +136,7 @@ export function SuperAdminPlans() {
             {/* Limits & Feature Flags */}
             <div className="p-6 border-t border-slate-50 bg-slate-50/50 mt-4 space-y-4 flex-1">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Hard Database Limits</p>
-              
+
               <div className="flex items-center gap-3 text-sm text-slate-600">
                 <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                   <Users size={16} />
@@ -204,18 +204,18 @@ export function SuperAdminPlans() {
       </div>
 
       {/* Modal - Plan Builder Form */}
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setModalOpen(false)}
         title={editingPlan ? 'Configure Subscription Tier' : 'Create Subscription Tier'}
         className="max-w-lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Plan Tier Name</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Basic Plan, Pro Plan, Enterprise Plus" 
+            <input
+              type="text"
+              placeholder="e.g. Basic Plan, Pro Plan, Enterprise Plus"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -228,8 +228,8 @@ export function SuperAdminPlans() {
               <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Base Price (INR / Year)</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">₹</span>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   min="0"
                   required
                   value={price}
@@ -241,7 +241,7 @@ export function SuperAdminPlans() {
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Plan Duration</label>
-              <select 
+              <select
                 value={durationMonths}
                 onChange={(e) => setDurationMonths(Number(e.target.value))}
                 className="w-full h-10 px-3 border border-slate-200 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -262,8 +262,8 @@ export function SuperAdminPlans() {
               <div className="space-y-1.5">
                 <label className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-tight">Doctor Limit</label>
                 <div className="flex flex-col gap-1.5">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
                     disabled={isUnlimitedDoctors}
                     value={maxDoctors}
@@ -271,8 +271,8 @@ export function SuperAdminPlans() {
                     className="w-full h-9 px-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
                   <label className="flex items-center gap-1 text-xs text-slate-600 cursor-pointer select-none">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={isUnlimitedDoctors}
                       onChange={(e) => setIsUnlimitedDoctors(e.target.checked)}
                       className="rounded text-blue-600 border-slate-300 focus:ring-blue-500"
@@ -286,8 +286,8 @@ export function SuperAdminPlans() {
               <div className="space-y-1.5">
                 <label className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-tight">Receptionist Limit</label>
                 <div className="flex flex-col gap-1.5">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
                     disabled={isUnlimitedReceptionists}
                     value={maxReceptionists}
@@ -295,8 +295,8 @@ export function SuperAdminPlans() {
                     className="w-full h-9 px-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
                   <label className="flex items-center gap-1 text-xs text-slate-600 cursor-pointer select-none">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={isUnlimitedReceptionists}
                       onChange={(e) => setIsUnlimitedReceptionists(e.target.checked)}
                       className="rounded text-blue-600 border-slate-300 focus:ring-blue-500"
@@ -310,8 +310,8 @@ export function SuperAdminPlans() {
               <div className="space-y-1.5">
                 <label className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-tight">Pharmacist Limit</label>
                 <div className="flex flex-col gap-1.5">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
                     disabled={isUnlimitedPharmacists}
                     value={maxPharmacists}
@@ -319,8 +319,8 @@ export function SuperAdminPlans() {
                     className="w-full h-9 px-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
                   <label className="flex items-center gap-1 text-xs text-slate-600 cursor-pointer select-none">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={isUnlimitedPharmacists}
                       onChange={(e) => setIsUnlimitedPharmacists(e.target.checked)}
                       className="rounded text-blue-600 border-slate-300 focus:ring-blue-500"
@@ -335,8 +335,8 @@ export function SuperAdminPlans() {
             <div className="space-y-1 mt-2">
               <label className="text-xs font-medium text-slate-600">Max Cloud Storage (GB)</label>
               <div className="relative">
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   min="1"
                   required
                   value={maxStorage}

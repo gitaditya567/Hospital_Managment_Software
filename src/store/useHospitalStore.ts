@@ -74,22 +74,22 @@ interface HospitalState {
   invoices: PatientInvoice[];
   hospitalName: string;
   loading: boolean;
-  
+
   // Actions
   fetchHospitalData: (hospitalId: string) => Promise<void>;
   addStaff: (member: Omit<StaffMember, 'id' | 'status'> & { password?: string }) => Promise<{ success: boolean; error?: string }>;
   toggleStaffStatus: (id: string) => Promise<void>;
   deleteStaff: (id: string) => Promise<void>;
   updateStaff: (id: string, updates: Partial<StaffMember> & { password?: string }) => Promise<{ success: boolean; error?: string }>;
-  
+
   addDepartment: (name: string, head?: string, extras?: { beds?: string; staffAssigned?: string }) => Promise<void>;
   deleteDepartment: (id: string) => Promise<void>;
   updateDepartment: (id: string, updates: Partial<Department>) => Promise<void>;
-  
+
   addSchedule: (schedule: Omit<DoctorSchedule, 'id'>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
   updateSchedule: (id: string, updates: Partial<DoctorSchedule>) => Promise<void>;
-  
+
   updateFees: (fees: Partial<StandardFees>) => Promise<void>;
   registerPatient: (patient: Omit<PatientRecord, 'id' | 'tokenNumber' | 'timeRegistered' | 'status'>) => Promise<PatientRecord>;
   updatePatientStatus: (patientId: string, status: PatientRecord['status']) => Promise<void>;
@@ -363,7 +363,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
 
       const data = await response.json();
       await get().fetchHospitalData(hospitalId);
-      
+
       const created: PatientRecord = {
         id: data._id || data.id,
         patientNo: data.patientNo,
@@ -379,7 +379,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
         vitals: data.vitals || [],
         pastDiagnoses: data.pastDiagnoses || ''
       };
-      
+
       return created;
     } catch (err) {
       console.error('Failed to register patient', err);

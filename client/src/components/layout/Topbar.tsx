@@ -49,7 +49,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   // Compute alerts (failed payments, expiring licenses, suspended accounts for Super Admin, or Tenant-specific alerts for Hospital Admin)
   const systemAlerts = React.useMemo(() => {
     const alerts: Array<{ id: string; text: string; time: string; type: 'error' | 'warning' }> = [];
-    
+
     if (user?.role === 'SUPER_ADMIN') {
       // Failed payment alerts
       activities
@@ -97,7 +97,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         if (tenant) {
           const diffTime = new Date(tenant.subscriptionExpiryDate).getTime() - new Date().getTime();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
+
           if (diffDays <= 0) {
             alerts.push({
               id: 'hosp-alert-expired',
@@ -115,7 +115,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           }
         }
       }
-      
+
       // Stock warning alert
       alerts.push({
         id: 'hosp-alert-stock',
@@ -137,39 +137,39 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   }, [activities, licenses, tenants, user]);
 
   return (
-    <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 lg:px-8 z-30 sticky top-0 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.015)]">
+    <header className="h-16 bg-white/80 backdrop-blur-md border-b border-teal-100/40 flex items-center justify-between px-4 lg:px-8 z-30 sticky top-0 shadow-[0_2px_18px_-4px_rgba(13,148,136,0.03)]">
       <div className="flex items-center flex-1 min-w-0 mr-4 gap-3">
-        <button 
+        <button
           onClick={onMenuClick}
-          className="md:hidden p-2 -ml-2 mr-2 text-slate-500 hover:bg-slate-50 rounded-xl shrink-0 transition-colors"
+          className="md:hidden p-2 -ml-2 mr-2 text-slate-500 hover:bg-teal-50 rounded-full shrink-0 transition-colors"
         >
           <Menu size={20} />
         </button>
 
-        <h1 className="text-sm font-extrabold text-slate-800 hidden sm:block bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mr-3 shrink-0 max-w-[160px] lg:max-w-[240px] truncate uppercase tracking-wider">
+        <h1 className="text-sm font-extrabold text-slate-800 hidden sm:block bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mr-3 shrink-0 max-w-[160px] lg:max-w-[240px] truncate uppercase tracking-wider text-glow-teal">
           {hospitalName}
         </h1>
 
         {(isSuperAdmin || user?.role === 'HOSPITAL_ADMIN' || user?.role === 'RECEPTIONIST') && (
           <div className="relative w-full max-w-[180px] lg:max-w-xs hidden md:block shrink">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-teal-500">
               <Search size={14} />
             </div>
             <input
               type="text"
               placeholder={
-                isSuperAdmin 
-                  ? "Search by Hospital, License..." 
+                isSuperAdmin
+                  ? "Search by Hospital, License..."
                   : user?.role === 'RECEPTIONIST'
-                  ? "Universal Search: Type phone or name..."
-                  : "Search staff, patient or phone..."
+                    ? "Universal Search: Type phone or name..."
+                    : "Search staff, patient or phone..."
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-9 pr-3 py-2 border border-slate-100 rounded-xl text-xs bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.005)]"
+              className="block w-full pl-9 pr-3 py-2 border border-teal-100/60 rounded-xl text-xs bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-250 shadow-[0_2px_8px_-2px_rgba(13,148,136,0.05)] focus:shadow-[0_4px_16px_-4px_rgba(13,148,136,0.1)]"
             />
             {searchQuery && (
-              <button 
+              <button
                 onClick={() => setSearchQuery('')}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
               >
@@ -185,7 +185,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             {doctors.map(doc => {
               const isActive = doc.status === 'Active';
               return (
-                <span 
+                <span
                   key={doc.id}
                   className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${
                     isActive 
@@ -205,9 +205,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="flex items-center space-x-2 sm:space-x-3">
         {/* Notifications Popover */}
         <div className="relative" ref={dropdownRef}>
-          <button 
+          <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all duration-200 active:scale-95 relative"
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all duration-200 active:scale-95 relative"
           >
             <Bell size={18} />
             {systemAlerts.length > 0 && (
@@ -249,21 +249,21 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             </div>
           )}
         </div>
-        
-        <div className="flex items-center space-x-2.5 border-l border-slate-100 pl-3.5">
+
+        <div className="flex items-center space-x-3.5 border-l border-slate-100/60 pl-3.5">
           <div className="hidden sm:block text-right">
-            <p className="text-xs font-bold text-slate-700 leading-none">{user?.name || 'User'}</p>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">{user?.role?.replace('_', ' ').toLowerCase()}</p>
+            <p className="text-xs font-extrabold text-slate-800 leading-tight">{user?.name || 'User'}</p>
+            <p className="text-[9px] text-slate-450 font-bold uppercase tracking-widest mt-0.5">{user?.role?.replace('_', ' ')}</p>
           </div>
-          <div className="h-9.5 w-9.5 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 flex items-center justify-center border border-blue-100/50 font-bold text-sm shadow-[0_2px_8px_-2px_rgba(37,99,235,0.05)]">
-            {user?.name ? user.name.charAt(0) : <User size={16} />}
+          <div className="w-[34px] h-[34px] bg-[#82E0DF] text-white flex items-center justify-center font-black text-[13px] rounded-full shrink-0 shadow-sm relative">
+            {user?.name ? user.name.charAt(0) : <User size={13} />}
           </div>
-          <button 
+          <button
             onClick={handleLogout}
-            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-200 active:scale-95 ml-1"
+            className="p-1.5 text-slate-400 hover:text-rose-650 hover:bg-rose-50/50 rounded-lg transition-all duration-200 active:scale-95 ml-0.5"
             title="Logout"
           >
-            <LogOut size={16} />
+            <LogOut size={16} className="stroke-[2.2px]" />
           </button>
         </div>
       </div>

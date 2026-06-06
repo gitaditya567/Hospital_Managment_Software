@@ -6,15 +6,15 @@ import { Modal } from '../../components/ui/Modal';
 import { Building2, Eye, Mail, MapPin, HardDrive, Users, Edit, Trash2, Calendar, Award } from 'lucide-react';
 
 export function SuperAdminHospitals() {
-  const { 
-    tenants, 
-    licenses, 
-    plans, 
-    searchQuery, 
-    onboardHospital, 
+  const {
+    tenants,
+    licenses,
+    plans,
+    searchQuery,
+    onboardHospital,
     updateTenant,
     deleteTenant,
-    toggleTenantStatus 
+    toggleTenantStatus
   } = useSuperAdminStore();
 
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
@@ -42,9 +42,9 @@ export function SuperAdminHospitals() {
   const filteredTenants = tenants.filter(t => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
-    return t.hospitalName.toLowerCase().includes(query) || 
-           t.adminEmail.toLowerCase().includes(query) || 
-           t.licenseCodeUsed.toLowerCase().includes(query);
+    return t.hospitalName.toLowerCase().includes(query) ||
+      t.adminEmail.toLowerCase().includes(query) ||
+      t.licenseCodeUsed.toLowerCase().includes(query);
   });
 
   // Filter unused licenses for onboarding form dropdown
@@ -104,7 +104,7 @@ export function SuperAdminHospitals() {
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTenant) return;
-    
+
     updateTenant(selectedTenant.id, {
       hospitalName: editHospitalName,
       adminEmail: editAdminEmail,
@@ -112,7 +112,7 @@ export function SuperAdminHospitals() {
       subscriptionExpiryDate: editSubscriptionExpiryDate,
       planId: editPlanId
     });
-    
+
     setIsEditModalOpen(false);
     setSelectedTenant(null);
   };
@@ -125,9 +125,9 @@ export function SuperAdminHospitals() {
     if (confirm(`SECURITY ALERT: Are you sure you want to ${actionText} "${tenant.hospitalName}"? \n\nSuspension instantly revokes SaaS access for all doctors, nurses, receptionists, and hospital administrators under this tenant database.`)) {
       toggleTenantStatus(tenantId);
       if (selectedTenant && selectedTenant.id === tenantId) {
-        setSelectedTenant({ 
-          ...selectedTenant, 
-          status: tenant.status === 'Active' ? 'Suspended' : 'Active' 
+        setSelectedTenant({
+          ...selectedTenant,
+          status: tenant.status === 'Active' ? 'Suspended' : 'Active'
         });
       }
     }
@@ -153,8 +153,8 @@ export function SuperAdminHospitals() {
   };
 
   const columns = [
-    { 
-      key: 'hospitalName', 
+    {
+      key: 'hospitalName',
       header: 'Hospital Name',
       render: (item: Tenant) => (
         <div>
@@ -163,15 +163,15 @@ export function SuperAdminHospitals() {
         </div>
       )
     },
-    { 
-      key: 'adminEmail', 
+    {
+      key: 'adminEmail',
       header: 'Admin Email',
       render: (item: Tenant) => (
         <span className="text-slate-600 text-xs font-medium">{item.adminEmail}</span>
       )
     },
-    { 
-      key: 'planId', 
+    {
+      key: 'planId',
       header: 'Subscribed Plan',
       render: (item: Tenant) => {
         const plan = plans.find(p => p.id === item.planId);
@@ -180,8 +180,8 @@ export function SuperAdminHospitals() {
         );
       }
     },
-    { 
-      key: 'subscriptionExpiryDate', 
+    {
+      key: 'subscriptionExpiryDate',
       header: 'Plan Expiration',
       render: (item: Tenant) => {
         const isExpired = new Date(item.subscriptionExpiryDate).getTime() < new Date().getTime();
@@ -192,8 +192,8 @@ export function SuperAdminHospitals() {
         );
       }
     },
-    { 
-      key: 'status', 
+    {
+      key: 'status',
       header: 'SaaS Status',
       render: (item: Tenant) => {
         const styles = {
@@ -208,29 +208,29 @@ export function SuperAdminHospitals() {
         );
       }
     },
-    { 
-      key: 'actions', 
+    {
+      key: 'actions',
       header: 'Administration Controls',
       render: (item: Tenant) => (
         <div className="flex items-center gap-1">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setSelectedTenant(item)}
             className="h-8 py-0 px-2 text-[11px] text-slate-600 hover:text-blue-600 border-slate-200 hover:border-blue-200 flex items-center gap-1"
             title="Telemetry Detail"
           >
             <Eye size={13} /> View
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => openEditModal(item)}
             className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 border-slate-200 hover:border-blue-200 flex items-center justify-center"
             title="Edit Profile"
           >
             <Edit size={13} />
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => handleToggleStatus(item.id)}
             className={`h-8 py-0 px-2 text-[11px] font-semibold flex items-center gap-1 ${
               item.status === 'Active' 
@@ -240,8 +240,8 @@ export function SuperAdminHospitals() {
           >
             {item.status === 'Active' ? 'Suspend' : 'Active'}
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => handleDeleteTenant(item.id)}
             className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 border-slate-200 hover:border-rose-200 flex items-center justify-center"
             title="Delete Tenant"
@@ -262,8 +262,8 @@ export function SuperAdminHospitals() {
           </h1>
           <p className="text-slate-500">Inspect registered clinics database status, telemetry capacity and access switches</p>
         </div>
-        <Button onClick={() => setIsOnboardModalOpen(true)} className="shadow-lg shadow-blue-500/10">
-          + Onboard New Hospital
+        <Button onClick={() => setIsOnboardModalOpen(true)} className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center">
+          <span className="text-base leading-none">+</span> Onboard New Hospital
         </Button>
       </div>
 
@@ -280,9 +280,9 @@ export function SuperAdminHospitals() {
       </div>
 
       {/* Detailed Modal */}
-      <Modal 
-        isOpen={selectedTenant !== null && !isEditModalOpen} 
-        onClose={() => setSelectedTenant(null)} 
+      <Modal
+        isOpen={selectedTenant !== null && !isEditModalOpen}
+        onClose={() => setSelectedTenant(null)}
         title="Tenant Registry Telemetry"
         className="max-w-lg"
       >
@@ -306,7 +306,7 @@ export function SuperAdminHospitals() {
             {/* General Info */}
             <div className="space-y-3.5">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">General Information</h4>
-              
+
               <div className="flex items-center gap-3 text-xs text-slate-600">
                 <Mail size={16} className="text-slate-400 shrink-0" />
                 <div>
@@ -327,7 +327,7 @@ export function SuperAdminHospitals() {
             {/* Subscription Metrics */}
             <div className="space-y-3.5">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">SaaS Usage telemetry Metrics</h4>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
                   <Users className="text-blue-500 shrink-0" size={18} />
@@ -340,7 +340,24 @@ export function SuperAdminHospitals() {
                 <div className="flex items-center gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
                   <HardDrive className="text-emerald-500 shrink-0" size={18} />
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{selectedTenant.storageUsed} GB</p>
+                    <p className="text-sm font-bold text-slate-800">
+                      {(() => {
+                        const plan = plans.find(p => p.id === selectedTenant.planId);
+                        const limitGB = plan ? plan.maxStorage : 10;
+                        const mb = selectedTenant.storageUsed;
+                        let usedStr = '';
+                        if (mb < 0.0009765625) { // less than 1 KB
+                          usedStr = `${(mb * 1024 * 1024).toFixed(0)} Bytes`;
+                        } else if (mb < 1) { // less than 1 MB
+                          usedStr = `${(mb * 1024).toFixed(2)} KB`;
+                        } else if (mb < 1024) { // less than 1 GB
+                          usedStr = `${mb.toFixed(2)} MB`;
+                        } else {
+                          usedStr = `${(mb / 1024).toFixed(2)} GB`;
+                        }
+                        return `${usedStr} / ${limitGB} GB`;
+                      })()}
+                    </p>
                     <p className="text-[10px] text-slate-400 font-medium">MongoDB physical space size</p>
                   </div>
                 </div>
@@ -360,34 +377,34 @@ export function SuperAdminHospitals() {
             </div>
 
             {/* Controls panel in view modal */}
-            <div className="pt-4 border-t border-slate-100 flex gap-2">
-              <Button 
-                variant="outline" 
+            <div className="pt-4 border-t border-slate-100 flex gap-2.5">
+              <Button
+                variant="outline"
                 onClick={() => openEditModal(selectedTenant)}
-                className="flex-1 flex items-center justify-center gap-1.5 border-slate-300 text-slate-700"
+                className="h-11 flex-1 flex items-center justify-center gap-2 font-bold text-sm border-slate-300 text-slate-700"
               >
-                <Edit size={14} /> Edit Hospital
+                <Edit size={15} /> Edit Hospital
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => handleDeleteTenant(selectedTenant.id)}
-                className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 flex items-center justify-center p-2.5"
+                className="h-11 w-11 border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 flex items-center justify-center p-0 shrink-0"
                 title="Remove Permanently"
               >
                 <Trash2 size={16} />
               </Button>
-              <Button 
+              <Button
                 onClick={() => handleToggleStatus(selectedTenant.id)}
-                className={`flex-[2] flex items-center justify-center gap-1.5 font-bold shadow-sm ${
+                className={`h-11 flex-[2] flex items-center justify-center gap-2 font-extrabold text-sm shadow-md ${
                   selectedTenant.status === 'Active' 
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white' 
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-rose-500/20' 
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-500/20'
                 }`}
               >
-                {selectedTenant.status === 'Active' ? 'SUSPEND ACCOUNT (KILL SWITCH)' : 'RESTORE ACCESS'}
+                {selectedTenant.status === 'Active' ? '⚠ Suspend (Kill Switch)' : '✓ Restore Access'}
               </Button>
             </div>
-            
+
             {selectedTenant.status === 'Active' && (
               <p className="text-[10px] text-slate-400 text-center leading-relaxed">
                 ⚠️ [KILL SWITCH]: Suspending is instant. It locks the tenant's clinical database and immediately denies dashboard access to all doctors, receptionists, pharmacists, and staff. Excludes viewing clinical records.
@@ -419,8 +436,8 @@ export function SuperAdminHospitals() {
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Hospital Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   placeholder="e.g. City Care Multi-Specialty Clinic"
                   value={hospitalName}
@@ -432,8 +449,8 @@ export function SuperAdminHospitals() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Email</label>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     required
                     placeholder="admin@hospital.com"
                     value={adminEmail}
@@ -444,8 +461,8 @@ export function SuperAdminHospitals() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Phone No</label>
-                  <input 
-                    type="tel" 
+                  <input
+                    type="tel"
                     required
                     placeholder="10-digit mobile"
                     value={adminPhone}
@@ -459,7 +476,7 @@ export function SuperAdminHospitals() {
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Physical Address</label>
-                <textarea 
+                <textarea
                   rows={2}
                   required
                   placeholder="Street, City, State, ZIP..."
@@ -469,12 +486,17 @@ export function SuperAdminHospitals() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setIsOnboardModalOpen(false)}>
+              <div className="flex justify-end gap-3 pt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsOnboardModalOpen(false)}
+                  className="h-11 px-5 font-bold text-sm"
+                >
                   Cancel
                 </Button>
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={() => {
                     if (!hospitalName || !adminEmail || !adminPhone || !address) {
                       alert('Please complete all hospital details in Step 1 first!');
@@ -482,9 +504,9 @@ export function SuperAdminHospitals() {
                     }
                     setOnboardStep(2);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 shadow-md font-bold"
+                  className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center shadow-lg shadow-blue-500/20"
                 >
-                  Next Step: Credentials →
+                  Next Step: Credentials <span className="text-base leading-none">→</span>
                 </Button>
               </div>
             </div>
@@ -492,8 +514,8 @@ export function SuperAdminHospitals() {
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Login Email / Username</label>
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   required
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
@@ -505,8 +527,8 @@ export function SuperAdminHospitals() {
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Set Admin Login Password</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   placeholder="Enter manual secure password (e.g. MySecretPass123)"
                   value={adminPassword}
@@ -522,7 +544,7 @@ export function SuperAdminHospitals() {
                     ({unusedLicenses.length} available)
                   </span>
                 </label>
-                <select 
+                <select
                   required
                   value={licenseCodeUsed}
                   onChange={(e) => setLicenseCodeUsed(e.target.value)}
@@ -540,16 +562,21 @@ export function SuperAdminHospitals() {
                 </select>
               </div>
 
-              <div className="flex justify-between gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setOnboardStep(1)}>
-                  ← Back to Hospital Info
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={!licenseCodeUsed || !adminPassword} 
-                  className="bg-blue-600 hover:bg-blue-700 shadow-md font-bold"
+              <div className="flex justify-between gap-3 pt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOnboardStep(1)}
+                  className="h-11 px-5 font-bold text-sm gap-1.5 flex items-center"
                 >
-                  Complete Onboarding & Activate SaaS ✓
+                  <span className="text-base leading-none">←</span> Back
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!licenseCodeUsed || !adminPassword}
+                  className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20"
+                >
+                  <span className="text-base leading-none">✓</span> Activate SaaS & Complete
                 </Button>
               </div>
             </div>
@@ -562,8 +589,8 @@ export function SuperAdminHospitals() {
         <form onSubmit={handleEditSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Hospital Name</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               required
               placeholder="e.g. Apollo Super Speciality"
               value={editHospitalName}
@@ -574,8 +601,8 @@ export function SuperAdminHospitals() {
 
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Contact Email</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               required
               placeholder="admin@hospital.com"
               value={editAdminEmail}
@@ -586,7 +613,7 @@ export function SuperAdminHospitals() {
 
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Physical Address</label>
-            <textarea 
+            <textarea
               rows={2}
               required
               placeholder="Address..."
@@ -601,8 +628,8 @@ export function SuperAdminHospitals() {
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
                 <Calendar size={13} /> Expiry Date
               </label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 required
                 value={editSubscriptionExpiryDate}
                 onChange={(e) => setEditSubscriptionExpiryDate(e.target.value)}
@@ -614,7 +641,7 @@ export function SuperAdminHospitals() {
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
                 <Award size={13} /> Assign Plan Tier
               </label>
-              <select 
+              <select
                 value={editPlanId}
                 onChange={(e) => setEditPlanId(e.target.value)}
                 className="w-full h-10 px-3 border border-slate-200 bg-white rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -626,11 +653,19 @@ export function SuperAdminHospitals() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
+          <div className="flex justify-end gap-3 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditModalOpen(false)}
+              className="h-11 px-5 font-bold text-sm"
+            >
               Cancel
             </Button>
-            <Button type="submit">
+            <Button
+              type="submit"
+              className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center shadow-lg shadow-blue-500/20"
+            >
               Save Changes
             </Button>
           </div>
@@ -638,9 +673,9 @@ export function SuperAdminHospitals() {
       </Modal>
 
       {/* Onboard Success Credentials Modal */}
-      <Modal 
-        isOpen={onboardSuccessData !== null} 
-        onClose={() => setOnboardSuccessData(null)} 
+      <Modal
+        isOpen={onboardSuccessData !== null}
+        onClose={() => setOnboardSuccessData(null)}
         title="🎉 Hospital Onboarded Successfully!"
         className="max-w-md"
       >
@@ -655,7 +690,7 @@ export function SuperAdminHospitals() {
                 <label className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Hospital Name</label>
                 <span className="text-sm font-semibold text-slate-800 block mt-0.5">{onboardSuccessData.hospitalName}</span>
               </div>
-              
+
               <hr className="border-slate-200/50" />
 
               <div className="grid grid-cols-2 gap-4">
@@ -689,14 +724,14 @@ export function SuperAdminHospitals() {
             </div>
 
             <div className="pt-2">
-              <Button 
+              <Button
                 onClick={() => {
                   navigator.clipboard.writeText(
                     `Hospital Name: ${onboardSuccessData.hospitalName}\nAdmin Contact Phone: ${onboardSuccessData.adminPhone || ''}\nAdmin Username/Email: ${onboardSuccessData.adminEmail}\nAdmin Password: ${onboardSuccessData.generatedPassword}\nHospital Access Code: ${onboardSuccessData.accessCode}`
                   );
                   alert('Credentials copied to clipboard! ✓');
                 }}
-                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-blue-500/15"
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-2 rounded-full shadow-lg shadow-blue-500/15"
               >
                 Copy All Credentials & Code
               </Button>

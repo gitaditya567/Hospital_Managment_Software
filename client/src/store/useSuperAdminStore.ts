@@ -31,7 +31,7 @@ export interface Tenant {
   licenseCodeUsed: string;
   subscriptionExpiryDate: string;
   staffCreated: number;
-  storageUsed: number; // in GB
+  storageUsed: number; // in MB
   planId: string;
 }
 
@@ -71,14 +71,14 @@ interface SuperAdminState {
   settings: PlatformSettings;
   searchQuery: string;
   loading: boolean;
-  
+
   // Actions
   fetchSuperAdminData: () => Promise<void>;
   setSearchQuery: (query: string) => void;
   generateLicense: (planId: string, validityMonths: number) => Promise<string>;
   revokeLicense: (code: string) => Promise<void>;
   deleteLicense: (code: string) => Promise<void>;
-  
+
   onboardHospital: (hospital: Omit<Tenant, 'id' | 'status' | 'staffCreated' | 'storageUsed'> & { adminPhone?: string; adminPassword?: string }) => Promise<{
     success: boolean;
     adminEmail?: string;
@@ -90,14 +90,16 @@ interface SuperAdminState {
   updateTenant: (id: string, updated: Partial<Tenant>) => Promise<void>;
   deleteTenant: (id: string) => Promise<void>;
   toggleTenantStatus: (tenantId: string) => Promise<void>; // Suspend / Reactivate
-  
+
   addPlan: (plan: Omit<Plan, 'id'>) => Promise<void>;
   updatePlan: (id: string, updated: Partial<Plan>) => Promise<void>;
   deletePlan: (id: string) => Promise<void>;
-  
+
   updateSettings: (settings: Partial<PlatformSettings>) => Promise<void>;
   addActivity: (description: string, type: Activity['type']) => Promise<void>;
   addInvoice: (invoice: Omit<Invoice, 'id' | 'date'>) => Promise<void>;
+  exportBackup: () => Promise<void>;
+  sendDiagnostics: () => Promise<string>;
 }
 
 export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
@@ -341,6 +343,41 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
       await get().fetchSuperAdminData();
     } catch (err) {
       console.error('Failed to add payment invoice log', err);
+    }
+  },
+
+  exportBackup: async () => {
+    try {
+      const response = await fetch('/api/superadmin/backup');
+      if (!response.ok) throw new Error('Backup failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `medisaas_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download database backup', err);
+      throw err;
+    }
+  },
+
+  sendDiagnostics: async () => {
+    try {
+      const response = await fetch('/api/superadmin/diagnostics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Diagnostics compile failed');
+      const data = await response.json();
+      await get().fetchSuperAdminData();
+      return data.token;
+    } catch (err) {
+      console.error('Failed to run diagnostics', err);
+      throw err;
     }
   }
 }));

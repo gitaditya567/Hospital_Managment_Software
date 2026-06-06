@@ -8,7 +8,7 @@ import { getPrintSettings } from './printSettings';
 export function printIsolatedHtml(title: string, htmlContent: string) {
   const settings = getPrintSettings();
   const printWindow = window.open('', '_blank');
-  
+
   if (!printWindow) {
     alert('Please enable browser popups to allow clinical printing operations.');
     return;

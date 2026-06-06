@@ -25,7 +25,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
           <h2 className="text-lg font-bold text-slate-800 tracking-tight">{title}</h2>
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all duration-200 active:scale-95"
+            className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all duration-200 active:scale-95"
           >
             <X size={18} />
           </button>

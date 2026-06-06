@@ -1,5 +1,5 @@
-import { 
-  Search, Users, Activity, Clock, Phone, FileText, 
+import {
+  Search, Users, Activity, Clock, Phone, FileText,
   CheckCircle2, Heart, Thermometer, Wind,
   Printer, Copy, Check, AlertCircle
 } from 'lucide-react';
@@ -11,7 +11,7 @@ import { getPrintSettings } from '../../utils/printSettings';
 export function DoctorSearch() {
   const { patients } = useHospitalStore();
   const { user } = useAuthStore();
-  
+
   const [search, setSearch] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [pastVisits, setPastVisits] = useState<any[]>([]);
@@ -43,8 +43,8 @@ export function DoctorSearch() {
 
   // Calculate statistics for directory dashboard
   const totalUniqueCount = uniquePatients.length;
-  const averageAge = totalUniqueCount > 0 
-    ? Math.round(uniquePatients.reduce((sum, p) => sum + p.age, 0) / totalUniqueCount) 
+  const averageAge = totalUniqueCount > 0
+    ? Math.round(uniquePatients.reduce((sum, p) => sum + p.age, 0) / totalUniqueCount)
     : 0;
 
   // Pull medical prescription records and consultation timelines on selection
@@ -61,7 +61,7 @@ export function DoctorSearch() {
         const completedVisits = patients
           .filter(p => p.phone === selectedPatient.phone)
           .map(p => ({
-            date: p.createdAt 
+            date: p.createdAt
               ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
               : p.timeRegistered || 'Unknown date',
             doctor: p.doctorName,
@@ -126,7 +126,7 @@ export function DoctorSearch() {
         const mergedHistory = [
           ...billsHistory,
           ...rxHistory.filter(rx => !billsHistory.some(b => b.rxCode === rx.rxCode)),
-          ...completedVisits.filter(cv => 
+          ...completedVisits.filter(cv =>
             !rxHistory.some(rx => rx.date === cv.date && rx.doctor === cv.doctor) &&
             !billsHistory.some(b => b.date === cv.date && b.doctor === cv.doctor)
           )
@@ -146,7 +146,7 @@ export function DoctorSearch() {
   // Copy prescription details in a readable format
   const handleCopyPrescription = (visit: any) => {
     let copyText = `Clinical Prescription Record\n=========================\nPatient: ${selectedPatient.name} (${selectedPatient.gender}, ${selectedPatient.age} Yrs)\nPhone: ${selectedPatient.phone}\nDoctor: Dr. ${visit.doctor}\nDate: ${visit.date}\nRx Code: ${visit.rxCode || 'N/A'}\n\nMedicines Prescribed:\n`;
-    
+
     if (Array.isArray(visit.medicines)) {
       visit.medicines.forEach((med: any, idx: number) => {
         copyText += `${idx + 1}. ${med.name} | Dosage: ${med.dosage || '1-0-1'} | Duration: ${med.duration || '5 Days'} | Qty: ${med.qty || 10}\n`;
@@ -287,7 +287,7 @@ export function DoctorSearch() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      
+
       {/* Header */}
       <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
         <div>
@@ -296,7 +296,7 @@ export function DoctorSearch() {
           </h1>
           <p className="text-slate-500 text-xs font-semibold">Query global clinical databases to pull complete longitudinal EMRs and prescription timelines</p>
         </div>
-        
+
         {/* Statistics Pillbox */}
         <div className="hidden md:flex items-center gap-4 text-xs font-bold text-slate-500">
           <div className="bg-slate-50 border border-slate-100 rounded-xl px-3.5 py-1.5 text-center">
@@ -311,7 +311,7 @@ export function DoctorSearch() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-        
+
         {/* Left Side: Directory Queries (span 4) */}
         <div className="lg:col-span-4 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col h-[calc(100vh-14rem)] overflow-hidden">
           <div className="space-y-4 h-full flex flex-col">
@@ -319,12 +319,12 @@ export function DoctorSearch() {
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Search Patient Master Directory</label>
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Type name, phone or record ID..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700 bg-slate-50/50 transition-all" 
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700 bg-slate-50/50 transition-all"
                 />
               </div>
             </div>
@@ -361,7 +361,7 @@ export function DoctorSearch() {
                         {p.gender || 'Female'}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center justify-between mt-2.5 text-[10px] text-slate-400 font-semibold border-t border-slate-50 pt-2">
                       <span className="flex items-center gap-1 font-mono text-[9px] text-slate-500">
                         <Phone size={10} className="text-slate-400" /> {p.phone}
@@ -385,7 +385,7 @@ export function DoctorSearch() {
         <div className="lg:col-span-6 flex flex-col h-[calc(100vh-14rem)]">
           {selectedPatient ? (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col h-full overflow-hidden animate-in fade-in duration-200">
-              
+
               {/* EMR Header Card */}
               <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <div>
@@ -399,7 +399,7 @@ export function DoctorSearch() {
                     Patient No: <span className="font-extrabold text-blue-600 font-mono">{selectedPatient.patientNo || 'N/A'}</span> • Age: {selectedPatient.age} Yrs • Gender: {selectedPatient.gender || 'Not specified'} • Phone: <span className="font-mono text-slate-700 font-bold">{selectedPatient.phone}</span>
                   </p>
                 </div>
-                
+
                 <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-xl text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
                   REF: {selectedPatient.id.substring(0, 8)}
                 </span>
@@ -407,16 +407,16 @@ export function DoctorSearch() {
 
               {/* Scrollable details container */}
               <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 md:grid-cols-10 gap-5 min-h-0">
-                
+
                 {/* Left col: Vitals + Diagnoses (span 4) */}
                 <div className="md:col-span-4 space-y-5">
-                  
+
                   {/* Captured Vitals */}
                   <div className="space-y-3">
                     <h3 className="text-[10px] uppercase tracking-wider font-black text-slate-400 flex items-center gap-1.5 border-b border-slate-50 pb-1.5">
                       <Activity size={12} className="text-blue-500" /> Active Vitals
                     </h3>
-                    
+
                     {selectedPatient.vitals && selectedPatient.vitals.length > 0 ? (
                       <div className="grid grid-cols-1 gap-2.5">
                         {selectedPatient.vitals.map((v: any) => {
@@ -460,12 +460,12 @@ export function DoctorSearch() {
                     <h3 className="text-[10px] uppercase tracking-wider font-black text-slate-400 flex items-center gap-1.5 border-b border-slate-50 pb-1.5">
                       <FileText size={12} className="text-blue-500" /> Diagnosed History
                     </h3>
-                    
+
                     {selectedPatient.pastDiagnoses ? (
                       <div className="flex flex-wrap gap-1.5">
                         {selectedPatient.pastDiagnoses.split(',').map((diag: string, idx: number) => (
-                          <span 
-                            key={idx} 
+                          <span
+                            key={idx}
                             className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold"
                           >
                             {diag.trim()}
@@ -498,12 +498,12 @@ export function DoctorSearch() {
                         const isPharmacy = !!visit.isPharmacyInvoice;
                         return (
                           <div key={index} className="relative animate-in slide-in-from-left duration-250">
-                            
+
                             {/* Bullet */}
                             <div className={`absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white ring-4 ${
                               isPharmacy ? "bg-emerald-500 ring-emerald-50" : "bg-blue-500 ring-blue-50"
                             }`}></div>
-                            
+
                             <div className="space-y-2 text-xs text-left">
                               <div className="flex justify-between items-center">
                                 <span className="font-extrabold text-slate-800 text-sm">
@@ -511,12 +511,12 @@ export function DoctorSearch() {
                                 </span>
                                 <span className="text-[9px] text-slate-400 font-bold font-mono">{visit.date}</span>
                               </div>
-                              
+
                               {isPharmacy ? (
                                 /* Detailed Green-Accented Pharmacy Invoice Receipt Card */
                                 <div className="bg-emerald-50/60 border border-emerald-200/80 p-4 rounded-xl shadow-sm space-y-3 relative overflow-hidden">
                                   <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-100/30 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                  
+
                                   <div className="flex justify-between items-center pb-2 border-b border-dashed border-emerald-200">
                                     <div>
                                       <span className="text-[8px] font-black uppercase text-emerald-600 block tracking-widest">dispensed invoice</span>
@@ -589,7 +589,7 @@ export function DoctorSearch() {
 
                                   {/* Action Items on timeline prescription card */}
                                   <div className="flex justify-between items-center border-t border-slate-200/50 pt-2.5 mt-3 text-[9px]">
-                                    
+
                                     <div className="flex items-center gap-2">
                                       {visit.rxCode && (
                                         <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded font-bold font-mono">
@@ -608,7 +608,7 @@ export function DoctorSearch() {
                                     <div className="flex gap-2">
                                       <button
                                         onClick={() => handleCopyPrescription(visit)}
-                                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-0.5 font-bold hover:bg-slate-100 rounded-lg px-2"
+                                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-0.5 font-bold hover:bg-slate-100 rounded-full px-2"
                                       >
                                         {copiedCode === visit.rxCode ? (
                                           <>
@@ -625,7 +625,7 @@ export function DoctorSearch() {
 
                                       <button
                                         onClick={() => handlePrintPrescription(visit)}
-                                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-0.5 font-bold hover:bg-slate-100 rounded-lg px-2"
+                                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-0.5 font-bold hover:bg-slate-100 rounded-full px-2"
                                       >
                                         <Printer size={10} />
                                         <span>Print Rx</span>
@@ -654,13 +654,13 @@ export function DoctorSearch() {
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-center justify-center p-12 text-center h-full text-slate-400">
-              
+
               {/* Directory Dashboard UI inside EMR frame when no patient selected */}
               <div className="max-w-md space-y-6">
                 <div className="bg-blue-50/50 p-4 rounded-full h-16 w-16 flex items-center justify-center mx-auto border border-blue-100/50">
                   <Users className="text-blue-600 animate-pulse" size={28} />
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Longitudinal EMR File Viewer</h3>
                   <p className="text-[11px] text-slate-400 leading-relaxed mt-1">

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './ui/Modal';
-import { 
-  Heart, Activity, Thermometer, Wind, Scale, 
-  Droplet, Gauge, ClipboardList, Check 
+import {
+  Heart, Activity, Thermometer, Wind, Scale,
+  Droplet, Gauge, ClipboardList, Check
 } from 'lucide-react';
 
 interface VitalsModalProps {
@@ -44,14 +44,14 @@ const COMMON_DIAGNOSES = [
   'None (Healthy Profile)'
 ];
 
-export function VitalsModal({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  initialVitals = [], 
-  initialPastDiagnoses = '' 
+export function VitalsModal({
+  isOpen,
+  onClose,
+  onSave,
+  initialVitals = [],
+  initialPastDiagnoses = ''
 }: VitalsModalProps) {
-  
+
   // Track selection state
   const [selectedVitals, setSelectedVitals] = useState<Record<string, boolean>>({});
   // Track input values
@@ -155,14 +155,14 @@ export function VitalsModal({
   };
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
       title="Clinical Vitals & Medical History"
       className="max-w-2xl bg-white rounded-2xl"
     >
       <div className="space-y-6 max-h-[70vh] overflow-y-auto px-1 pr-2">
-        
+
         {/* Intro */}
         <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-xl flex gap-2.5 items-start">
           <div className="h-7 w-7 rounded bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 border border-blue-100 mt-0.5">
@@ -179,7 +179,7 @@ export function VitalsModal({
         {/* Vitals Input Grid */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Checklist: Common Vitals</h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {COMMON_VITALS.map(v => {
               const Icon = v.icon;
@@ -187,7 +187,7 @@ export function VitalsModal({
               const value = vitalValues[v.name] || '';
 
               return (
-                <div 
+                <div
                   key={v.name}
                   onClick={() => !isChecked && handleToggleVital(v.name)}
                   className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all duration-200 cursor-pointer ${
@@ -199,14 +199,14 @@ export function VitalsModal({
                   <div className="flex justify-between items-center w-full">
                     <div className="flex items-center gap-2.5">
                       {/* Checkbox */}
-                      <input 
+                      <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => handleToggleVital(v.name)}
                         onClick={e => e.stopPropagation()}
                         className="h-4 w-4 text-blue-600 border-slate-300 rounded cursor-pointer"
                       />
-                      
+
                       {/* Icon & Label */}
                       <div className={`p-1.5 rounded-lg flex items-center justify-center border ${
                         isChecked 
@@ -217,14 +217,14 @@ export function VitalsModal({
                       </div>
                       <span className="text-xs font-extrabold text-slate-800">{v.label}</span>
                     </div>
-                    
+
                     <span className="text-[10px] font-bold text-slate-400 font-mono uppercase">{v.unit}</span>
                   </div>
 
                   {/* Value input (only shown/active if checked) */}
                   {isChecked && (
                     <div className="mt-3.5 flex gap-2 items-center animate-in slide-in-from-top-2 duration-150" onClick={e => e.stopPropagation()}>
-                      <input 
+                      <input
                         type="text"
                         placeholder={v.placeholder}
                         value={value}
@@ -243,7 +243,7 @@ export function VitalsModal({
         {/* Diagnoses Section */}
         <div className="space-y-3 pt-2">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Past Medical Diagnoses</h3>
-          
+
           {/* Quick Tags */}
           <div className="flex flex-wrap gap-2">
             {COMMON_DIAGNOSES.map(tag => {
@@ -269,7 +269,7 @@ export function VitalsModal({
           {/* Custom additional history input */}
           <div className="space-y-1 mt-3">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Additional History / Custom Conditions</label>
-            <input 
+            <input
               type="text"
               placeholder="e.g. Chronic Kidney Disease, Previous Heart Surgery"
               value={customHistory}
@@ -281,18 +281,18 @@ export function VitalsModal({
 
         {/* Actions */}
         <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
-          <button 
-            type="button" 
-            onClick={onClose} 
-            className="px-4 py-2 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-200 text-slate-500 rounded-full text-xs font-bold hover:bg-slate-50 transition-colors"
           >
             Cancel
           </button>
-          
-          <button 
-            type="button" 
-            onClick={handleSave} 
-            className="px-5 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-500 shadow-md shadow-blue-500/10 transition-colors"
+
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-5 py-2 bg-blue-600 text-white rounded-full text-xs font-bold hover:bg-blue-500 shadow-md shadow-blue-500/10 transition-colors"
           >
             Save Details
           </button>

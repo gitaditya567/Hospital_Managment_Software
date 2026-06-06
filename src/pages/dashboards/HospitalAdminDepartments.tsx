@@ -4,11 +4,11 @@ import { Settings, Plus, Trash2, Edit, BedDouble, Users } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export function HospitalAdminDepartments() {
-  const { 
-    departments, 
+  const {
+    departments,
     staff,
-    addDepartment, 
-    deleteDepartment, 
+    addDepartment,
+    deleteDepartment,
     updateDepartment,
   } = useHospitalStore();
 
@@ -74,7 +74,7 @@ export function HospitalAdminDepartments() {
 
   return (
     <div className="space-y-8 pb-20">
-      
+
       {/* SECTION 1: Departments */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
@@ -84,9 +84,9 @@ export function HospitalAdminDepartments() {
             </h1>
             <p className="text-xs text-slate-500 font-medium">Configure medical wings, assign clinical directors, and allocate diagnostic rooms.</p>
           </div>
-          <Button 
+          <Button
             onClick={() => setIsDeptModalOpen(true)}
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md px-5 py-2.5 font-semibold text-xs transition-all"
+            className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center"
           >
             <Plus size={16} /> Add Department
           </Button>
@@ -170,7 +170,7 @@ export function HospitalAdminDepartments() {
                           <button
                             onClick={() => handleOpenEditDeptModal(dept)}
                             title="Edit Department"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 text-[10px] font-bold transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 text-[10px] font-bold transition-all"
                           >
                             <Edit size={11} /> Edit
                           </button>
@@ -181,7 +181,7 @@ export function HospitalAdminDepartments() {
                               }
                             }}
                             title="Delete Department"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 hover:border-rose-300 text-[10px] font-bold transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 hover:border-rose-300 text-[10px] font-bold transition-all"
                           >
                             <Trash2 size={11} /> Delete
                           </button>
@@ -278,17 +278,17 @@ export function HospitalAdminDepartments() {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setIsDeptModalOpen(false)}
                   className="h-10 text-xs font-bold"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  className="h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 rounded-xl"
+                <Button
+                  type="submit"
+                  className="h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 rounded-full"
                 >
                   Establish Wing
                 </Button>
@@ -378,17 +378,17 @@ export function HospitalAdminDepartments() {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setIsEditDeptModalOpen(false)}
                   className="h-10 text-xs font-bold"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  className="h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 rounded-xl"
+                <Button
+                  type="submit"
+                  className="h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 rounded-full"
                 >
                   Save Changes
                 </Button>

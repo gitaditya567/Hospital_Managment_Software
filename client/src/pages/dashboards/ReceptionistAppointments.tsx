@@ -63,13 +63,13 @@ export function ReceptionistAppointments() {
     const month = currentMonth.getMonth();
     const date = new Date(year, month, 1);
     const days = [];
-    
+
     // Fill leading empty slots
     const firstDayIndex = date.getDay();
     for (let i = 0; i < firstDayIndex; i++) {
       days.push(null);
     }
-    
+
     while (date.getMonth() === month) {
       days.push(new Date(date));
       date.setDate(date.getDate() + 1);
@@ -100,7 +100,7 @@ export function ReceptionistAppointments() {
             setNewAppt(prev => ({ ...prev, doctorId: doctors[0].id }));
           }
           setShowAddForm(!showAddForm);
-        }} className="flex items-center gap-1.5 font-bold shadow-md hover:shadow-lg transition-all rounded-xl">
+        }} className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center">
           <Plus size={16} /> Book Appointment
         </Button>
       </div>
@@ -111,18 +111,18 @@ export function ReceptionistAppointments() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-extrabold text-slate-800 tracking-tight">Select Date</h2>
             <div className="flex gap-1">
-              <button 
+              <button
                 onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))}
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
               <span className="text-xs font-bold text-slate-700 px-2 flex items-center">
                 {currentMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
               </span>
-              <button 
+              <button
                 onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))}
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
               >
                 <ChevronRight size={16} />
               </button>
@@ -170,55 +170,55 @@ export function ReceptionistAppointments() {
                 <Plus size={16} /> New Appointment Form
               </h2>
               <form onSubmit={handleCreateAppointment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input 
-                  label="Patient Full Name" 
-                  required 
+                <Input
+                  label="Patient Full Name"
+                  required
                   value={newAppt.name}
-                  onChange={e => setNewAppt({...newAppt, name: e.target.value})}
+                  onChange={e => setNewAppt({ ...newAppt, name: e.target.value })}
                   placeholder="e.g. Rahul Verma"
                 />
-                <Input 
-                  label="Phone Number" 
-                  required 
+                <Input
+                  label="Phone Number"
+                  required
                   value={newAppt.phone}
-                  onChange={e => setNewAppt({...newAppt, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                  onChange={e => setNewAppt({ ...newAppt, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   maxLength={10}
                   pattern="[0-9]{10}"
                   placeholder="10-digit mobile"
                 />
                 <div className="grid grid-cols-2 gap-2">
-                  <Input 
-                    label="Age" 
-                    type="number" 
-                    required 
+                  <Input
+                    label="Age"
+                    type="number"
+                    required
                     value={newAppt.age}
-                    onChange={e => setNewAppt({...newAppt, age: e.target.value})}
+                    onChange={e => setNewAppt({ ...newAppt, age: e.target.value })}
                     placeholder="Yrs"
                   />
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Time</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                       value={newAppt.time}
-                      onChange={e => setNewAppt({...newAppt, time: e.target.value})}
+                      onChange={e => setNewAppt({ ...newAppt, time: e.target.value })}
                       placeholder="10:00 AM"
                     />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Physician</label>
-                  <select 
+                  <select
                     className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium"
                     value={newAppt.doctorId}
-                    onChange={e => setNewAppt({...newAppt, doctorId: e.target.value})}
+                    onChange={e => setNewAppt({ ...newAppt, doctorId: e.target.value })}
                   >
                     {doctors.map(d => (
                       <option key={d.id} value={d.id}>{d.name} ({d.department})</option>
                     ))}
                   </select>
                 </div>
-                
+
                 {/* Patient Vitals & History Action Button */}
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clinical Vitals & History</label>
@@ -241,7 +241,7 @@ export function ReceptionistAppointments() {
                       {vitals.length > 0 ? `${vitals.length} Recorded` : 'Pending'}
                     </span>
                   </button>
-                  
+
                   {/* Visual mini-pill grid showing recorded vitals */}
                   {vitals.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5 p-2 bg-emerald-50/30 border border-emerald-100/40 rounded-lg animate-in fade-in duration-200 max-h-16 overflow-y-auto">
@@ -277,7 +277,7 @@ export function ReceptionistAppointments() {
                 <p className="text-[11px] text-slate-400 font-medium">Auto-filtering schedule listings</p>
               </div>
               <div className="space-y-1">
-                <select 
+                <select
                   className="flex h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   value={selectedDoctor}
                   onChange={e => setSelectedDoctor(e.target.value)}
@@ -324,7 +324,7 @@ export function ReceptionistAppointments() {
           </div>
         </div>
       </div>
-      <VitalsModal 
+      <VitalsModal
         isOpen={isVitalsModalOpen}
         onClose={() => setIsVitalsModalOpen(false)}
         onSave={(savedVitals, savedDiagnoses) => {

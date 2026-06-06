@@ -25,39 +25,42 @@ export const superadminRouter = express.Router();
 // Helper to calculate the actual dynamic database storage occupied by a hospital tenant in MB
 const getHospitalStorageUsed = async (hospitalId) => {
   try {
-    const [
-      staffCount,
-      patientCount,
-      invoiceCount,
-      medicineCount,
-      prescriptionCount,
-      billCount,
-      deptCount,
-      scheduleCount,
-      userCount
-    ] = await Promise.all([
-      Staff.countDocuments({ hospitalId }),
-      Patient.countDocuments({ hospitalId }),
-      Invoice.countDocuments({ hospitalId }),
-      Medicine.countDocuments({ hospitalId }),
-      Prescription.countDocuments({ hospitalId }),
-      PharmacyBill.countDocuments({ hospitalId }),
-      Department.countDocuments({ hospitalId }),
-      DoctorSchedule.countDocuments({ hospitalId }),
-      User.countDocuments({ hospitalId })
-    ]);
+    const collections = [
+      { model: Staff, isTenant: false },
+      { model: Patient, isTenant: false },
+      { model: Invoice, isTenant: false },
+      { model: Medicine, isTenant: false },
+      { model: Prescription, isTenant: false },
+      { model: PharmacyBill, isTenant: false },
+      { model: Department, isTenant: false },
+      { model: DoctorSchedule, isTenant: false },
+      { model: User, isTenant: false },
+      { model: Tenant, isTenant: true }
+    ];
 
-    const totalRecords = staffCount + patientCount + invoiceCount + medicineCount + prescriptionCount + billCount + deptCount + scheduleCount + userCount;
+    let totalBytes = 0;
 
-    // Base collection overhead of 1.15 MB
-    // Plus 0.05 MB (50 KB) per actual database document (indexes, schema definitions, logs)
-    const baseOverhead = 1.15;
-    const sizePerRecord = 0.05;
-    const storageUsedMB = baseOverhead + (totalRecords * sizePerRecord);
+    await Promise.all(collections.map(async (col) => {
+      const matchQuery = col.isTenant 
+        ? { _id: mongoose.Types.ObjectId.isValid(hospitalId) ? new mongoose.Types.ObjectId(hospitalId) : null }
+        : { hospitalId };
 
-    return Number(storageUsedMB.toFixed(2));
+      const result = await col.model.aggregate([
+        { $match: matchQuery },
+        { $group: { _id: null, totalSize: { $sum: { $bsonSize: "$$ROOT" } } } }
+      ]);
+
+      if (result && result[0]) {
+        totalBytes += result[0].totalSize;
+      }
+    }));
+
+    // Convert bytes to MB
+    const totalMB = totalBytes / (1024 * 1024);
+    return Number(totalMB.toFixed(6));
   } catch (error) {
-    return 1.15;
+    console.error("Error in getHospitalStorageUsed BSON calculation:", error);
+    return 0.00034;
   }
 };
 
@@ -531,3 +534,74 @@ superadminRouter.put('/settings', async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
+
+
+// ----------------------------------------------------
+// 7. PLATFORM SECURITY & DIAGNOSTICS
+// ----------------------------------------------------
+
+superadminRouter.get('/backup', async (req, res) => {
+  try {
+    const [tenants, plans, settings, licenses, activities, invoices] = await Promise.all([
+      Tenant.find({}),
+      Plan.find({}),
+      SystemSetting.findOne({}),
+      LicenseCode.find({}),
+      PlatformActivity.find({}),
+      SubscriptionInvoice.find({})
+    ]);
+
+    const backupData = {
+      backupTimestamp: new Date().toISOString(),
+      tenants,
+      plans,
+      settings: settings || {},
+      licenses,
+      activities,
+      invoices
+    };
+
+    // Set response headers to trigger file download
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=medisaas_backup.json');
+    res.json(backupData);
+  } catch (error) {
+    res.status(500).json({ message: `Database backup failed: ${error.message}` });
+  }
+});
+
+superadminRouter.post('/diagnostics', async (req, res) => {
+  try {
+    const [tenantCount, planCount, licenseCount, activeTenantCount] = await Promise.all([
+      Tenant.countDocuments({}),
+      Plan.countDocuments({}),
+      LicenseCode.countDocuments({}),
+      Tenant.countDocuments({ status: 'Active' })
+    ]);
+
+    const diagnosticToken = `COMP-${Date.now().toString().slice(-4)}-DX${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const activity = new PlatformActivity({
+      description: `Central system diagnostics compiled. Compliance index token generated: ${diagnosticToken}.`,
+      type: 'system',
+      timestamp: new Date().toISOString()
+    });
+    await activity.save();
+
+    res.json({
+      success: true,
+      token: diagnosticToken,
+      diagnosticsReport: {
+        timestamp: new Date().toISOString(),
+        activeTenants: activeTenantCount,
+        totalTenants: tenantCount,
+        totalPlans: planCount,
+        totalLicenses: licenseCount,
+        connectionState: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: `Diagnostics compile failed: ${error.message}` });
+  }
+});
+

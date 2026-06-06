@@ -48,8 +48,8 @@ export function DoctorDashboard() {
       setSearchSuggestions([]);
       return;
     }
-    const filtered = AI_MEDICINES.filter(med => 
-      med.name.toLowerCase().includes(query.toLowerCase()) || 
+    const filtered = AI_MEDICINES.filter(med =>
+      med.name.toLowerCase().includes(query.toLowerCase()) ||
       med.category.toLowerCase().includes(query.toLowerCase())
     );
     setSearchSuggestions(filtered);
@@ -179,12 +179,12 @@ export function DoctorDashboard() {
       try {
         // Source 1: All completed visits for this phone number from the in-memory store
         const completedVisits = patients
-          .filter(p => 
-            p.phone === selectedPatient.phone && 
+          .filter(p =>
+            p.phone === selectedPatient.phone &&
             p.status === 'Completed'
           )
           .map(p => ({
-            date: p.createdAt 
+            date: p.createdAt
               ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
               : p.timeRegistered || 'Unknown date',
             doctor: p.doctorName,
@@ -221,7 +221,7 @@ export function DoctorDashboard() {
         // De-duplicate by merging completed visits that have a matching rx prescription
         const mergedHistory = [
           ...rxHistory,
-          ...completedVisits.filter(cv => 
+          ...completedVisits.filter(cv =>
             !rxHistory.some(rx => rx.date === cv.date && rx.doctor === cv.doctor)
           )
         ];
@@ -240,8 +240,8 @@ export function DoctorDashboard() {
   // Filter patients allotted to this doctor who are either waiting or currently in consultation.
   // Sort so that the patient in consultation is always at the top of the queue.
   const doctorQueue = patients
-    .filter(p => 
-      p.doctorName.toLowerCase().trim() === user?.name?.toLowerCase().trim() && 
+    .filter(p =>
+      p.doctorName.toLowerCase().trim() === user?.name?.toLowerCase().trim() &&
       (p.status === 'Waiting' || p.status === 'In Consultation')
     )
     .sort((a, b) => {
@@ -253,8 +253,8 @@ export function DoctorDashboard() {
   const waitingPatients = doctorQueue.filter(p => p.status === 'Waiting');
 
   const totalWaitingCount = doctorQueue.length;
-  const checkedTodayCount = patients.filter(p => 
-    p.doctorName.toLowerCase().trim() === user?.name?.toLowerCase().trim() && 
+  const checkedTodayCount = patients.filter(p =>
+    p.doctorName.toLowerCase().trim() === user?.name?.toLowerCase().trim() &&
     p.status === 'Completed'
   ).length;
 
@@ -271,7 +271,7 @@ export function DoctorDashboard() {
   // Handle selecting a patient: updates clicked patient to In Consultation and resets others to Waiting
   const handleSelectPatient = async (patient: any) => {
     setSelectedPatient(patient);
-    
+
     try {
       // 1. Set clicked patient's status to 'In Consultation'
       if (patient.status !== 'In Consultation') {
@@ -279,7 +279,7 @@ export function DoctorDashboard() {
       }
 
       // 2. Set all other patients of this doctor who are currently 'In Consultation' back to 'Waiting'
-      const otherConsulting = patients.filter(p => 
+      const otherConsulting = patients.filter(p =>
         p.id !== patient.id &&
         p.doctorName.toLowerCase().trim() === user?.name?.toLowerCase().trim() &&
         p.status === 'In Consultation'
@@ -305,7 +305,7 @@ export function DoctorDashboard() {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      
+
       recognition.onresult = (event: any) => {
         let currentTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -346,7 +346,7 @@ export function DoctorDashboard() {
     // A simplified keyword scanner for demonstration
     // "Prescribing Paracetamol 500 milligram twice a day for five days"
     const lowerText = text.toLowerCase();
-    
+
     if (lowerText.includes('paracetamol')) {
       // Avoid duplicates
       if (!prescriptions.some(p => p.medicine === 'Paracetamol 500mg')) {
@@ -442,19 +442,19 @@ export function DoctorDashboard() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-6">
+    <div className="flex h-[calc(100vh-8rem)] gap-6 font-sans">
       {/* Left Column: Waiting Room */}
-      <div className="w-1/3 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+      <div className="w-1/3 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden">
         {/* Header with DND Toggle */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+        <div className="p-4 border-b border-teal-50 bg-teal-50/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={cn(
               "w-2 h-2 rounded-full",
               isDndMode ? "bg-rose-500 animate-pulse" : "bg-emerald-500 animate-pulse"
             )} />
-            <h2 className="font-bold text-slate-800 tracking-tight text-sm">Waiting Room</h2>
+            <h2 className="font-bold text-slate-800 tracking-tight text-sm text-glow-teal">Waiting Room</h2>
           </div>
-          
+
           {/* Toggle Switch */}
           <button
             onClick={() => {
@@ -486,8 +486,8 @@ export function DoctorDashboard() {
         </div>
 
         {/* Stats Row - Always Visible */}
-        <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50/50 border-b border-slate-100">
-          <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 p-3 bg-teal-50/10 border-b border-teal-100/50">
+          <div className="bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-teal-100/40 shadow-sm flex items-center gap-2 hover:border-teal-300 transition-colors">
             <div className="p-1.5 bg-amber-50 rounded-lg text-amber-600">
               <Users size={14} />
             </div>
@@ -496,7 +496,7 @@ export function DoctorDashboard() {
               <p className="text-sm font-bold text-slate-800">{totalWaitingCount}</p>
             </div>
           </div>
-          <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex items-center gap-2">
+          <div className="bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-teal-100/40 shadow-sm flex items-center gap-2 hover:border-teal-300 transition-colors">
             <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
               <UserCheck size={14} />
             </div>
@@ -529,14 +529,14 @@ export function DoctorDashboard() {
           ) : (
             doctorQueue.length > 0 ? (
               doctorQueue.map((patient) => (
-                <div 
-                  key={patient.id} 
+                <div
+                  key={patient.id}
                   onClick={() => handleSelectPatient(patient)}
                   className={cn(
-                    "p-3 mb-2 rounded-lg border cursor-pointer transition-all hover:shadow-sm",
-                    selectedPatient?.id === patient.id 
-                      ? "border-blue-500 bg-blue-50/50 shadow-sm shadow-blue-100" 
-                      : "border-slate-100 bg-white hover:border-slate-300"
+                    "p-3 mb-2 rounded-xl border cursor-pointer transition-all duration-200",
+                    selectedPatient?.id === patient.id
+                      ? "border-teal-500 bg-teal-50/40 shadow-[0_4px_16px_rgba(20,184,166,0.1)]"
+                      : "border-teal-100/30 bg-white/70 hover:border-teal-300 hover:bg-white"
                   )}
                 >
                   <div className="flex justify-between items-start gap-2">
@@ -545,10 +545,10 @@ export function DoctorDashboard() {
                       "text-[9px] px-1.5 py-0.5 rounded-full font-bold border whitespace-nowrap",
                       patient.status === 'In Consultation'
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse"
-                        : "bg-blue-50 text-blue-700 border-blue-100"
+                        : "bg-teal-50 text-teal-700 border-teal-100/50"
                     )}>
-                      {patient.status === 'In Consultation' 
-                        ? 'Consulting' 
+                      {patient.status === 'In Consultation'
+                        ? 'Consulting'
                         : `Waiting No. ${waitingPatients.indexOf(patient) + 1}`
                       }
                     </span>
@@ -582,31 +582,31 @@ export function DoctorDashboard() {
       </div>
 
       {/* Right Column: EMR / Workspace */}
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+      <div className="flex-1 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden">
         {selectedPatient ? (
           <div className="flex flex-col h-full animate-in fade-in">
             {/* Patient Header */}
-            <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div className="p-6 border-b border-teal-100/40 bg-teal-50/15 flex justify-between items-center">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h2 className="text-2xl font-bold text-slate-800">{selectedPatient.name}</h2>
+                  <h2 className="text-2xl font-bold text-slate-800 text-glow-teal">{selectedPatient.name}</h2>
                   {(pastVisits && pastVisits.length > 0) ? (
-                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">Returning Patient</span>
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold">Returning Patient</span>
                   ) : (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">New Patient</span>
+                    <span className="text-xs bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full font-bold">New Patient</span>
                   )}
                 </div>
                 <p className="text-slate-500">
-                  Patient No: <span className="font-extrabold text-blue-600">{selectedPatient.patientNo || 'N/A'}</span> • Age: {selectedPatient.age} • Gender: {selectedPatient.gender || 'Not specified'}
+                  Patient No: <span className="font-extrabold text-teal-600">{selectedPatient.patientNo || 'N/A'}</span> • Age: {selectedPatient.age} • Gender: {selectedPatient.gender || 'Not specified'}
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 {/* ⏸️ Put on Hold (Recall Later) */}
                 <button
                   type="button"
                   onClick={handlePutOnHold}
-                  className="px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-extrabold rounded-xl text-xs flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  className="px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-extrabold rounded-full text-xs flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm"
                   title="Put this patient back on the waiting queue to call them later"
                 >
                   <Clock size={13} />
@@ -617,15 +617,15 @@ export function DoctorDashboard() {
                 <button
                   type="button"
                   onClick={handleCompleteAndClose}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-md shadow-emerald-500/10"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-full text-xs flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-md shadow-emerald-500/10"
                   title="Complete consultation and close patient session"
                 >
                   <CheckCircle size={13} />
                   <span>Complete & Close</span>
                 </button>
 
-                <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                <span className="px-3 py-1.5 bg-teal-100 text-teal-800 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse"></span>
                   <span>Consulting</span>
                 </span>
               </div>
@@ -633,12 +633,12 @@ export function DoctorDashboard() {
 
             <div className="flex-1 flex overflow-hidden">
               {/* Left inner column: Patient Profile + Past History */}
-              <div className="w-[38%] border-r border-slate-100 bg-slate-50/50 flex flex-col overflow-hidden">
+              <div className="w-[38%] border-r border-teal-100/50 bg-slate-50/50 flex flex-col overflow-hidden">
 
                 {/* Patient Info Card */}
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-blue-100">
+                <div className="p-4 bg-gradient-to-br from-teal-50/50 to-cyan-50/50 border-b border-teal-100/40">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
                       {selectedPatient.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
@@ -650,11 +650,11 @@ export function DoctorDashboard() {
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                      <Phone size={10} className="text-blue-500 flex-shrink-0" />
+                      <Phone size={10} className="text-teal-500 flex-shrink-0" />
                       <span className="font-mono">{selectedPatient.phone}</span>
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                      <FileText size={10} className="text-blue-500 flex-shrink-0" />
+                      <FileText size={10} className="text-teal-500 flex-shrink-0" />
                       <span className="font-medium">Token: {selectedPatient.tokenNumber}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-2.5">
@@ -664,7 +664,7 @@ export function DoctorDashboard() {
                         className={`text-[10px] px-3 py-1.5 rounded-xl font-bold border flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm hover:shadow ${
                           !loadingHistory && pastVisits.length > 0
                             ? 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10'
-                            : 'bg-blue-600 border-blue-600 hover:bg-blue-700 text-white shadow-blue-500/10'
+                            : 'bg-teal-600 border-teal-600 hover:bg-teal-700 text-white shadow-teal-500/10'
                         }`}
                       >
                         <FileText size={12} className="stroke-[2.5]" />
@@ -678,7 +678,7 @@ export function DoctorDashboard() {
                 <div className="p-4 border-b border-slate-100 bg-white space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 flex items-center gap-1.5">
-                      <Activity size={12} className="text-blue-600 animate-pulse" /> Clinical Vitals
+                      <Activity size={12} className="text-teal-600 animate-pulse" /> Clinical Vitals
                     </h3>
                     {selectedPatient.vitals && selectedPatient.vitals.length > 0 && (
                       <span className="text-[8px] bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold px-1.5 py-0.5 rounded-full uppercase">
@@ -693,9 +693,9 @@ export function DoctorDashboard() {
                         // Smart colored thresholds for high-quality alerts
                         let alertClass = 'bg-slate-50 border-slate-200/60 text-slate-700';
                         let dotClass = 'bg-slate-400';
-                        
+
                         const numVal = parseFloat(v.value);
-                        
+
                         if (v.name === 'Temperature' && numVal > 100) {
                           alertClass = 'bg-amber-50 border-amber-200 text-amber-800';
                           dotClass = 'bg-amber-500 animate-pulse';
@@ -751,17 +751,17 @@ export function DoctorDashboard() {
                   {/* Past Medical History Card */}
                   <div className="space-y-1.5 pt-1.5">
                     <h4 className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 flex items-center gap-1.5">
-                      <FileText size={12} className="text-blue-500" /> Past Diagnoses
+                      <FileText size={12} className="text-teal-500" /> Past Diagnoses
                     </h4>
                     {selectedPatient.pastDiagnoses ? (
                       <div className="flex flex-wrap gap-1">
                         {selectedPatient.pastDiagnoses.split(',').map((diag: string, index: number) => (
-                          <span 
-                            key={index} 
+                          <span
+                            key={index}
                             className={`px-2 py-0.5 rounded-lg text-[9px] font-extrabold border ${
                               diag.toLowerCase().includes('none')
                                 ? 'bg-slate-50 text-slate-500 border-slate-200'
-                                : 'bg-blue-50 text-blue-700 border-blue-100 shadow-sm'
+                                : 'bg-teal-50 text-teal-700 border-teal-100/60 shadow-sm'
                             }`}
                           >
                             {diag.trim()}
@@ -782,13 +782,13 @@ export function DoctorDashboard() {
 
                   {loadingHistory ? (
                     <div className="text-center py-8 text-slate-400">
-                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                       <span className="text-[11px]">Loading history...</span>
                     </div>
                   ) : pastVisits.length > 0 ? (
                     <div className="space-y-2">
                       {pastVisits.map((visit: any, idx: number) => (
-                        <div key={idx} className="bg-white rounded-lg border border-slate-100 shadow-sm p-2.5 hover:border-blue-200 hover:shadow-md transition-all duration-150">
+                        <div key={idx} className="bg-white rounded-xl border border-teal-100/50 shadow-sm p-2.5 hover:border-teal-200 hover:shadow-md transition-all duration-150">
                           {/* Visit number + status */}
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-1.5">
@@ -825,7 +825,7 @@ export function DoctorDashboard() {
                           {/* Token & RxCode */}
                           <div className="flex items-center justify-between mt-1.5 text-[9px] text-slate-400 font-mono">
                             {visit.tokenNumber && <span>Token: {visit.tokenNumber}</span>}
-                            {visit.rxCode && <span className="text-blue-500">Rx: {visit.rxCode}</span>}
+                            {visit.rxCode && <span className="text-teal-600 font-bold">Rx: {visit.rxCode}</span>}
                           </div>
                         </div>
                       ))}
@@ -844,275 +844,274 @@ export function DoctorDashboard() {
 
               {/* Right inner column: Current Prescription Pad */}
               <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
-                  {/* Dual Smart Entry Tabs */}
-              <div className="flex border-b border-slate-200 text-xs font-bold text-slate-400">
-                <button 
-                  type="button"
-                  onClick={() => setEntryMode('voice')}
-                  className={`flex-1 pb-3 border-b-2 text-center transition-all flex items-center justify-center gap-1.5 ${
-                    entryMode === 'voice' ? 'border-blue-600 text-blue-600 font-extrabold' : 'border-transparent hover:text-slate-500'
+                <div className="flex border-b border-teal-100 text-xs font-bold text-slate-400">
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode('voice')}
+                    className={`flex-1 pb-3 border-b-2 text-center transition-all flex items-center justify-center gap-1.5 ${
+                    entryMode === 'voice' ? 'border-teal-600 text-teal-600 font-extrabold text-glow-teal' : 'border-transparent hover:text-slate-550'
                   }`}
-                >
-                  <Mic size={14} /> Voice Prescription (AI Speak)
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setEntryMode('manual')}
-                  className={`flex-1 pb-3 border-b-2 text-center transition-all flex items-center justify-center gap-1.5 ${
-                    entryMode === 'manual' ? 'border-blue-600 text-blue-600 font-extrabold' : 'border-transparent hover:text-slate-500'
+                  >
+                    <Mic size={14} className={entryMode === 'voice' ? 'text-teal-600' : ''} /> Voice Prescription (AI Speak)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode('manual')}
+                    className={`flex-1 pb-3 border-b-2 text-center transition-all flex items-center justify-center gap-1.5 ${
+                    entryMode === 'manual' ? 'border-teal-600 text-teal-600 font-extrabold text-glow-teal' : 'border-transparent hover:text-slate-550'
                   }`}
-                >
-                  <Keyboard size={14} /> Manual Smart Prescription (AI Search)
-                </button>
-              </div>
-
-              {/* Voice Entry Mode rendering */}
-              {entryMode === 'voice' && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  {/* Dictation Action */}
-                  <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-                    <button 
-                      type="button"
-                      onClick={toggleDictation}
-                      className={cn(
-                        "w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all duration-300",
-                        isDictating 
-                          ? "bg-red-500 text-white animate-pulse-fast shadow-red-500/50 scale-110" 
-                          : "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
-                      )}
-                    >
-                      <Mic size={32} />
-                    </button>
-                    <p className="mt-4 font-medium text-slate-700">
-                      {isDictating ? 'Listening... Speak now' : 'Click to Start Dictation'}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">Say "Prescribing Paracetamol..." to test</p>
-                  </div>
-
-                  {/* Transcript Text Box */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">AI Transcript</label>
-                    <textarea 
-                      className="w-full h-24 p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-medium text-slate-700 text-xs"
-                      value={transcript}
-                      onChange={(e) => setTranscript(e.target.value)}
-                      placeholder="Voice transcript will appear here..."
-                    />
-                  </div>
+                  >
+                    <Keyboard size={14} className={entryMode === 'manual' ? 'text-teal-600' : ''} /> Manual Smart Prescription (AI Search)
+                  </button>
                 </div>
-              )}
 
-              {/* Manual Smart Autocomplete Entry Mode rendering */}
-              {entryMode === 'manual' && (
-                <div className="space-y-4 animate-in fade-in duration-200 relative">
-                  {/* Search Bar */}
-                  <div className="relative">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                      Search Medicine (AI Autocomplete)
-                    </label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                      <input 
-                        type="text"
-                        placeholder="Type medicine name (e.g. Paracetamol, Dolo, Pan-D, Amox)..."
-                        value={searchQuery}
-                        onChange={e => handleSearchChange(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-bold text-slate-700 bg-slate-50/50"
-                      />
-                    </div>
-
-                    {/* Autocomplete Dropdown list */}
-                    {searchQuery.trim().length > 0 && searchSuggestions.length > 0 && (
-                      <div className="absolute inset-x-0 top-full mt-1 bg-white border border-slate-200/80 rounded-xl shadow-xl z-20 overflow-hidden divide-y divide-slate-100 max-h-48 overflow-y-auto animate-in slide-in-from-top-1 duration-150">
-                        {searchSuggestions.map((med: any) => (
-                          <div 
-                            key={med.name}
-                            onClick={() => handleSelectSuggestion(med)}
-                            className="p-3 hover:bg-blue-50/40 cursor-pointer flex justify-between items-center text-xs font-semibold"
-                          >
-                            <div className="text-left">
-                              <div className="text-slate-800 font-extrabold">{med.name}</div>
-                              <span className="text-[9px] text-slate-400 font-bold bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded-md font-mono mt-0.5 inline-block">
-                                {med.category}
-                              </span>
-                            </div>
-                            
-                            <div className="text-right">
-                              <span className="text-[10px] text-blue-600 font-bold font-mono uppercase bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
-                                💡 AI Recommended
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Smart pre-filled details form */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/60 font-medium text-xs items-end">
-                    <div className="space-y-1 text-left sm:col-span-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Medicine Name</label>
-                      <input 
-                        type="text"
-                        placeholder="e.g. Paracetamol 500mg"
-                        value={manualMedicine}
-                        onChange={e => setManualMedicine(e.target.value)}
-                        className="w-full h-9 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-1 text-left">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dosage</label>
-                      <input 
-                        type="text"
-                        placeholder="e.g. 1-0-1 (Post meals)"
-                        value={manualDosage}
-                        onChange={e => {
-                          const val = e.target.value;
-                          if (/^\d{3}$/.test(val)) {
-                            setManualDosage(val.split('').join('-'));
-                          } else if (/^\d{4}$/.test(val)) {
-                            setManualDosage(val.split('').join('-'));
-                          } else {
-                            setManualDosage(val);
-                          }
-                        }}
-                        className="w-full h-9 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-1 text-left">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Duration</label>
-                      <input 
-                        type="text"
-                        placeholder="e.g. 5 Days"
-                        value={manualDuration}
-                        onChange={e => setManualDuration(e.target.value)}
-                        className="w-full h-9 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                      />
-                    </div>
-                    <div className="text-left w-full">
+                {/* Voice Entry Mode rendering */}
+                {entryMode === 'voice' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    {/* Dictation Action */}
+                    <div className="flex flex-col items-center justify-center p-8 bg-teal-50/15 rounded-2xl border-2 border-dashed border-teal-100/60 shadow-inner">
                       <button
                         type="button"
-                        onClick={handleAddManualMedicine}
-                        className="w-full h-9 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/10 hover:shadow-lg hover:shadow-blue-500/20 active:scale-95 transition-all"
+                        onClick={toggleDictation}
+                        className={cn(
+                          "w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all duration-300",
+                          isDictating
+                            ? "bg-rose-500 text-white animate-pulse-fast shadow-rose-500/40 scale-110 pulse-ring"
+                            : "bg-teal-600 text-white hover:bg-teal-700 hover:scale-105 shadow-teal-500/10"
+                        )}
                       >
-                        <Plus size={14} className="stroke-[3]" /> Add Medication
+                        <Mic size={32} />
                       </button>
+                      <p className="mt-4 font-medium text-slate-700">
+                        {isDictating ? 'Listening... Speak now' : 'Click to Start Dictation'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">Say "Prescribing Paracetamol..." to test</p>
+                    </div>
+
+                    {/* Transcript Text Box */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">AI Transcript</label>
+                      <textarea
+                        className="w-full h-24 p-3 rounded-xl border border-teal-100/60 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 resize-none font-medium text-slate-700 text-xs outline-none transition-all duration-200 shadow-inner"
+                        value={transcript}
+                        onChange={(e) => setTranscript(e.target.value)}
+                        placeholder="Voice transcript will appear here..."
+                      />
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Structured UI Table */}
-              {prescriptions.length > 0 && (
-                <div className="space-y-2 animate-in slide-in-from-bottom-4">
-                  <label className="text-sm font-medium text-slate-700">Extracted Medications</label>
-                  <div className="border border-slate-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                          <th className="px-4 py-3 font-medium text-slate-700">Medicine</th>
-                          <th className="px-4 py-3 font-medium text-slate-700">Dosage</th>
-                          <th className="px-4 py-3 font-medium text-slate-700">Duration</th>
-                          <th className="px-4 py-3 font-medium text-slate-700 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {prescriptions.map((p, i) => {
-                          const isEditing = editingIndex === i;
-                          if (isEditing) {
+                {/* Manual Smart Autocomplete Entry Mode rendering */}
+                {entryMode === 'manual' && (
+                  <div className="space-y-4 animate-in fade-in duration-200 relative">
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        Search Medicine (AI Autocomplete)
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Type medicine name (e.g. Paracetamol, Dolo, Pan-D, Amox)..."
+                          value={searchQuery}
+                          onChange={e => handleSearchChange(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 border border-teal-100/60 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none text-xs font-bold text-slate-700 bg-slate-50/50 transition-all shadow-sm"
+                        />
+                      </div>
+
+                      {/* Autocomplete Dropdown list */}
+                      {searchQuery.trim().length > 0 && searchSuggestions.length > 0 && (
+                        <div className="absolute inset-x-0 top-full mt-1 bg-white border border-slate-200/80 rounded-xl shadow-xl z-20 overflow-hidden divide-y divide-slate-100 max-h-48 overflow-y-auto animate-in slide-in-from-top-1 duration-150">
+                          {searchSuggestions.map((med: any) => (
+                            <div
+                              key={med.name}
+                              onClick={() => handleSelectSuggestion(med)}
+                              className="p-3 hover:bg-blue-50/40 cursor-pointer flex justify-between items-center text-xs font-semibold"
+                            >
+                              <div className="text-left">
+                                <div className="text-slate-800 font-extrabold">{med.name}</div>
+                                <span className="text-[9px] text-slate-400 font-bold bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded-md font-mono mt-0.5 inline-block">
+                                  {med.category}
+                                </span>
+                              </div>
+
+                              <div className="text-right">
+                                <span className="text-[10px] text-teal-600 font-bold font-mono uppercase bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">
+                                  💡 AI Recommended
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Smart pre-filled details form */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/60 font-medium text-xs items-end">
+                      <div className="space-y-1 text-left sm:col-span-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Medicine Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Paracetamol 500mg"
+                          value={manualMedicine}
+                          onChange={e => setManualMedicine(e.target.value)}
+                          className="w-full h-9 rounded-xl border border-teal-100/60 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        />
+                      </div>
+                      <div className="space-y-1 text-left">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dosage</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 1-0-1 (Post meals)"
+                          value={manualDosage}
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (/^\d{3}$/.test(val)) {
+                              setManualDosage(val.split('').join('-'));
+                            } else if (/^\d{4}$/.test(val)) {
+                              setManualDosage(val.split('').join('-'));
+                            } else {
+                              setManualDosage(val);
+                            }
+                          }}
+                          className="w-full h-9 rounded-xl border border-teal-100/60 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        />
+                      </div>
+                      <div className="space-y-1 text-left">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Duration</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 5 Days"
+                          value={manualDuration}
+                          onChange={e => setManualDuration(e.target.value)}
+                          className="w-full h-9 rounded-xl border border-teal-100/60 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 font-mono"
+                        />
+                      </div>
+                      <div className="text-left w-full">
+                        <button
+                          type="button"
+                          onClick={handleAddManualMedicine}
+                          className="w-full h-9 bg-teal-600 hover:bg-teal-500 text-white font-extrabold rounded-full text-xs flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/10 hover:shadow-lg hover:shadow-teal-500/20 active:scale-95 transition-all text-glow-teal"
+                        >
+                          <Plus size={14} className="stroke-[3]" /> Add Medication
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Structured UI Table */}
+                {prescriptions.length > 0 && (
+                  <div className="space-y-2 animate-in slide-in-from-bottom-4">
+                    <label className="text-sm font-medium text-slate-700">Extracted Medications</label>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="px-4 py-3 font-medium text-slate-700">Medicine</th>
+                            <th className="px-4 py-3 font-medium text-slate-700">Dosage</th>
+                            <th className="px-4 py-3 font-medium text-slate-700">Duration</th>
+                            <th className="px-4 py-3 font-medium text-slate-700 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {prescriptions.map((p, i) => {
+                            const isEditing = editingIndex === i;
+                            if (isEditing) {
+                              return (
+                                <tr key={i} className="bg-teal-50/20 animate-in fade-in duration-150">
+                                  <td className="px-4 py-2 font-medium">
+                                    <input
+                                      type="text"
+                                      value={editMedicine}
+                                      onChange={e => setEditMedicine(e.target.value)}
+                                      className="w-full h-8 rounded-xl border border-teal-100/60 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 text-slate-600 font-medium">
+                                    <input
+                                      type="text"
+                                      value={editDosage}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        if (/^\d{3}$/.test(val)) {
+                                          setEditDosage(val.split('').join('-'));
+                                        } else if (/^\d{4}$/.test(val)) {
+                                          setEditDosage(val.split('').join('-'));
+                                        } else {
+                                          setEditDosage(val);
+                                        }
+                                      }}
+                                      className="w-full h-8 rounded-xl border border-teal-100/60 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 text-slate-600 font-mono">
+                                    <input
+                                      type="text"
+                                      value={editDuration}
+                                      onChange={e => setEditDuration(e.target.value)}
+                                      className="w-full h-8 rounded-xl border border-teal-100/60 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 text-right">
+                                    <div className="flex gap-1 justify-end">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveEdit(i)}
+                                        title="Save Changes"
+                                        className="text-emerald-600 hover:text-emerald-700 p-1.5 rounded-full hover:bg-emerald-50 transition-colors"
+                                      >
+                                        <CheckCircle size={14} className="stroke-[2.5]" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingIndex(null)}
+                                        title="Cancel"
+                                        className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+
                             return (
-                              <tr key={i} className="bg-blue-50/20 animate-in fade-in duration-150">
-                                <td className="px-4 py-2 font-medium">
-                                  <input 
-                                    type="text"
-                                    value={editMedicine}
-                                    onChange={e => setEditMedicine(e.target.value)}
-                                    className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  />
-                                </td>
-                                <td className="px-4 py-2 text-slate-600 font-medium">
-                                  <input 
-                                    type="text"
-                                    value={editDosage}
-                                    onChange={e => {
-                                      const val = e.target.value;
-                                      if (/^\d{3}$/.test(val)) {
-                                        setEditDosage(val.split('').join('-'));
-                                      } else if (/^\d{4}$/.test(val)) {
-                                        setEditDosage(val.split('').join('-'));
-                                      } else {
-                                        setEditDosage(val);
-                                      }
-                                    }}
-                                    className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  />
-                                </td>
-                                <td className="px-4 py-2 text-slate-600 font-mono">
-                                  <input 
-                                    type="text"
-                                    value={editDuration}
-                                    onChange={e => setEditDuration(e.target.value)}
-                                    className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  />
-                                </td>
-                                <td className="px-4 py-2 text-right">
-                                  <div className="flex gap-1 justify-end">
-                                    <button 
+                              <tr key={i} className="bg-white hover:bg-slate-50/40 transition-colors">
+                                <td className="px-4 py-3 font-medium text-slate-800">{p.medicine}</td>
+                                <td className="px-4 py-3 text-slate-600 font-medium">{p.dosage}</td>
+                                <td className="px-4 py-3 text-slate-600 font-mono">{p.duration}</td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex gap-1.5 justify-end">
+                                    <button
                                       type="button"
-                                      onClick={() => handleSaveEdit(i)}
-                                      title="Save Changes"
-                                      className="text-emerald-600 hover:text-emerald-700 p-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                                      onClick={() => handleStartEdit(i, p)}
+                                      title="Edit medication details"
+                                      className="text-slate-400 hover:text-teal-600 p-1.5 rounded-full hover:bg-teal-50 transition-colors"
                                     >
-                                      <CheckCircle size={14} className="stroke-[2.5]" />
+                                      <Edit size={14} />
                                     </button>
-                                    <button 
+                                    <button
                                       type="button"
-                                      onClick={() => setEditingIndex(null)}
-                                      title="Cancel"
-                                      className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                                      onClick={() => setPrescriptions(prev => prev.filter((_, idx) => idx !== i))}
+                                      title="Remove medication"
+                                      className="text-slate-400 hover:text-rose-600 p-1.5 rounded-full hover:bg-rose-50 transition-colors"
                                     >
-                                      <X size={14} />
+                                      <Trash2 size={14} />
                                     </button>
                                   </div>
                                 </td>
                               </tr>
                             );
-                          }
-
-                          return (
-                            <tr key={i} className="bg-white hover:bg-slate-50/40 transition-colors">
-                              <td className="px-4 py-3 font-medium text-slate-800">{p.medicine}</td>
-                              <td className="px-4 py-3 text-slate-600 font-medium">{p.dosage}</td>
-                              <td className="px-4 py-3 text-slate-600 font-mono">{p.duration}</td>
-                              <td className="px-4 py-3 text-right">
-                                <div className="flex gap-1.5 justify-end">
-                                  <button 
-                                    type="button"
-                                    onClick={() => handleStartEdit(i, p)}
-                                    title="Edit medication details"
-                                    className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
-                                  >
-                                    <Edit size={14} />
-                                  </button>
-                                  <button 
-                                    type="button"
-                                    onClick={() => setPrescriptions(prev => prev.filter((_, idx) => idx !== i))}
-                                    title="Remove medication"
-                                    className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
             </div>
 
             {/* Footer Action */}
@@ -1138,7 +1137,7 @@ export function DoctorDashboard() {
         >
           <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
             {/* Patient summary header */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+            <div className="bg-gradient-to-br from-teal-50 to-cyan-50/50 p-4 rounded-xl border border-teal-100/50 flex items-center justify-between shadow-sm">
               <div className="space-y-0.5">
                 <h3 className="text-sm font-extrabold text-slate-800">{selectedPatient.name}</h3>
                 <p className="text-[10px] text-slate-500 font-bold font-mono">
@@ -1147,7 +1146,7 @@ export function DoctorDashboard() {
               </div>
               <div className="text-right">
                 <span className="text-[9px] font-bold uppercase text-slate-400 block">Visits Captured</span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   {pastVisits.length} Records Found
                 </span>
@@ -1157,29 +1156,29 @@ export function DoctorDashboard() {
             {/* Historical timeline */}
             <div className="space-y-3">
               <h4 className="text-xs font-extrabold uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
-                <Clock size={14} className="text-blue-500" /> Longitudinal Visit Timeline
+                <Clock size={14} className="text-teal-600" /> Longitudinal Visit Timeline
               </h4>
-              
+
               {loadingHistory ? (
                 <div className="text-center py-12 text-slate-400">
-                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                   <span className="text-xs font-semibold">Loading EMR logs...</span>
                 </div>
               ) : pastVisits.length > 0 ? (
-                <div className="relative border-l border-slate-200 pl-5 ml-2.5 space-y-5 text-left">
+                <div className="relative border-l border-teal-200 pl-5 ml-2.5 space-y-5 text-left">
                   {pastVisits.map((visit: any, index: number) => (
                     <div key={index} className="relative animate-in slide-in-from-left-2 duration-150">
                       {/* Timeline bullet */}
-                      <div className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white font-mono text-[7px] font-bold shadow-sm shadow-blue-500/20">
+                      <div className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-teal-600 border-2 border-white flex items-center justify-center text-white font-mono text-[7px] font-bold shadow-sm shadow-teal-500/20">
                         {pastVisits.length - index}
                       </div>
-                      
-                      <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 space-y-2 hover:border-blue-200/60 hover:bg-slate-50/80 hover:shadow-sm transition-all duration-200">
+
+                      <div className="bg-slate-50 border border-teal-200/50 rounded-xl p-3.5 space-y-2 hover:border-teal-200/80 hover:bg-slate-50/80 hover:shadow-sm transition-all duration-200">
                         <div className="flex justify-between items-center">
                           <span className="font-extrabold text-xs text-slate-800 font-sans">Physician: {visit.doctor}</span>
                           <span className="text-[10px] text-slate-400 font-bold font-mono">{visit.date}</span>
                         </div>
-                        
+
                         {/* Prescribed medicines box */}
                         <div className="bg-white rounded-lg border border-slate-100 p-2.5 shadow-inner">
                           <p className="text-[11px] text-slate-600 leading-relaxed font-sans">
@@ -1191,7 +1190,7 @@ export function DoctorDashboard() {
                         <div className="flex items-center justify-between mt-1 text-[9px] font-mono text-slate-400">
                           {visit.tokenNumber && <span>Queue Token: {visit.tokenNumber}</span>}
                           {visit.rxCode && (
-                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 font-bold font-mono">
+                            <span className="px-1.5 py-0.5 rounded bg-teal-50 text-teal-600 border border-teal-100/60 font-bold font-mono">
                               Rx: {visit.rxCode}
                             </span>
                           )}
@@ -1221,7 +1220,7 @@ export function DoctorDashboard() {
             <div className="flex justify-end pt-2 border-t border-slate-100">
               <button
                 onClick={() => setIsHistoryModalOpen(false)}
-                className="px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 shadow-md shadow-slate-900/10 transition-colors w-full sm:w-auto"
+                className="px-5 py-2 bg-slate-800 text-white rounded-full text-xs font-bold hover:bg-slate-700 shadow-md shadow-slate-900/10 transition-colors w-full sm:w-auto"
               >
                 Done & Close
               </button>

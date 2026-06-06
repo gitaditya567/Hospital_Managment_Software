@@ -18,6 +18,17 @@ authRouter.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid password. Access denied.' });
     }
 
+    // Check if maintenance mode is active (Except for SUPER_ADMIN)
+    if (user.role !== 'SUPER_ADMIN') {
+      const { SystemSetting } = await import('../models/SystemSetting.js');
+      const settings = await SystemSetting.findOne({});
+      if (settings && settings.maintenanceMode) {
+        return res.status(503).json({ 
+          message: 'System is under maintenance. Access restricted to Super Admins only.' 
+        });
+      }
+    }
+
     // Three-Factor Validation: All roles except SUPER_ADMIN must activate terminal on first-time login
     if (user.role !== 'SUPER_ADMIN') {
       // Check if there is a Tenant document for this user's hospitalId
@@ -66,6 +77,16 @@ authRouter.post('/login', async (req, res) => {
         hospitalId: user.hospitalId
       }
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+authRouter.get('/maintenance-status', async (req, res) => {
+  try {
+    const { SystemSetting } = await import('../models/SystemSetting.js');
+    const settings = await SystemSetting.findOne({});
+    res.json({ maintenanceMode: settings ? settings.maintenanceMode : false });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

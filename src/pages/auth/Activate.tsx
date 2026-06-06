@@ -9,14 +9,14 @@ export function Activate() {
   const [step, setStep] = useState(1);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  
+
   // Setup fields
   const [hospitalName, setHospitalName] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [address, setAddress] = useState('');
-  
+
   const [validatedPlan, setValidatedPlan] = useState<any>(null);
   const [validityMonths, setValidityMonths] = useState(12);
 
@@ -174,7 +174,7 @@ export function Activate() {
                 <p className="text-[10px] text-slate-400 font-medium leading-normal">Verification triggers real-time query inside LicenseCodes registry.</p>
               </div>
 
-              <Button type="submit" className="w-full h-12 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center justify-center gap-2 rounded-2xl transition-all shadow-md shadow-blue-500/15 font-bold hover:-translate-y-[1.5px] hover:scale-[1.01] active:translate-y-0 active:scale-[0.99]">
+              <Button type="submit" className="w-full h-12 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center justify-center gap-2 rounded-full transition-all shadow-md shadow-blue-500/15 font-bold hover:-translate-y-[1.5px] hover:scale-[1.01] active:translate-y-0 active:scale-[0.99]">
                 Verify License Code <ArrowRight size={16} />
               </Button>
 
@@ -194,7 +194,7 @@ export function Activate() {
                         key={lic.code}
                         type="button"
                         onClick={() => setCode(lic.code)}
-                        className="w-full p-2.5 bg-slate-50 hover:bg-slate-100/70 rounded-xl border border-slate-100 flex justify-between items-center text-slate-600 hover:text-slate-900 transition-all duration-200 text-left active:scale-[0.99]"
+                        className="w-full p-2.5 bg-slate-50 hover:bg-slate-100/70 rounded-full border border-slate-100 flex justify-between items-center text-slate-600 hover:text-slate-900 transition-all duration-200 text-left active:scale-[0.99]"
                       >
                         <span className="font-bold tracking-wider">{lic.code}</span>
                         <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100/30 font-sans font-bold shadow-sm">
@@ -218,8 +218,8 @@ export function Activate() {
                 <div>
                   <p className="font-extrabold text-sm">License Verified Successfully!</p>
                   <p className="mt-0.5 font-semibold text-slate-500">
-                    Tier: <span className="font-bold text-slate-700">{validatedPlan.name}</span> • 
-                    Storage: <span className="font-bold text-slate-700">{validatedPlan.maxStorage}GB</span> • 
+                    Tier: <span className="font-bold text-slate-700">{validatedPlan.name}</span> •
+                    Storage: <span className="font-bold text-slate-700">{validatedPlan.maxStorage}GB</span> •
                     Validity: <span className="font-bold text-slate-700">{validityMonths} Months</span>
                   </p>
                 </div>
@@ -321,13 +321,13 @@ export function Activate() {
                 <Button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="w-1/3 h-12 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-2xl font-bold text-sm transition-all"
+                  className="w-1/3 h-12 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-full font-bold text-sm transition-all"
                 >
                   Back
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/15 hover:-translate-y-[1.5px] hover:scale-[1.01] active:translate-y-0 active:scale-[0.99]"
+                  className="flex-1 h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/15 hover:-translate-y-[1.5px] hover:scale-[1.01] active:translate-y-0 active:scale-[0.99]"
                 >
                   Create Hospital Node <CheckCircle2 size={16} />
                 </Button>
@@ -338,8 +338,8 @@ export function Activate() {
 
         <div className="mt-8 text-center text-xs text-slate-400 flex justify-between items-center px-3 font-semibold">
           <span>MediSaaS Platform Gateway v1.0.0</span>
-          <button 
-            onClick={() => navigate('/login')} 
+          <button
+            onClick={() => navigate('/login')}
             className="text-blue-600 hover:text-blue-700 font-bold transition-colors active:scale-95"
           >
             Back to Operator Login

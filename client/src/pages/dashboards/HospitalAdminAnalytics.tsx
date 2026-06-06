@@ -3,13 +3,13 @@ import { useHospitalStore } from '../../store/useHospitalStore';
 import { usePharmacyStore } from '../../store/usePharmacyStore';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
-import { 
-  PieChart as PieIcon, 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  Activity, 
-  ArrowUpRight, 
+import {
+  PieChart as PieIcon,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Activity,
+  ArrowUpRight,
   ArrowDownRight,
   Sparkles,
   Users,
@@ -100,7 +100,7 @@ export function HospitalAdminAnalytics() {
 
     const collectedThisMonth = invoices
       .filter(inv => inv.status === 'Paid' && isThisMonth(inv.date))
-      .reduce((sum, inv) => sum + inv.amount, 0) + 
+      .reduce((sum, inv) => sum + inv.amount, 0) +
       bills.filter(b => isThisMonth(b.date)).reduce((sum, b) => sum + b.total, 0);
 
     // 3. Pending (Pending Invoices overall)
@@ -126,8 +126,8 @@ export function HospitalAdminAnalytics() {
     // Percentage of collected over total invoiced
     const totalOPDOverall = invoices.reduce((sum, inv) => sum + inv.amount, 0);
     const totalSaaSOverall = totalOPDOverall + collectedPharmacyOverall;
-    const collectedPercentage = totalSaaSOverall > 0 
-      ? Math.round((collectedOverall / totalSaaSOverall) * 100) 
+    const collectedPercentage = totalSaaSOverall > 0
+      ? Math.round((collectedOverall / totalSaaSOverall) * 100)
       : 100;
 
     return {
@@ -313,7 +313,7 @@ export function HospitalAdminAnalytics() {
     // Apply search query filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(tx => 
+      result = result.filter(tx =>
         tx.id.toLowerCase().includes(q) ||
         tx.patientName.toLowerCase().includes(q) ||
         tx.patientPhone.includes(q) ||
@@ -342,7 +342,7 @@ export function HospitalAdminAnalytics() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      
+
       {/* Header telemetry band */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-6 rounded-2xl shadow-xl border border-slate-700/50 relative overflow-hidden">
         <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-indigo-500/10 rounded-full blur-3xl -z-10"></div>
@@ -362,7 +362,7 @@ export function HospitalAdminAnalytics() {
         </div>
 
         <div className="mt-4 md:mt-0 flex gap-2">
-          <button 
+          <button
             onClick={() => setSelectedTimeline('month')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
               selectedTimeline === 'month' 
@@ -372,7 +372,7 @@ export function HospitalAdminAnalytics() {
           >
             This Calendar Month
           </button>
-          <button 
+          <button
             onClick={() => setSelectedTimeline('year')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
               selectedTimeline === 'year' 
@@ -387,7 +387,7 @@ export function HospitalAdminAnalytics() {
 
       {/* 4 Premium KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
+
         {/* Card 1: This Month Amount */}
         <div className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between">
           <div className="flex justify-between items-start">
@@ -486,10 +486,10 @@ export function HospitalAdminAnalytics() {
 
       {/* Main Analytics Dash Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
+
         {/* Left Card: Pie Chart Segment shares */}
         <div className="lg:col-span-7 bg-white rounded-2xl shadow-md border border-slate-200/80 p-6 flex flex-col justify-between relative">
-          
+
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -505,14 +505,14 @@ export function HospitalAdminAnalytics() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center py-4">
-            
+
             {/* Real Mathematical Pie Chart SVG */}
             <div className="flex justify-center items-center relative">
               <svg width="220" height="220" viewBox="0 0 120 120" className="overflow-visible select-none">
                 {/* Background glow circle */}
                 <circle cx={60} cy={60} r={46} fill="#f8fafc" />
                 <circle cx={60} cy={60} r={44} fill="transparent" stroke="#f1f5f9" strokeWidth={1} />
-                
+
                 {/* Sector render mapping */}
                 {departmentRevenueData.sectors.map((sec, idx) => {
                   const r = 42; // Radius
@@ -527,14 +527,14 @@ export function HospitalAdminAnalytics() {
 
                   // Full circular ring path handler if only 1 category takes 100% space
                   const isFull = sec.percent >= 0.999;
-                  const pathData = isFull 
-                    ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z` 
+                  const pathData = isFull
+                    ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
                     : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${sec.largeArcFlag} 1 ${x2} ${y2} Z`;
 
                   // Explode offset translates the hovered sector outwards
                   const isHovered = hoveredIndex === idx;
-                  const translateStyle = isHovered 
-                    ? { transform: `translate(${sec.dx}px, ${sec.dy}px)` } 
+                  const translateStyle = isHovered
+                    ? { transform: `translate(${sec.dx}px, ${sec.dy}px)` }
                     : undefined;
 
                   return (
@@ -631,7 +631,7 @@ export function HospitalAdminAnalytics() {
         {/* Right Card: Performance Telemetry Progress Bars */}
         <div className="lg:col-span-5 bg-white rounded-2xl shadow-md border border-slate-200/80 p-6 flex flex-col justify-between">
           <div className="space-y-6">
-            
+
             <div>
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Users className="text-indigo-600" size={18} /> Telemetry Progress
@@ -654,13 +654,13 @@ export function HospitalAdminAnalytics() {
                         {percentInt}% of Total
                       </span>
                     </div>
-                    
+
                     <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
                       <div
                         className="h-full rounded-full transition-all duration-700 ease-out"
-                        style={{ 
-                          width: `${percentInt}%`, 
-                          backgroundColor: sec.color 
+                        style={{
+                          width: `${percentInt}%`,
+                          backgroundColor: sec.color
                         }}
                       />
                     </div>
@@ -696,10 +696,10 @@ export function HospitalAdminAnalytics() {
 
       {/* COMPULSORY FEATURE: Financial Transaction Audit Ledger Table with Custom Date Filter */}
       <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 overflow-hidden">
-        
+
         {/* Table Header and Control Panels */}
         <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
-          
+
           <div className="space-y-1">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <Receipt className="text-indigo-600" size={20} /> Departmental Audited Transactions
@@ -711,16 +711,16 @@ export function HospitalAdminAnalytics() {
 
           {/* Controls: Search, Date Filter Input & Quick Presets */}
           <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto items-stretch sm:items-center">
-            
+
             {/* Search Input Bar */}
             <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search patient, operator, receipt..." 
+              <input
+                type="text"
+                placeholder="Search patient, operator, receipt..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700 bg-white" 
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700 bg-white"
               />
             </div>
 
@@ -728,7 +728,7 @@ export function HospitalAdminAnalytics() {
             <div className="flex items-center gap-2 border border-slate-200 bg-white px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 w-full sm:w-auto">
               <Filter size={14} className="text-indigo-500 shrink-0" />
               <span className="shrink-0 text-slate-400 font-medium">Date:</span>
-              <input 
+              <input
                 type="date"
                 value={filterDate}
                 onChange={e => setFilterDate(e.target.value)}
@@ -784,14 +784,14 @@ export function HospitalAdminAnalytics() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 text-xs font-semibold">
-              
+
               {filteredTransactions.map((tx) => {
                 const isPaid = tx.status === 'Paid';
                 const isPharmacy = tx.type === 'Pharmacy';
-                
+
                 return (
                   <tr key={tx.id} className="hover:bg-slate-50/30 transition-colors">
-                    
+
                     {/* Receipt No */}
                     <td className="px-6 py-4">
                       <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg font-black font-mono shadow-sm">
@@ -867,7 +867,7 @@ export function HospitalAdminAnalytics() {
                           setSelectedTxId(tx.id);
                           setIsModalOpen(true);
                         }}
-                        className="rounded-xl text-[10px] font-extrabold h-8 px-3 border-indigo-200 text-indigo-700 hover:bg-indigo-50/50 flex gap-1 items-center ml-auto"
+                        className="rounded-full text-[10px] font-extrabold h-8 px-3 border-indigo-200 text-indigo-700 hover:bg-indigo-50/50 flex gap-1 items-center ml-auto"
                         title="View Detailed virtual receipt"
                       >
                         <Eye size={12} />
@@ -896,7 +896,7 @@ export function HospitalAdminAnalytics() {
                             setFilterDate(todayStr);
                             setSearchQuery('');
                           }}
-                          className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 mt-2"
+                          className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold transition-all flex items-center gap-1 mt-2"
                         >
                           <RefreshCw size={12} /> Reset Ledger to Today
                         </button>
@@ -924,11 +924,11 @@ export function HospitalAdminAnalytics() {
       >
         {selectedTransaction && (
           <div className="space-y-5">
-            
+
             {/* Visual virtual thermal paper design */}
             <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200/80 flex justify-center">
               <div className="w-[72mm] bg-white border border-slate-300/80 p-4 shadow-sm text-slate-900 font-mono text-[10px] space-y-4 rounded-md relative overflow-hidden">
-                
+
                 {/* Visual Watermark */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none transform -rotate-45">
                   <span className="text-3xl font-black uppercase tracking-widest text-slate-900">AUDITED</span>
@@ -987,7 +987,7 @@ export function HospitalAdminAnalytics() {
                 {/* Itemized list details block */}
                 <div className="space-y-2 border-b border-dashed border-slate-300 pb-2.5">
                   <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Itemized Billing</div>
-                  
+
                   {selectedTransaction.type === 'Pharmacy' && pharmacyBillDetails ? (
                     <div className="space-y-1.5">
                       {pharmacyBillDetails.items.map((item, idx) => (
@@ -1025,8 +1025,8 @@ export function HospitalAdminAnalytics() {
                     |||||||||||||||||||||||
                   </div>
                   <p className="text-[7px] text-slate-400 uppercase tracking-wider">
-                    {selectedTransaction.status === 'Paid' 
-                      ? 'Thank you for cooperation' 
+                    {selectedTransaction.status === 'Paid'
+                      ? 'Thank you for cooperation'
                       : 'Please settle outstanding payment'}
                   </p>
                 </div>
@@ -1036,21 +1036,21 @@ export function HospitalAdminAnalytics() {
 
             {/* Modal Actions */}
             <div className="flex gap-2">
-              <Button 
+              <Button
                 onClick={() => {
                   window.print();
-                }} 
-                className="flex-1 font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 flex gap-2 items-center justify-center text-xs h-10"
+                }}
+                className="flex-1 font-bold rounded-full bg-indigo-600 hover:bg-indigo-700 flex gap-2 items-center justify-center text-xs h-10"
               >
                 <Printer size={14} /> Execute Print
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setIsModalOpen(false);
                   setSelectedTxId(null);
                 }}
-                className="flex-1 font-bold rounded-xl text-xs h-10"
+                className="flex-1 font-bold rounded-full text-xs h-10"
               >
                 Close Preview
               </Button>

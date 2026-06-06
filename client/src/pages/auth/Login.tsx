@@ -12,8 +12,20 @@ export function Login() {
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isMaintenanceActive, setIsMaintenanceActive] = useState(false);
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    fetch('/api/auth/maintenance-status')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.maintenanceMode) {
+          setIsMaintenanceActive(true);
+        }
+      })
+      .catch(err => console.error('Failed to query maintenance status', err));
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,19 +52,34 @@ export function Login() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-slate-50 via-blue-50/20 to-indigo-50/30 text-slate-600 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-gradient-to-tr from-teal-50/50 via-white to-cyan-50/40 text-slate-600 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans medical-grid">
       {/* Ambient background decoration */}
-      <div className="absolute top-1/4 left-1/3 w-80 h-80 bg-blue-400/80 rounded-full blur-[120px] opacity-10 pointer-events-none animate-float"></div>
-      <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-indigo-400/80 rounded-full blur-[120px] opacity-10 pointer-events-none animate-float" style={{ animationDelay: '1.5s' }}></div>
+      <div className="absolute top-1/4 left-1/3 w-80 h-80 bg-teal-300/40 rounded-full blur-[120px] opacity-20 pointer-events-none animate-float-slow"></div>
+      <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-cyan-300/40 rounded-full blur-[120px] opacity-20 pointer-events-none animate-float-slow" style={{ animationDelay: '2s' }}></div>
+
+      {/* Sweeping ECG heartwave background */}
+      <div className="absolute inset-x-0 bottom-0 h-48 w-full pointer-events-none opacity-40">
+        <svg className="w-full h-full text-teal-600/10" preserveAspectRatio="none" viewBox="0 0 1000 100">
+          <path 
+            className="animate-ecg stroke-teal-500/30" 
+            strokeWidth="3" 
+            fill="none" 
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="1000" 
+            d="M0,50 L250,50 L260,35 L270,65 L280,50 L350,50 L365,15 L380,85 L395,50 L470,50 L480,35 L490,65 L500,50 L650,50 L665,20 L680,80 L695,50 L770,50 L780,35 L790,65 L800,50 L1000,50" 
+          />
+        </svg>
+      </div>
 
       <div className="w-full max-w-md z-10 animate-fade-in-up">
         {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center h-15 w-15 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-2xl font-extrabold mb-3.5 shadow-lg shadow-blue-500/20 animate-float">
+        <div className="text-center mb-8 flex flex-col items-center">
+          <div className="inline-flex items-center justify-center h-16 w-16 rounded-3xl bg-gradient-to-br from-teal-400 to-cyan-500 text-white text-3xl font-extrabold mb-4 shadow-[0_4px_20px_rgba(20,184,166,0.35)] animate-heartbeat">
             ✚
           </div>
-          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-slate-800 to-slate-950 bg-clip-text text-transparent flex justify-center items-center gap-2.5">
-            MediSaaS <span className="text-[10px] bg-blue-50 border border-blue-100 text-blue-600 px-2.5 py-0.5 rounded-full font-mono uppercase tracking-widest font-extrabold shadow-sm">Gateway</span>
+          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-teal-800 to-cyan-950 bg-clip-text text-transparent flex justify-center items-center gap-2.5 text-glow-teal">
+            MediSaaS <span className="text-[10px] bg-teal-50 border border-teal-100 text-teal-600 px-2.5 py-0.5 rounded-full font-mono uppercase tracking-widest font-extrabold shadow-sm">Gateway</span>
           </h1>
           <p className="text-slate-400 mt-2 text-xs font-semibold uppercase tracking-wider">
             Enter credentials below to access the gateway node
@@ -60,7 +87,21 @@ export function Login() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-white/80 backdrop-blur-xl border border-slate-100/90 rounded-3xl shadow-[0_12px_40px_-12px_rgba(0,0,0,0.05)] p-8 md:p-10">
+        <div className="glass-card rounded-3xl shadow-[0_12px_40px_-12px_rgba(13,148,136,0.08)] border border-teal-100/50 p-8 md:p-10 relative overflow-hidden">
+          {/* Floating stethoscope background vector inside card */}
+          <div className="absolute -right-8 -top-8 w-24 h-24 text-teal-500/10 pointer-events-none animate-float-slow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19H3v-6h6v6zm12 0h-6v-6h6v6zM9 9H3V3h6v6zm12 0h-6V3h6v6z" />
+            </svg>
+          </div>
+
+          {isMaintenanceActive && (
+            <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200/80 text-amber-800 rounded-xl text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
+              <span className="text-amber-500 font-bold shrink-0">⚠️</span>
+              <span className="font-extrabold uppercase tracking-wide">System Maintenance Active: Super Admin Login Only</span>
+            </div>
+          )}
+
           {error && (
             <div className="mb-5 p-3.5 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
               <span className="text-rose-500 font-bold shrink-0">⚠️</span>
@@ -71,9 +112,9 @@ export function Login() {
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email Input */}
             <div className="space-y-1.5 group">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-blue-600 transition-colors">Email Address</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-teal-600 transition-colors">Email Address</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 transition-colors group-focus-within:text-blue-500">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 transition-colors group-focus-within:text-teal-500">
                   <Mail size={16} />
                 </div>
                 <input
@@ -82,16 +123,16 @@ export function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-100 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
+                  className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50/50 border border-teal-100/60 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-200"
                 />
               </div>
             </div>
 
             {/* Password Input */}
             <div className="space-y-1.5 group">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-blue-600 transition-colors">Password</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-teal-600 transition-colors">Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 transition-colors group-focus-within:text-blue-500">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 transition-colors group-focus-within:text-teal-500">
                   <Lock size={16} />
                 </div>
                 <input
@@ -100,7 +141,7 @@ export function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="block w-full pl-11 pr-11 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-100 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
+                  className="block w-full pl-11 pr-11 py-2.5 rounded-xl text-sm bg-slate-50/50 border border-teal-100/60 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-200"
                 />
                 <button
                   type="button"
@@ -114,9 +155,9 @@ export function Login() {
 
             {/* Hospital Access Code Input */}
             <div className="space-y-1.5 group">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-blue-600 transition-colors">Hospital Access Code</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-teal-600 transition-colors">Hospital Access Code</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold transition-colors group-focus-within:text-blue-500">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-teal-600 font-bold transition-colors group-focus-within:text-teal-500">
                   🔑
                 </div>
                 <input
@@ -124,7 +165,7 @@ export function Login() {
                   placeholder="e.g. HOSP-2026-R4T1-OP90 (First login only)"
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}
-                  className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-100 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 uppercase font-mono tracking-wider"
+                  className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50/50 border border-teal-100/60 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-200 uppercase font-mono tracking-wider"
                 />
               </div>
               <p className="text-[9px] text-slate-400 font-medium leading-normal pt-0.5">
@@ -136,12 +177,12 @@ export function Login() {
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input 
                   type="checkbox" 
-                  className="rounded-md bg-slate-50 border-slate-200 text-blue-600 focus:ring-blue-500/20 focus:ring-offset-white" 
+                  className="rounded-md bg-slate-50 border-slate-200 text-teal-600 focus:ring-teal-500/20 focus:ring-offset-white" 
                   defaultChecked
                 />
                 <span className="text-slate-400 font-semibold group-hover:text-slate-600 transition-colors">Remember session</span>
               </label>
-              <a href="#" className="font-bold text-blue-600 hover:text-blue-700 transition-colors">
+              <a href="#" className="font-bold text-teal-600 hover:text-teal-700 transition-colors">
                 Recover Credentials
               </a>
             </div>
@@ -149,7 +190,7 @@ export function Login() {
             <Button 
               type="submit" 
               disabled={loading}
-              className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/15 disabled:opacity-50 disabled:pointer-events-none hover:-translate-y-[1.5px] hover:scale-[1.01] active:translate-y-0 active:scale-[0.99]"
+              className="w-full h-12 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-500/15 disabled:opacity-50 disabled:pointer-events-none hover:-translate-y-[1.5px] hover:scale-[1.01] active:translate-y-0 active:scale-[0.99] text-glow-teal animate-shimmer"
             >
               {loading ? 'Verifying Gateway Node...' : 'Sign In to System'} <LogIn size={16} />
             </Button>
@@ -162,9 +203,9 @@ export function Login() {
           <button 
             type="button"
             onClick={() => navigate('/activate')} 
-            className="text-blue-600 hover:text-blue-700 font-bold transition-colors flex items-center gap-1 active:scale-95"
+            className="text-teal-600 hover:text-teal-700 font-bold transition-colors flex items-center gap-1 active:scale-95"
           >
-            Activate Node <Sparkles size={12} className="text-blue-500" />
+            Activate Node <Sparkles size={12} className="text-teal-500 animate-pulse" />
           </button>
         </div>
       </div>

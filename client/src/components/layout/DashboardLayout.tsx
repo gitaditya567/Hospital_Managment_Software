@@ -17,6 +17,7 @@ export function DashboardLayout() {
   const fetchPharmacyData = usePharmacyStore((state) => state.fetchPharmacyData);
 
   const [isSuspended, setIsSuspended] = useState(false);
+  const [isMaintenanceActive, setIsMaintenanceActive] = useState(false);
   const [countdown, setCountdown] = useState(120); // 2 minutes (120s) countdown
 
   useEffect(() => {
@@ -27,29 +28,44 @@ export function DashboardLayout() {
     } else if (user.hospitalId) {
       // Fetch hospital operational data
       fetchHospitalData(user.hospitalId);
-      
+
       // Fetch pharmacy specific inventory/orders
       fetchPharmacyData(user.hospitalId);
     }
   }, [user, fetchSuperAdminData, fetchHospitalData, fetchPharmacyData]);
 
-  // Periodic suspension status check
+  // Periodic maintenance & suspension status check
   useEffect(() => {
-    if (!user || user.role === 'SUPER_ADMIN' || !user.hospitalId) return;
+    if (!user || user.role === 'SUPER_ADMIN') return;
 
     const checkStatus = async () => {
       try {
-        const res = await fetch(`/api/auth/hospital-status/${user.hospitalId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status === 'Suspended') {
-            setIsSuspended(true);
+        // 1. Query maintenance status
+        const maintRes = await fetch('/api/auth/maintenance-status');
+        if (maintRes.ok) {
+          const maintData = await maintRes.json();
+          if (maintData.maintenanceMode) {
+            setIsMaintenanceActive(true);
+            return; // Exit early: maintenance page takes priority
           } else {
-            setIsSuspended(false);
+            setIsMaintenanceActive(false);
+          }
+        }
+
+        // 2. Query hospital suspension status if hospitalId exists
+        if (user.hospitalId) {
+          const res = await fetch(`/api/auth/hospital-status/${user.hospitalId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'Suspended') {
+              setIsSuspended(true);
+            } else {
+              setIsSuspended(false);
+            }
           }
         }
       } catch (err) {
-        console.error('Failed to query hospital status', err);
+        console.error('Failed to query system status', err);
       }
     };
 
@@ -82,7 +98,7 @@ export function DashboardLayout() {
       <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-auto p-4 md:p-8">
+        <main className="flex-1 overflow-auto p-4 md:p-8 medical-grid">
           <div className="max-w-7xl mx-auto">
             <Outlet />
           </div>
@@ -90,7 +106,7 @@ export function DashboardLayout() {
       </div>
 
       {/* Hospital Suspension Block Alert (Sleek Red Modal Panel) */}
-      {isSuspended && (
+      {isSuspended && !isMaintenanceActive && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-xl bg-slate-950/90 animate-in fade-in duration-300 font-sans">
           <div className="relative max-w-lg w-full bg-slate-900 border-2 border-rose-500/40 rounded-3xl p-8 shadow-[0_0_50px_rgba(244,63,94,0.15)] text-center space-y-6 overflow-hidden">
             {/* Ambient Red Glow decor */}
@@ -111,7 +127,7 @@ export function DashboardLayout() {
               </p>
             </div>
 
-            <p className="text-sm text-slate-300 leading-relaxed max-w-sm mx-auto">
+            <p className="text-sm text-slate-300 leading-relaxed max-w-sm mx-auto font-medium">
               Your hospital's system node has been suspended by the central platform operator. Operations are frozen and database connections are locked.
             </p>
 
@@ -129,9 +145,51 @@ export function DashboardLayout() {
               <button
                 type="button"
                 onClick={() => logout()}
-                className="w-full h-12 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-rose-600/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full h-12 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-full transition-all shadow-lg shadow-rose-600/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <LogOut size={16} /> Terminate & Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Platform Maintenance Mode Overlay (Sleek Amber-Teal Modal Panel) */}
+      {isMaintenanceActive && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-xl bg-slate-900/95 animate-in fade-in duration-300 font-sans">
+          <div className="relative max-w-lg w-full bg-slate-950 border-2 border-amber-500/40 rounded-3xl p-8 shadow-[0_0_50px_rgba(245,158,11,0.15)] text-center space-y-6 overflow-hidden">
+            {/* Ambient amber glow decor */}
+            <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-500/10 rounded-full blur-[60px] pointer-events-none"></div>
+            <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-teal-500/10 rounded-full blur-[60px] pointer-events-none"></div>
+
+            {/* Telemetry Grid inside maintenance box */}
+            <div className="absolute inset-0 opacity-5 pointer-events-none medical-grid"></div>
+
+            {/* Pulsing Icon */}
+            <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
+              <span className="text-4xl animate-bounce">🛠️</span>
+            </div>
+
+            <div className="space-y-2 relative z-10">
+              <h1 className="text-2xl font-black tracking-tight text-white uppercase text-glow-teal">
+                System Under Maintenance
+              </h1>
+              <p className="text-xs text-amber-400 font-bold uppercase tracking-widest font-mono">
+                Platform Upgrades Active
+              </p>
+            </div>
+
+            <p className="text-sm text-slate-300 leading-relaxed max-w-sm mx-auto relative z-10 font-medium">
+              We are currently performing scheduled maintenance optimizations to upgrade clinical telemetry databases. All services are temporarily suspended. Please try again shortly.
+            </p>
+
+            <div className="pt-2 relative z-10">
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="w-full h-12 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-full transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Return to Login Gate
               </button>
             </div>
           </div>

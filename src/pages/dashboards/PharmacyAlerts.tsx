@@ -15,8 +15,8 @@ export function PharmacyAlerts() {
   const columns = [
     { key: 'code', header: 'Item Code' },
     { key: 'name', header: 'Medicine Name' },
-    { 
-      key: 'stock', 
+    {
+      key: 'stock',
       header: 'Current Stock',
       render: (item: Medicine) => (
         <span className={`font-bold font-mono ${item.stock < item.minThreshold ? 'text-rose-600' : 'text-slate-700'}`}>
@@ -24,8 +24,8 @@ export function PharmacyAlerts() {
         </span>
       )
     },
-    { 
-      key: 'expiryDate', 
+    {
+      key: 'expiryDate',
       header: 'Expiry Date',
       render: (item: Medicine) => {
         const expiry = new Date(item.expiryDate);
@@ -46,8 +46,8 @@ export function PharmacyAlerts() {
       key: 'location',
       header: 'Rack Location'
     },
-    { 
-      key: 'action', 
+    {
+      key: 'action',
       header: 'Action Plan',
       render: (item: Medicine) => {
         const expiry = new Date(item.expiryDate);
@@ -86,7 +86,7 @@ export function PharmacyAlerts() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      
+
       {/* Title */}
       <div>
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">

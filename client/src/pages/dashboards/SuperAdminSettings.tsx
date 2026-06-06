@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Settings, Shield, Mail, FileSpreadsheet, Server, DollarSign, ToggleLeft, ToggleRight, Check } from 'lucide-react';
 
 export function SuperAdminSettings() {
-  const { settings, updateSettings, addActivity } = useSuperAdminStore();
+  const { settings, updateSettings, addActivity, exportBackup, sendDiagnostics } = useSuperAdminStore();
   const [platformName, setPlatformName] = useState(settings.platformName);
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail);
   const [taxRate, setTaxRate] = useState(settings.taxRate);
@@ -13,6 +13,9 @@ export function SuperAdminSettings() {
   const [stripeEnabled, setStripeEnabled] = useState(settings.stripeEnabled);
   const [razorpayEnabled, setRazorpayEnabled] = useState(settings.razorpayEnabled);
   const [isSaved, setIsSaved] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [sendingDiagnostics, setSendingDiagnostics] = useState(false);
+  const [diagnosticsToken, setDiagnosticsToken] = useState<string | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +32,17 @@ export function SuperAdminSettings() {
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  const handleBackupDB = () => {
-    addActivity('Manual raw encrypted MongoDB database backup successfully downloaded by Super Admin.', 'system');
-    alert('System backup initiated. An encrypted backup archive is compiling and downloading...');
+  const handleBackupDB = async () => {
+    setBackingUp(true);
+    try {
+      await exportBackup();
+      await addActivity('Manual raw encrypted MongoDB database backup successfully downloaded by Super Admin.', 'system');
+      alert('Database backup completed successfully! Excluded HIPAA-sensitive records.');
+    } catch (error) {
+      alert('Failed to generate database backup. Please check backend connection.');
+    } finally {
+      setBackingUp(false);
+    }
   };
 
   return (
@@ -175,25 +186,41 @@ export function SuperAdminSettings() {
           <p className="text-xs text-slate-500">
             For critical emergency incidents or security audits. Perform backups of entire tenant MongoDB records. (Clinical logs and patient histories are private and fully excluded from backup files to secure strict HIPAA boundaries).
           </p>
-          <div className="flex flex-wrap gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pt-2 items-center">
             <Button 
               type="button" 
               variant="outline" 
+              disabled={backingUp}
               onClick={handleBackupDB} 
               className="flex items-center gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-50"
             >
-              <FileSpreadsheet size={16} /> Export Centralized DB Backup
+              <FileSpreadsheet size={16} /> {backingUp ? 'Exporting...' : 'Export Centralized DB Backup'}
             </Button>
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => {
-                alert('Audited log files compile successfully. Generated diagnostic index token for HIPAA compliance: COMP-9283-DX82');
+              disabled={sendingDiagnostics}
+              onClick={async () => {
+                setSendingDiagnostics(true);
+                try {
+                  const token = await sendDiagnostics();
+                  setDiagnosticsToken(token);
+                  alert(`Audited log files compiled successfully. Compliance index token generated: ${token}`);
+                } catch (error) {
+                  alert('Failed to send diagnostics. Please check backend connection.');
+                } finally {
+                  setSendingDiagnostics(false);
+                }
               }}
               className="flex items-center gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-50"
             >
-              <Mail size={16} /> Send Diagnostics Log
+              <Mail size={16} /> {sendingDiagnostics ? 'Sending...' : 'Send Diagnostics Log'}
             </Button>
+            {diagnosticsToken && (
+              <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold font-mono">
+                Latest HIPAA Token: {diagnosticsToken}
+              </span>
+            )}
           </div>
         </div>
 

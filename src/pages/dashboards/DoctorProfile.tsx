@@ -71,7 +71,7 @@ export function DoctorProfile() {
       }
 
       setSuccessMsg('Operational profile parameters updated successfully!');
-      
+
       // Update global user name if it changed
       if (user) {
         const userJson = localStorage.getItem('medisaas_user');
@@ -164,8 +164,8 @@ export function DoctorProfile() {
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <User size={16} />
                   </div>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     value={fullName}
                     onChange={e => setFullName(e.target.value)}
@@ -182,8 +182,8 @@ export function DoctorProfile() {
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <Stethoscope size={16} />
                   </div>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     value={specialization}
                     onChange={e => setSpecialization(e.target.value)}
@@ -206,8 +206,8 @@ export function DoctorProfile() {
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <Award size={16} />
                   </div>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     value={licenseNo}
                     onChange={e => setLicenseNo(e.target.value)}
@@ -224,8 +224,8 @@ export function DoctorProfile() {
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <Phone size={16} />
                   </div>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     value={contact}
                     onChange={e => setContact(e.target.value.replace(/\D/g, '').slice(0, 10))}
@@ -245,7 +245,7 @@ export function DoctorProfile() {
             {/* Signature Area */}
             <div className="space-y-2">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Signature Format (Text Block)</label>
-              <textarea 
+              <textarea
                 required
                 value={signature}
                 onChange={e => setSignature(e.target.value)}
@@ -261,10 +261,10 @@ export function DoctorProfile() {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 font-mono">
                 🔒 HIPAA Compliant Cryptography Node
               </span>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={saving}
-                className="shadow-xl shadow-blue-500/10 font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-2xl px-6 py-2.5 h-11 flex items-center justify-center gap-1.5 transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                className="shadow-xl shadow-blue-500/10 font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-6 py-2.5 h-11 flex items-center justify-center gap-1.5 transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
               >
                 {saving ? (
                   <>
@@ -289,7 +289,7 @@ export function DoctorProfile() {
             <div className="h-20 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-100 flex items-center justify-between px-6 relative overflow-hidden">
               {/* Decorative elements */}
               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-[20px]"></div>
-              
+
               <div className="flex items-center gap-2 z-10">
                 <span className="text-blue-600 font-black text-xs">✚</span>
                 <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider font-mono">MediSaaS ID</span>

@@ -4,7 +4,7 @@ import type { PatientRecord } from '../../store/useHospitalStore';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { VitalsModal } from '../../components/VitalsModal';
-import { 
+import {
   Users, Search, FileText, UserPlus, Calendar, Shield, CheckCircle2,
   TrendingUp, Award, UserCheck, Activity
 } from 'lucide-react';
@@ -15,7 +15,7 @@ export function ReceptionistPatients() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
-  
+
   // Quick check-in states
   const [checkInDoctorId, setCheckInDoctorId] = useState('');
   const [checkInFeeType, setCheckInFeeType] = useState('OPD Consultation Fee');
@@ -31,7 +31,7 @@ export function ReceptionistPatients() {
 
   // Aggregate unique patients by phone number to create a true master patient directory
   const uniquePatientsMap = new Map<string, PatientRecord & { visitsCount: number; allVisits: PatientRecord[] }>();
-  
+
   patients.forEach(p => {
     const existing = uniquePatientsMap.get(p.phone);
     if (existing) {
@@ -93,7 +93,7 @@ export function ReceptionistPatients() {
 
     const selectedDoc = activeDoctors.find(d => d.id === checkInDoctorId);
     const doctorName = selectedDoc ? selectedDoc.name : 'General Physician';
-    
+
     // Register
     const newPatient = await registerPatient({
       name: selectedPatient.name,
@@ -195,12 +195,12 @@ export function ReceptionistPatients() {
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search patients by name, phone or record ID..." 
+            <input
+              type="text"
+              placeholder="Search patients by name, phone or record ID..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700" 
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700"
             />
           </div>
         </div>
@@ -247,18 +247,18 @@ export function ReceptionistPatients() {
                   </td>
                   <td className="px-5 py-4 text-right">
                     <div className="flex gap-2 justify-end">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => handleOpenHistory(patient)}
-                        className="rounded-lg text-[10px] h-8 font-bold text-slate-600 hover:text-slate-800 flex gap-1 items-center"
+                        className="rounded-full text-[10px] h-8 font-bold text-slate-600 hover:text-slate-800 flex gap-1 items-center"
                       >
                         <FileText size={12} /> History
                       </Button>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         onClick={() => handleOpenCheckIn(patient)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] h-8 font-bold flex gap-1 items-center"
+                        className="bg-blue-600 hover:bg-blue-500 text-white rounded-full text-[10px] h-8 font-bold flex gap-1 items-center"
                       >
                         <UserPlus size={12} /> Check-In
                       </Button>
@@ -280,9 +280,9 @@ export function ReceptionistPatients() {
       </div>
 
       {/* History and Timeline Drawer Modal */}
-      <Modal 
-        isOpen={isHistoryModalOpen} 
-        onClose={() => setIsHistoryModalOpen(false)} 
+      <Modal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
         title="Patient Medical Profile & History"
         className="max-w-md sm:max-w-lg"
       >
@@ -374,9 +374,9 @@ export function ReceptionistPatients() {
             </div>
 
             <div className="flex justify-end pt-3">
-              <Button 
+              <Button
                 onClick={() => setIsHistoryModalOpen(false)}
-                className="font-bold rounded-xl w-full sm:w-auto"
+                className="font-bold rounded-full w-full sm:w-auto"
               >
                 Close Profile
               </Button>
@@ -386,9 +386,9 @@ export function ReceptionistPatients() {
       </Modal>
 
       {/* Lightning Quick Re-Check-In Modal */}
-      <Modal 
-        isOpen={isCheckInModalOpen} 
-        onClose={() => setIsCheckInModalOpen(false)} 
+      <Modal
+        isOpen={isCheckInModalOpen}
+        onClose={() => setIsCheckInModalOpen(false)}
         title="Lightning Quick Patient Check-In"
         className="max-w-xs sm:max-w-sm"
       >
@@ -404,7 +404,7 @@ export function ReceptionistPatients() {
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Assign OPD Shift Doctor</label>
-                  <select 
+                  <select
                     className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                     value={checkInDoctorId}
                     onChange={e => setCheckInDoctorId(e.target.value)}
@@ -419,7 +419,7 @@ export function ReceptionistPatients() {
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">OPD Billing Config</label>
-                  <select 
+                  <select
                     className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                     value={checkInFeeType}
                     onChange={e => setCheckInFeeType(e.target.value)}
@@ -451,7 +451,7 @@ export function ReceptionistPatients() {
                       {vitals.length > 0 ? `${vitals.length} Recorded` : 'Pending'}
                     </span>
                   </button>
-                  
+
                   {/* Visual mini-pill grid showing recorded vitals */}
                   {vitals.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5 p-2 bg-emerald-50/30 border border-emerald-100/40 rounded-lg animate-in fade-in duration-200 max-h-16 overflow-y-auto">
@@ -477,17 +477,17 @@ export function ReceptionistPatients() {
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <Button 
-                    type="submit" 
-                    className="flex-1 font-bold rounded-xl text-xs bg-blue-600 hover:bg-blue-500 text-white"
+                  <Button
+                    type="submit"
+                    className="flex-1 font-bold rounded-full text-xs bg-blue-600 hover:bg-blue-500 text-white"
                   >
                     Register Check-In
                   </Button>
-                  <Button 
+                  <Button
                     type="button"
-                    variant="outline" 
+                    variant="outline"
                     onClick={() => setIsCheckInModalOpen(false)}
-                    className="flex-1 font-bold rounded-xl text-xs"
+                    className="flex-1 font-bold rounded-full text-xs"
                   >
                     Cancel
                   </Button>
@@ -518,9 +518,9 @@ export function ReceptionistPatients() {
                   </div>
                 </div>
 
-                <Button 
+                <Button
                   onClick={() => setIsCheckInModalOpen(false)}
-                  className="w-full font-bold rounded-xl text-xs mt-2"
+                  className="w-full font-bold rounded-full text-xs mt-2"
                 >
                   Done & Close
                 </Button>
@@ -530,7 +530,7 @@ export function ReceptionistPatients() {
         )}
       </Modal>
 
-      <VitalsModal 
+      <VitalsModal
         isOpen={isVitalsModalOpen}
         onClose={() => setIsVitalsModalOpen(false)}
         onSave={(savedVitals, savedDiagnoses) => {

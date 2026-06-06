@@ -3,8 +3,8 @@ import { useHospitalStore } from '../../store/useHospitalStore';
 import type { PatientInvoice } from '../../store/useHospitalStore';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { 
-  Receipt, Printer, Search, CreditCard, CheckCircle2, 
+import {
+  Receipt, Printer, Search, CreditCard, CheckCircle2,
   DollarSign, Clock, TrendingUp
 } from 'lucide-react';
 import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
@@ -15,7 +15,7 @@ export function ReceptionistInvoices() {
   const { invoices, collectPatientFee, hospitalName } = useHospitalStore();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Paid' | 'Pending'>('All');
-  
+
   const [printInvoiceData, setPrintInvoiceData] = useState<PatientInvoice | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
@@ -35,12 +35,12 @@ export function ReceptionistInvoices() {
 
   // Filter invoices
   const filteredInvoices = invoices.filter(inv => {
-    const matchesSearch = 
+    const matchesSearch =
       inv.patientName.toLowerCase().includes(search.toLowerCase()) ||
       inv.patientPhone.includes(search) ||
       inv.id.toLowerCase().includes(search.toLowerCase()) ||
       inv.doctorName.toLowerCase().includes(search.toLowerCase());
-    
+
     if (filterStatus === 'All') return matchesSearch;
     return matchesSearch && inv.status === filterStatus;
   });
@@ -129,12 +129,12 @@ export function ReceptionistInvoices() {
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3 justify-between items-center bg-slate-50/50">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search invoice, patient, doctor..." 
+            <input
+              type="text"
+              placeholder="Search invoice, patient, doctor..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700" 
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700"
             />
           </div>
 
@@ -206,19 +206,19 @@ export function ReceptionistInvoices() {
                     <td className="px-5 py-4 text-right">
                       <div className="flex gap-2 justify-end">
                         {!isPaid && (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             onClick={() => handleCollect(invoice.id)}
-                            className="bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] h-8 font-bold flex gap-1 items-center"
+                            className="bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] h-8 font-bold flex gap-1 items-center"
                           >
                             <CreditCard size={12} /> Collect
                           </Button>
                         )}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handlePrint(invoice)}
-                          className="rounded-lg text-[10px] h-8 font-bold text-slate-600 hover:text-slate-800 flex gap-1 items-center"
+                          className="rounded-full text-[10px] h-8 font-bold text-slate-600 hover:text-slate-800 flex gap-1 items-center"
                         >
                           <Printer size={12} /> Slip
                         </Button>
@@ -241,17 +241,17 @@ export function ReceptionistInvoices() {
       </div>
 
       {/* 3-Inch Thermal Slip Modal */}
-      <Modal 
-        isOpen={isPrintModalOpen} 
-        onClose={() => setIsPrintModalOpen(false)} 
+      <Modal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
         title="Thermal Slip Print Preview"
         className="max-w-xs sm:max-w-sm"
       >
         {printInvoiceData && (
           <div className="space-y-5">
             <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 flex justify-center">
-              <div 
-                id="thermal-slip-template" 
+              <div
+                id="thermal-slip-template"
                 className="bg-white border shadow-sm text-slate-900 transition-all duration-250 max-h-[380px] overflow-y-auto"
                 style={{
                   width: printSettings.paperSize === 'A4' ? '260px' : '190px',
@@ -320,29 +320,29 @@ export function ReceptionistInvoices() {
             </div>
 
             <div className="flex gap-2">
-              <Button 
+              <Button
                 onClick={() => {
-                  const headerTitle = printSettings.showHeader 
+                  const headerTitle = printSettings.showHeader
                     ? `<div class="text-center pb-2 dashed-divider">
-                         ${printSettings.logoUrl ? `<div style="text-align: center; margin-bottom: 6px;"><img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
-                         <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || hospitalName}</h3>
-                         <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Clinical Registry Slip</p>
-                         <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${printInvoiceData.date}</p>
-                       </div>`
+                         ${printSettings.logoUrl ? `< div style = "text-align: center; margin-bottom: 6px;" > <img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
+            <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || hospitalName}</h3>
+            <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Clinical Registry Slip</p>
+            <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${printInvoiceData.date}</p>
+          </div>`
                     : '';
 
                   const footerContent = printSettings.showFooter
-                    ? `<div class="text-center pt-3 dashed-divider">
-                         <div class="barcode-container brand-accent-bg">|||||||||||||||||||||||</div>
-                         <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase; leading-height: 1.3;">
-                           ${printSettings.customFooterText || (printInvoiceData.status === 'Paid' ? 'Thank you for cooperation' : 'Please settle outstanding payment')}
-                         </p>
-                       </div>`
+                    ? `< div class="text-center pt-3 dashed-divider">
+        <div class="barcode-container brand-accent-bg">|||||||||||||||||||||||</div>
+        <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase; leading-height: 1.3;">
+          ${printSettings.customFooterText || (printInvoiceData.status === 'Paid' ? 'Thank you for cooperation' : 'Please settle outstanding payment')}
+        </p>
+    </div>`
                     : '';
 
                   const slipHtml = `
-                    <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
-                      ${headerTitle}
+    < div style = "font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;" >
+                      ${ headerTitle }
 
                       <div class="text-center py-3 my-2" style="border: 1px solid ${printSettings.accentColor}30; border-radius: 8px; background-color: #f8fafc;">
                         <p style="margin: 0; font-size: 0.75em; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Transaction Status</p>
@@ -382,21 +382,21 @@ export function ReceptionistInvoices() {
                         </div>
                       </div>
 
-                      ${footerContent}
-                    </div>
-                  `;
+                      ${ footerContent }
+                    </div >
+    `;
 
                   printIsolatedHtml("OPD Billing Receipt", slipHtml);
                   setIsPrintModalOpen(false);
                 }} 
-                className="flex-1 font-bold rounded-xl"
+                className="flex-1 font-bold rounded-full"
               >
                 <Printer size={16} className="mr-1.5" /> Execute Print
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setIsPrintModalOpen(false)}
-                className="flex-1 font-bold rounded-xl"
+                className="flex-1 font-bold rounded-full"
               >
                 Close Preview
               </Button>

@@ -80,7 +80,7 @@ export function HospitalAdminBilling() {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Dynamic Subscription Status Banner */}
       {isExpired ? (
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 animate-in fade-in">
@@ -95,7 +95,7 @@ export function HospitalAdminBilling() {
               </p>
             </div>
           </div>
-          <Button className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-5 rounded-xl">
+          <Button className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-5 rounded-full">
             Contact Super Admin to Renew
           </Button>
         </div>
@@ -112,7 +112,7 @@ export function HospitalAdminBilling() {
               </p>
             </div>
           </div>
-          <Button className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs h-10 px-5 rounded-xl">
+          <Button className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs h-10 px-5 rounded-full">
             Renew Subscription Plan
           </Button>
         </div>
@@ -129,7 +129,7 @@ export function HospitalAdminBilling() {
               </p>
             </div>
           </div>
-          <Button variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 font-bold text-xs h-10 px-5 rounded-xl">
+          <Button variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 font-bold text-xs h-10 px-5 rounded-full">
             Upgrade Plan Tier
           </Button>
         </div>
@@ -137,7 +137,7 @@ export function HospitalAdminBilling() {
 
       {/* Usage telemetry cards & progress bars */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Progress Bars Limit details */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-6">
           <div className="border-b border-slate-100 pb-3">
@@ -158,7 +158,7 @@ export function HospitalAdminBilling() {
                   </span>
                 </div>
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       plan.maxDoctors !== -1 && doctorsCreated >= plan.maxDoctors ? 'bg-rose-500' : 'bg-blue-600'
                     }`}
@@ -176,7 +176,7 @@ export function HospitalAdminBilling() {
                   </span>
                 </div>
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       plan.maxReceptionists !== -1 && receptionistsCreated >= plan.maxReceptionists ? 'bg-rose-500' : 'bg-blue-600'
                     }`}
@@ -194,7 +194,7 @@ export function HospitalAdminBilling() {
                   </span>
                 </div>
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       plan.maxPharmacists !== -1 && pharmacistsCreated >= plan.maxPharmacists ? 'bg-rose-500' : 'bg-blue-600'
                     }`}
@@ -210,11 +210,22 @@ export function HospitalAdminBilling() {
                     <HardDrive size={14} className="text-slate-400 inline" /> Database Storage Quota
                   </span>
                   <span className="font-bold font-mono">
-                    {storageUsed < 1024 ? `${storageUsed.toFixed(2)} MB` : `${(storageUsed / 1024).toFixed(2)} GB`} / {plan.maxStorage} GB used
+                    {(() => {
+                      const mb = storageUsed;
+                      if (mb < 0.0009765625) {
+                        return `${(mb * 1024 * 1024).toFixed(0)} Bytes`;
+                      } else if (mb < 1) {
+                        return `${(mb * 1024).toFixed(2)} KB`;
+                      } else if (mb < 1024) {
+                        return `${mb.toFixed(2)} MB`;
+                      } else {
+                        return `${(mb / 1024).toFixed(2)} GB`;
+                      }
+                    })()} / {plan.maxStorage} GB used
                   </span>
                 </div>
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full rounded-full bg-indigo-600 transition-all duration-500"
                     style={{ width: `${Math.min((storageUsed / (plan.maxStorage * 1024)) * 100, 100)}%` }}
                   />
@@ -235,11 +246,11 @@ export function HospitalAdminBilling() {
                   {plan?.name === 'Enterprise Plan' ? 'Enterprise SLAs Enabled' : plan?.name === 'Pro Plan' ? 'Priority SLAs Enabled' : 'Standard Support Enabled'}
                 </p>
                 <p className="text-[10px] text-blue-700 mt-0.5">
-                  {plan?.name === 'Enterprise Plan' 
-                    ? 'Your hospital has priority 24/7 dedicated engineering support. Support emails: support@medisaas.com.' 
-                    : plan?.name === 'Pro Plan' 
-                    ? 'Your hospital has priority email support with a 12-hour response guarantee. Support emails: support@medisaas.com.' 
-                    : 'Your hospital has standard email support with a 24-hour response guarantee. Support emails: support@medisaas.com.'}
+                  {plan?.name === 'Enterprise Plan'
+                    ? 'Your hospital has priority 24/7 dedicated engineering support. Support emails: support@medisaas.com.'
+                    : plan?.name === 'Pro Plan'
+                      ? 'Your hospital has priority email support with a 12-hour response guarantee. Support emails: support@medisaas.com.'
+                      : 'Your hospital has standard email support with a 24-hour response guarantee. Support emails: support@medisaas.com.'}
                 </p>
               </div>
             </div>
@@ -274,7 +285,7 @@ export function HospitalAdminBilling() {
             </h2>
             <p className="text-xs text-slate-500">Configure global sheet margins, padding, typography, branding titles, and colors for patient slips and prescriptions.</p>
           </div>
-          <Button 
+          <Button
             onClick={handleSavePrintSettings}
             className={`font-bold text-xs h-10 px-5 rounded-xl transition-all duration-300 flex items-center gap-1.5 shadow-sm hover:scale-[1.01] active:scale-[0.99] ${
               saveSuccess 
@@ -297,7 +308,7 @@ export function HospitalAdminBilling() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Controls Column */}
           <div className="lg:col-span-7 space-y-6">
-            
+
             {/* Presets and Sizes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -337,7 +348,7 @@ export function HospitalAdminBilling() {
               <h3 className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
                 <Sliders size={14} className="text-slate-400" /> Dimension & Typography Formatting
               </h3>
-              
+
               {/* Margin */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-semibold text-slate-700">
@@ -392,7 +403,7 @@ export function HospitalAdminBilling() {
 
             {/* Color accent selection & header footer toggles */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              
+
               {/* Color selectors */}
               <div className="space-y-3">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Print Primary Ink Accent</label>
@@ -453,7 +464,7 @@ export function HospitalAdminBilling() {
             {/* Logo Upload Section */}
             <div className="space-y-3 bg-slate-50/50 border border-slate-200/50 p-4 rounded-2xl">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Hospital Logo Image</label>
-              
+
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 {printSettings.logoUrl ? (
                   <div className="relative h-16 w-16 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-1.5 group shadow-sm">
@@ -509,10 +520,10 @@ export function HospitalAdminBilling() {
           {/* Interactive Live Preview Column */}
           <div className="lg:col-span-5 flex flex-col items-center">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block self-start mb-2">Live Visual Output Preview</span>
-            
+
             <div className="bg-slate-100/80 p-5 rounded-3xl border border-slate-200/60 flex items-center justify-center w-full min-h-[420px] shadow-inner relative overflow-hidden">
               {/* Physical Slip Background representation */}
-              <div 
+              <div
                 className="bg-white border border-slate-300 rounded shadow-md text-slate-900 transition-all duration-300 max-h-[430px] overflow-y-auto"
                 style={{
                   width: printSettings.paperSize === 'A4' ? '260px' : '190px',
@@ -637,7 +648,7 @@ export function HospitalAdminBilling() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button 
+                    <button
                       onClick={() => alert(`Downloading receipt for invoice ${inv.id}...`)}
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-500"
                     >
