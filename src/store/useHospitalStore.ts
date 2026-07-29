@@ -8,7 +8,9 @@ export interface StaffMember {
   department?: string; // Optional for non-doctors
   contact: string;
   email: string;
+  personalEmail?: string;
   status: 'Active' | 'Inactive' | 'On Leave';
+  roleHistory?: Array<{ previousRole: string; newRole: string; updatedAt: string }>;
 }
 
 export interface Department {
@@ -52,6 +54,8 @@ export interface PatientRecord {
   createdAt?: string;
   vitals?: Array<{ name: string; value: string }>;
   pastDiagnoses?: string;
+  paymentStatus?: 'Paid' | 'Unpaid' | 'Pending';
+  appointmentTime?: string;
 }
 
 export interface PatientInvoice {
@@ -73,6 +77,7 @@ interface HospitalState {
   patients: PatientRecord[];
   invoices: PatientInvoice[];
   hospitalName: string;
+  hospitalLogo: string;
   loading: boolean;
 
   // Actions
@@ -91,11 +96,13 @@ interface HospitalState {
   updateSchedule: (id: string, updates: Partial<DoctorSchedule>) => Promise<void>;
 
   updateFees: (fees: Partial<StandardFees>) => Promise<void>;
-  registerPatient: (patient: Omit<PatientRecord, 'id' | 'tokenNumber' | 'timeRegistered' | 'status'>) => Promise<PatientRecord>;
+  registerPatient: (patient: Omit<PatientRecord, 'id' | 'tokenNumber' | 'timeRegistered' | 'status'> & { payNow?: boolean }) => Promise<PatientRecord>;
   updatePatientStatus: (patientId: string, status: PatientRecord['status']) => Promise<void>;
   addPatientInvoice: (invoice: Omit<PatientInvoice, 'id' | 'date'>) => Promise<void>;
   collectPatientFee: (invoiceId: string) => Promise<void>;
+  collectPatientFeeDirectly: (patientId: string, amount?: number, feeType?: string) => Promise<void>;
   cancelPatient: (patientId: string) => Promise<void>;
+  renewSubscription: (hospitalId: string, licenseCode: string) => Promise<{ success: boolean; message?: string; error?: string }>;
 }
 
 export const useHospitalStore = create<HospitalState>((set, get) => ({
@@ -105,7 +112,8 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
   fees: { opdFee: 500, emergencyFee: 1200, bedChargePerDay: 2500 },
   patients: [],
   invoices: [],
-  hospitalName: 'City Care Hospital',
+  hospitalName: localStorage.getItem('medisaas_hospital_name') || 'Smart Hospital',
+  hospitalLogo: localStorage.getItem('medisaas_hospital_logo') || '',
   loading: false,
 
   fetchHospitalData: async (hospitalId) => {
@@ -137,7 +145,9 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
           department: s.department,
           contact: s.contact,
           email: s.email,
-          status: s.status
+          personalEmail: s.personalEmail || '',
+          status: s.status,
+          roleHistory: s.roleHistory || []
         })),
         departments: deptData.map((d: any) => ({
           id: d._id || d.id,
@@ -171,7 +181,9 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
           waitTime: p.waitTime,
           createdAt: p.createdAt,
           vitals: p.vitals || [],
-          pastDiagnoses: p.pastDiagnoses || ''
+          pastDiagnoses: p.pastDiagnoses || '',
+          paymentStatus: p.paymentStatus || 'Paid',
+          appointmentTime: p.appointmentTime || ''
         })),
         invoices: invData.map((i: any) => ({
           id: i._id || i.id,
@@ -184,9 +196,18 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
           feeType: i.feeType
         })),
         fees: feesData,
-        hospitalName: profileData.hospitalName || 'City Care Hospital',
+        hospitalName: profileData.hospitalName || get().hospitalName || 'Smart Hospital',
+        hospitalLogo: profileData.hospitalLogo || get().hospitalLogo || localStorage.getItem('medisaas_hospital_logo') || '',
         loading: false
       });
+
+      const activeLogo = profileData.hospitalLogo || get().hospitalLogo || localStorage.getItem('medisaas_hospital_logo');
+      if (activeLogo) {
+        localStorage.setItem('medisaas_hospital_logo', activeLogo);
+      }
+      if (profileData.hospitalName) {
+        localStorage.setItem('medisaas_hospital_name', profileData.hospitalName);
+      }
     } catch (error) {
       console.error('Failed to load hospital operations data', error);
       set({ loading: false });
@@ -427,6 +448,20 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
     }
   },
 
+  collectPatientFeeDirectly: async (patientId, amount = 500, feeType = 'OPD Consultation Fee') => {
+    const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
+    try {
+      await fetch(`/api/hospital/patients/${patientId}/collect-fee`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, feeType })
+      });
+      await get().fetchHospitalData(hospitalId);
+    } catch (err) {
+      console.error('Failed to collect patient fee directly', err);
+    }
+  },
+
   cancelPatient: async (patientId) => {
     const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
     try {
@@ -434,6 +469,24 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
       await get().fetchHospitalData(hospitalId);
     } catch (err) {
       console.error('Failed to cancel patient appointment', err);
+    }
+  },
+
+  renewSubscription: async (hospitalId, licenseCode) => {
+    try {
+      const response = await fetch('/api/hospital/renew-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hospitalId, licenseCode })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.message || 'Renewal failed.' };
+      }
+      await get().fetchHospitalData(hospitalId);
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Server connection error.' };
     }
   }
 }));

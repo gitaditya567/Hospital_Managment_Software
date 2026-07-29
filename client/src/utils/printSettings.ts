@@ -19,12 +19,12 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   paperSize: '80mm',
   showHeader: true,
   showFooter: true,
-  customHeaderText: 'City Care Hospital',
-  customFooterText: 'Thank you for cooperation',
+  customHeaderText: 'Smart Hospital',
+  customFooterText: 'Thank you for visiting! Smart Hospital Management Software • Copyright © twinsCloud',
   logoUrl: ''
 };
 
-const LOCAL_STORAGE_KEY = 'medisaas_print_settings';
+const LOCAL_STORAGE_KEY = 'smarthospital_print_settings';
 export const PRINT_SETTINGS_EVENT = 'medisaas-print-settings-changed';
 
 export function getPrintSettings(): PrintSettings {

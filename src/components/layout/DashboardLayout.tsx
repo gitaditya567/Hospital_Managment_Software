@@ -10,7 +10,7 @@ import { usePharmacyStore } from '../../store/usePharmacyStore';
 import { ShieldAlert, LogOut } from 'lucide-react';
 
 export function DashboardLayout() {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuthStore();
   const fetchSuperAdminData = useSuperAdminStore((state) => state.fetchSuperAdminData);
   const fetchHospitalData = useHospitalStore((state) => state.fetchHospitalData);
@@ -97,7 +97,7 @@ export function DashboardLayout() {
     <div className="flex h-screen bg-background font-sans overflow-hidden">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
+        <Topbar onMenuClick={() => setSidebarOpen(prev => !prev)} isSidebarOpen={isSidebarOpen} />
         <main className="flex-1 overflow-auto p-4 md:p-8 medical-grid">
           <div className="max-w-7xl mx-auto">
             <Outlet />

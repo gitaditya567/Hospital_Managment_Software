@@ -24,9 +24,12 @@ export function ReceptionistDashboard() {
     updatePatientStatus, 
     addPatientInvoice, 
     collectPatientFee,
+    collectPatientFeeDirectly,
     cancelPatient,
     hospitalName
   } = useHospitalStore();
+
+  const [queueTab, setQueueTab] = useState<'PAID' | 'UNPAID'>('PAID');
 
   const { searchQuery } = useSuperAdminStore();
 
@@ -239,23 +242,50 @@ export function ReceptionistDashboard() {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return true;
     return (
-      p.name.toLowerCase().includes(query) ||
-      p.phone.includes(query) ||
-      p.tokenNumber.toLowerCase().includes(query) ||
-      p.id.toLowerCase().includes(query)
+      (p.name && p.name.toLowerCase().includes(query)) ||
+      (p.phone && p.phone.includes(query)) ||
+      (p.tokenNumber && p.tokenNumber.toLowerCase().includes(query)) ||
+      (p.id && p.id.toLowerCase().includes(query))
     );
   });
 
+  // Strictly sort paidPatients by FIFO (First-In, First-Out: createdAt ascending timestamp)
+  const paidPatients = filteredPatients
+    .filter(p => p.paymentStatus === 'Paid' || (!p.paymentStatus && !invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending')))
+    .sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeA - timeB;
+    });
+
+  const unpaidPatients = filteredPatients
+    .filter(p => p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Pending' || invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending'))
+    .sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeA - timeB;
+    });
+
+  const displayedPatients = queueTab === 'PAID' ? paidPatients : unpaidPatients;
+
   // Dynamic counts for receptionist dashboard interactive visualizer
-  const waitingCount = patients.filter(p => p.status === 'Waiting').length;
-  const consultingCount = patients.filter(p => p.status === 'In Consultation').length;
-  const completedCount = patients.filter(p => p.status === 'Completed').length;
-  const totalCount = patients.length;
+  const waitingCount = paidPatients.filter(p => p.status === 'Waiting').length;
+  const consultingCount = paidPatients.filter(p => p.status === 'In Consultation').length;
+  const completedCount = paidPatients.filter(p => p.status === 'Completed').length;
+  const totalCount = paidPatients.length;
   const maxVal = Math.max(waitingCount, consultingCount, completedCount, 2);
 
-  // Status Tap-to-Cycle click handler
+  // Status Tap-to-Cycle click handler with Strict Payment Validation
   const handleStatusCycle = (e: React.MouseEvent, p: PatientRecord) => {
     e.stopPropagation();
+
+    const isUnpaid = p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Pending' || invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending');
+
+    if (p.status === 'Waiting' && isUnpaid) {
+      alert(`Payment Compulsory!\n\nPatient "${p.name}" has not paid the OPD consultation fee. Please click "Pay Now" to collect payment before routing patient to Doctor Consultation.`);
+      return;
+    }
+
     const nextStatusMap: Record<PatientRecord['status'], PatientRecord['status']> = {
       'Waiting': 'In Consultation',
       'In Consultation': 'Completed',
@@ -444,6 +474,53 @@ export function ReceptionistDashboard() {
             </div>
           </div>
 
+          {/* OPD Queue Payment Filter Tabs */}
+          <div className="px-5 py-3 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex gap-2 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setQueueTab('PAID')}
+                className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all ${
+                  queueTab === 'PAID'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <CheckCircle2 size={14} />
+                <span>Active Doctor Queue (Paid)</span>
+                <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold ${
+                  queueTab === 'PAID' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {paidPatients.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQueueTab('UNPAID')}
+                className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all ${
+                  queueTab === 'UNPAID'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                }`}
+              >
+                <CreditCard size={14} />
+                <span>Unpaid Patients (Fee Pending)</span>
+                <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold ${
+                  queueTab === 'UNPAID' ? 'bg-white/20 text-white' : 'bg-rose-200 text-rose-800'
+                }`}>
+                  {unpaidPatients.length}
+                </span>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-500 font-semibold italic">
+              {queueTab === 'PAID' 
+                ? '✓ Showing patients ready for Doctor consultation' 
+                : '⚠️ Payment required before Doctor queue activation'}
+            </p>
+          </div>
+
           {/* Today's Queue Data Table */}
           <div className="flex-1 overflow-y-auto">
             <table className="w-full text-left border-collapse">
@@ -453,17 +530,17 @@ export function ReceptionistDashboard() {
                   <th className="px-5 py-3.5">Patient Name</th>
                   <th className="px-5 py-3.5">Age/Gender</th>
                   <th className="px-5 py-3.5">Assigned Doctor</th>
-                  <th className="px-5 py-3.5">Status (Tap to Cycle)</th>
+                  <th className="px-5 py-3.5">Payment & Status</th>
                   <th className="px-5 py-3.5 text-right">Wait Time</th>
                   <th className="px-5 py-3.5 text-right">Quick Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 text-xs font-semibold">
-                {filteredPatients.map((patient) => {
+                {displayedPatients.map((patient) => {
                   const isSelected = selectedPatient?.id === patient.id;
                   const isWaiting = patient.status === 'Waiting';
                   const isConsulting = patient.status === 'In Consultation';
-                  const hasUnpaidInvoice = invoices.some(inv => inv.patientPhone === patient.phone && inv.status === 'Pending');
+                  const isUnpaid = queueTab === 'UNPAID' || patient.paymentStatus === 'Unpaid' || patient.paymentStatus === 'Pending' || invoices.some(inv => inv.patientPhone === patient.phone && inv.status === 'Pending');
                   
                   return (
                     <tr 
@@ -477,9 +554,20 @@ export function ReceptionistDashboard() {
                       }`}
                     >
                       <td className="px-5 py-3.5">
-                        <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg font-bold font-mono">
-                          {patient.tokenNumber}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg font-bold font-mono">
+                            {patient.tokenNumber}
+                          </span>
+                          {queueTab === 'PAID' && (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold whitespace-nowrap ${
+                              patient.status === 'In Consultation'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-blue-50 text-blue-700 border border-blue-100'
+                            }`}>
+                              {patient.status === 'In Consultation' ? 'Active' : `Pos #${paidPatients.filter(p => p.status === 'Waiting').indexOf(patient) + 1}`}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
@@ -499,43 +587,59 @@ export function ReceptionistDashboard() {
                         <span className="text-slate-800 font-extrabold">{patient.doctorName}</span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span 
-                          onClick={(e) => handleStatusCycle(e, patient)}
-                          title="Click directly to cycle status"
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border transition-all hover:scale-105 ${
-                            isWaiting ? 'bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/30 hover:bg-[#3b82f6]/20' :
-                            isConsulting ? 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30 hover:bg-[#10b981]/20' :
-                            'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/30 hover:bg-[#f59e0b]/20'
-                          }`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${
-                            isWaiting ? 'bg-[#3b82f6]' : isConsulting ? 'bg-[#10b981] animate-pulse' : 'bg-[#f59e0b]'
-                          }`}></span>
-                          {patient.status}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span 
+                            onClick={(e) => handleStatusCycle(e, patient)}
+                            title="Click directly to cycle status"
+                            className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-extrabold border transition-all hover:scale-105 ${
+                              isWaiting ? 'bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/30 hover:bg-[#3b82f6]/20' :
+                              isConsulting ? 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30 hover:bg-[#10b981]/20' :
+                              'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/30 hover:bg-[#f59e0b]/20'
+                            }`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${
+                              isWaiting ? 'bg-[#3b82f6]' : isConsulting ? 'bg-[#10b981] animate-pulse' : 'bg-[#f59e0b]'
+                            }`}></span>
+                            {patient.status}
+                          </span>
+
+                          <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            isUnpaid ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {isUnpaid ? 'Fee Unpaid' : 'Fee Paid ✓'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-right text-slate-500 font-mono text-[10px]">
                         {patient.waitTime || '0m'} ago
                       </td>
                       <td className="px-5 py-3.5 text-right" onClick={e => e.stopPropagation()}>
-                        <div className="flex gap-1.5 justify-end">
-                          <button
-                            onClick={(e) => handleQuickPrint(e, patient)}
-                            title="Print Duplicate OPD Slip"
-                            className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded transition-colors"
-                          >
-                            <Printer size={14} />
-                          </button>
-                          {hasUnpaidInvoice && (
+                        <div className="flex gap-1.5 justify-end items-center">
+                          {isUnpaid ? (
                             <button
-                              onClick={(e) => handleQuickPay(e, patient)}
-                              title="Quick collect payment"
-                              className="p-1 hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 rounded transition-colors"
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await collectPatientFeeDirectly(patient.id, 500, 'OPD Consultation Fee');
+                                setWsLogs(prev => [`Payment Success: Collected ₹500 for "${patient.name}". Activated into Doctor Queue.`, ...prev]);
+                                setQueueTab('PAID');
+                              }}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all animate-bounce hover:animate-none"
                             >
-                              <CreditCard size={14} />
+                              <CreditCard size={12} /> Pay Now (₹500)
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleQuickPrint(e, patient)}
+                              title="Print Duplicate OPD Slip"
+                              className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded transition-colors"
+                            >
+                              <Printer size={14} />
                             </button>
                           )}
                           <button
+                            type="button"
                             onClick={(e) => handleQuickCancel(e, patient)}
                             title="Cancel patient check-in"
                             className="p-1 hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded transition-colors"
@@ -548,10 +652,10 @@ export function ReceptionistDashboard() {
                   );
                 })}
 
-                {filteredPatients.length === 0 && (
+                {displayedPatients.length === 0 && (
                   <tr>
                     <td colSpan={7} className="text-center py-16 text-slate-400 font-bold">
-                      No active walk-in logs matching search queries.
+                      {queueTab === 'PAID' ? 'No paid patients currently in Doctor queue.' : 'No unpaid patients in pending fee list.'}
                     </td>
                   </tr>
                 )}

@@ -3,7 +3,8 @@ import { useHospitalStore } from '../../store/useHospitalStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Button } from '../../components/ui/Button';
-import { Users, UserPlus, X, Stethoscope, ShieldCheck, Trash2, ShieldAlert, Edit } from 'lucide-react';
+import { PasswordStrengthMeter } from '../../components/ui/PasswordStrengthMeter';
+import { Users, UserPlus, X, Stethoscope, ShieldCheck, Trash2, ShieldAlert, Edit, History, ArrowRight, Clock } from 'lucide-react';
 
 export function HospitalAdminStaff() {
   const { staff, addStaff, toggleStaffStatus, deleteStaff, updateStaff } = useHospitalStore();
@@ -21,9 +22,19 @@ export function HospitalAdminStaff() {
   const [drawerError, setDrawerError] = useState('');
   const [drawerSuccess, setDrawerSuccess] = useState('');
 
+  // Role History Modal state
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedStaffHistory, setSelectedStaffHistory] = useState<any | null>(null);
+
+  const handleOpenHistoryModal = (member: any) => {
+    setSelectedStaffHistory(member);
+    setIsHistoryModalOpen(true);
+  };
+
   // Form states
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [personalEmail, setPersonalEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'Doctor' | 'Receptionist' | 'Pharmacy' | 'Lab Technician'>('Doctor');
@@ -39,6 +50,7 @@ export function HospitalAdminStaff() {
     setEditingStaffId(null);
     setFullName('');
     setEmail('');
+    setPersonalEmail('');
     setPassword('');
     setPhone('');
     setRole('Doctor');
@@ -52,6 +64,7 @@ export function HospitalAdminStaff() {
     setEditingStaffId(member.id);
     setFullName(member.name);
     setEmail(member.email);
+    setPersonalEmail(member.personalEmail || '');
     setPassword(''); // leave blank if not changing
     setPhone(member.contact);
     setRole(member.role);
@@ -74,6 +87,7 @@ export function HospitalAdminStaff() {
     const payload = {
       name: fullName.trim(),
       email: email.trim(),
+      personalEmail: personalEmail.trim(),
       role,
       department: role === 'Doctor' ? specialization : (role === 'Pharmacy' ? 'Pharmacy' : (role === 'Receptionist' ? 'Front Desk' : (role === 'Lab Technician' ? 'Lab Support' : 'Staff'))),
       contact: phone.trim(),
@@ -198,6 +212,13 @@ export function HospitalAdminStaff() {
                     </td>
                     <td className="px-6 py-4 text-right flex justify-end gap-1">
                       <button
+                        onClick={() => handleOpenHistoryModal(member)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                        title="View Role History & Audit Log"
+                      >
+                        <History size={16} />
+                      </button>
+                      <button
                         onClick={() => handleOpenEditDrawer(member)}
                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                         title="Edit Employee Credentials"
@@ -291,9 +312,9 @@ export function HospitalAdminStaff() {
                         />
                       </div>
 
-                      {/* Email */}
+                      {/* Login Email */}
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Email Address</label>
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Login Username / Email</label>
                         <div className="relative">
                           <input
                             type="email"
@@ -304,6 +325,19 @@ export function HospitalAdminStaff() {
                             className="w-full h-10 border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
                           />
                         </div>
+                      </div>
+
+                      {/* Personal Security Email */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Personal Email (For Password Resets & Alerts)</label>
+                        <input
+                          type="email"
+                          value={personalEmail}
+                          onChange={(e) => setPersonalEmail(e.target.value)}
+                          placeholder="e.g. alok.tripathi.personal@gmail.com"
+                          className="w-full h-10 border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+                        />
+                        <p className="text-[10px] text-slate-400">Password reset recovery credentials will be sent to this personal inbox.</p>
                       </div>
 
                       {/* Phone */}
@@ -334,6 +368,7 @@ export function HospitalAdminStaff() {
                           placeholder="••••••••"
                           className="w-full h-10 border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
                         />
+                        <PasswordStrengthMeter password={password} onPasswordChange={setPassword} />
                       </div>
 
                       {/* Role Dropdown */}
@@ -384,6 +419,118 @@ export function HospitalAdminStaff() {
                     </form>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Role History Modal */}
+      {isHistoryModalOpen && selectedStaffHistory && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-6 relative">
+              <button
+                onClick={() => { setIsHistoryModalOpen(false); setSelectedStaffHistory(null); }}
+                className="absolute top-5 right-5 h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-1">
+                <History size={14} /> Role Assignment History
+              </div>
+              <h2 className="text-xl font-bold text-white">{selectedStaffHistory.name}</h2>
+              <p className="text-xs text-slate-300 font-mono mt-0.5">{selectedStaffHistory.email}</p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              
+              {/* Current Active Role Badge */}
+              <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Active Role</p>
+                  <p className="text-sm font-extrabold text-slate-800">{selectedStaffHistory.role}</p>
+                </div>
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold rounded-full">
+                  Active Role
+                </span>
+              </div>
+
+              {/* Timeline Log */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={14} className="text-slate-400" /> Audit History Trail ({selectedStaffHistory.roleHistory?.length || 1})
+                </h3>
+
+                <div className="space-y-3 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-200 pt-1">
+                  {selectedStaffHistory.roleHistory && selectedStaffHistory.roleHistory.length > 0 ? (
+                    selectedStaffHistory.roleHistory.map((item: any, idx: number) => {
+                      const dateStr = item.updatedAt ? new Date(item.updatedAt).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 'Initial Onboarding';
+
+                      const isInitial = item.previousRole === 'Initial Assignment';
+
+                      return (
+                        <div key={idx} className="relative flex items-start gap-4 pl-8 group">
+                          <div className={`absolute left-2 top-2 h-3.5 w-3.5 rounded-full bg-white border-2 ${isInitial ? 'border-blue-500' : 'border-indigo-600'} shadow-sm shrink-0`} />
+
+                          <div className="bg-white border border-slate-200 rounded-xl p-3.5 w-full shadow-2xs group-hover:border-indigo-200 transition-colors space-y-1.5">
+                            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                              {isInitial ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-400 font-semibold text-[11px]">Initial Assignment:</span>
+                                  <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[11px] font-extrabold">
+                                    {item.newRole}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[11px] font-mono">
+                                    {item.previousRole}
+                                  </span>
+                                  <ArrowRight size={14} className="text-indigo-500 shrink-0" />
+                                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded text-[11px] font-extrabold">
+                                    {item.newRole}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                              <Clock size={12} className="text-slate-300 shrink-0" />
+                              {dateStr}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="relative flex items-start gap-4 pl-8">
+                      <div className="absolute left-2 top-2 h-3.5 w-3.5 rounded-full bg-white border-2 border-indigo-600 shadow-sm shrink-0" />
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 w-full text-xs text-slate-500">
+                        <p className="font-bold text-slate-700">Initial Role Assigned: {selectedStaffHistory.role}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">No subsequent role modifications recorded.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex justify-end">
+                <Button
+                  onClick={() => { setIsHistoryModalOpen(false); setSelectedStaffHistory(null); }}
+                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs h-9 px-5 rounded-xl"
+                >
+                  Close History
+                </Button>
               </div>
             </div>
           </div>

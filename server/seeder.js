@@ -24,7 +24,7 @@ connectDB();
 
 const seedDatabase = async () => {
   try {
-    // Clear all existing collections
+    // Clear all existing collections (Removes all dummy data)
     console.log('Clearing database tables...');
     await User.deleteMany({});
     await Tenant.deleteMany({});
@@ -42,9 +42,9 @@ const seedDatabase = async () => {
     await SystemSetting.deleteMany({});
     await Plan.deleteMany({});
 
-    console.log('Tables cleared. Seeding default configurations...');
+    console.log('Tables cleared. Seeding clean production configurations...');
 
-    // 0. Seed Subscription Plans
+    // 1. Seed Subscription Plans
     await Plan.insertMany([
       { id: 'plan-basic', name: 'Basic Plan', price: 9999, maxDoctors: 2, maxReceptionists: 1, maxPharmacists: 1, maxStorage: 10, durationMonths: 12 },
       { id: 'plan-pro', name: 'Pro Plan', price: 24999, maxDoctors: 10, maxReceptionists: 5, maxPharmacists: 3, maxStorage: 100, durationMonths: 12 },
@@ -52,36 +52,18 @@ const seedDatabase = async () => {
     ]);
     console.log('✓ Central Subscription Plans seeded.');
 
-    // 1. Create central operator license codes
+    // 2. Create central operator license codes (Unused)
     await LicenseCode.insertMany([
-      { code: 'HOSP-2026-R4T1-OP90', planId: 'plan-enterprise', validityMonths: 12, status: 'Unused', isUsed: false },
-      { code: 'HOSP-2026-PEND-7777', planId: 'plan-pro', validityMonths: 6, status: 'Unused', isUsed: false },
-      { code: 'HOSP-2026-LITE-3011', planId: 'plan-basic', validityMonths: 12, status: 'Unused', isUsed: false }
+      { code: 'HMS-2026-001-R4#1%P', planId: 'plan-enterprise', validityMonths: 12, status: 'Unused', isUsed: false },
+      { code: 'HMS-2026-002-X7@4!Q', planId: 'plan-pro', validityMonths: 6, status: 'Unused', isUsed: false },
+      { code: 'HMS-2026-003-8B$9*M', planId: 'plan-basic', validityMonths: 12, status: 'Unused', isUsed: false }
     ]);
     console.log('✓ Cryptographic SaaS Licenses seeded.');
-
-    // 2. Create Tenant Nodes (Apollo Main & City Care)
-    await Tenant.insertMany([
-      { 
-        _id: new mongoose.Types.ObjectId('65f3d9b1c92d5a3f124a9001'), 
-        hospitalName: 'City Care Hospital', 
-        adminEmail: 'admin@citycare.com', 
-        address: '102 Metro Road, Connaught Place, New Delhi',
-        licenseCodeUsed: 'HOSP-2026-R4T1-OP90',
-        subscriptionExpiryDate: '2027-05-23',
-        planId: 'plan-enterprise',
-        opdFee: 500,
-        emergencyFee: 1200,
-        bedChargePerDay: 2500,
-        status: 'Active'
-      }
-    ]);
-    console.log('✓ Hospital Tenant Nodes seeded.');
 
     // 3. Create default Super Admin user
     const superAdmin = new User({
       name: 'Super Operator',
-      email: process.env.ADMIN_EMAIL || 'super@med.com',
+      email: process.env.ADMIN_EMAIL || 'admin@smarthospital.com',
       password: process.env.ADMIN_PASSWORD || 'demo1234',
       role: 'SUPER_ADMIN',
       hospitalId: null,
@@ -90,34 +72,11 @@ const seedDatabase = async () => {
     await superAdmin.save();
     console.log(`✓ Default Super Admin user seeded (${superAdmin.email}).`);
 
-    // 4. Create Staff Directory
-    await Staff.insertMany([
-      { name: 'Dr. Sarah Smith', role: 'Doctor', department: 'Cardiology', contact: '9876543210', email: 'sarah.smith@medisaas.com', hospitalId: '65f3d9b1c92d5a3f124a9001', status: 'Active' },
-      { name: 'Dr. John Davis', role: 'Doctor', department: 'Orthopedics', contact: '9876543211', email: 'john.davis@medisaas.com', hospitalId: '65f3d9b1c92d5a3f124a9001', status: 'Active' },
-      { name: 'Emily White', role: 'Receptionist', contact: '9876543212', email: 'emily.white@medisaas.com', hospitalId: '65f3d9b1c92d5a3f124a9001', status: 'Active' },
-      { name: 'Michael Brown', role: 'Pharmacy', contact: '9876543213', email: 'michael.brown@medisaas.com', hospitalId: '65f3d9b1c92d5a3f124a9001', status: 'Active' }
-    ]);
-    console.log('✓ Staff Personnel directory seeded.');
-
-    // 9. Create Default Departments
-    await Department.insertMany([
-      { name: 'Cardiology', head: 'Dr. Sarah Smith', staffCount: 1, rooms: 'Rooms 101-105', status: 'Active', hospitalId: '65f3d9b1c92d5a3f124a9001' },
-      { name: 'Orthopedics', head: 'Dr. John Davis', staffCount: 1, rooms: 'Rooms 201-205', status: 'Active', hospitalId: '65f3d9b1c92d5a3f124a9001' }
-    ]);
-    console.log('✓ Clinical departments seeded.');
-
-    // 10. Create Default Doctor Schedules
-    await DoctorSchedule.insertMany([
-      { doctorId: 'doc@med.com', doctorName: 'Dr. Sarah Smith', roomNumber: 'Room 101', availability: '09:00 AM - 01:00 PM', days: 'Mon, Wed, Fri', hospitalId: '65f3d9b1c92d5a3f124a9001' },
-      { doctorId: 'doc@med.com', doctorName: 'Dr. John Davis', roomNumber: 'Room 201', availability: '10:00 AM - 02:00 PM', days: 'Tue, Thu', hospitalId: '65f3d9b1c92d5a3f124a9001' }
-    ]);
-    console.log('✓ Doctor Schedules seeded.');
-
-    // 11. Create System Setting
+    // 4. Create Global System Settings
     const defaultSetting = new SystemSetting({
-      platformName: 'MediSaaS Central Control',
+      platformName: 'Smart Hospital Management Software - Central Operator',
       maintenanceMode: false,
-      supportEmail: 'superadmin.support@medisaas.com',
+      supportEmail: 'support@twinscloud.com',
       allowManualOnboarding: true,
       stripeEnabled: true,
       razorpayEnabled: true,
@@ -126,21 +85,14 @@ const seedDatabase = async () => {
     await defaultSetting.save();
     console.log('✓ Global System settings configuration seeded.');
 
-    // 12. Create Subscription Invoice
-    await SubscriptionInvoice.insertMany([
-      { hospitalName: 'City Care Hospital', planName: 'Enterprise Plan', amount: 59999, status: 'Paid', date: new Date().toISOString().split('T')[0], method: 'Manual Invoice' }
-    ]);
-    console.log('✓ Subscription revenue invoices seeded.');
-
-    // 13. Create Platform Activity Logs
+    // 5. Create Platform Activity Log
     await PlatformActivity.insertMany([
-      { description: 'Global MediSaaS Platform initialization sequence completed successfully.', type: 'system', timestamp: new Date().toISOString() },
-      { description: 'Default hospital node City Care Hospital successfully activated.', type: 'hospital', timestamp: new Date().toISOString() }
+      { description: 'Smart Hospital Management Software initialization completed. Ready for hospital onboarding.', type: 'system', timestamp: new Date().toISOString() }
     ]);
-    console.log('✓ Platform audit logs seeded.');
+    console.log('✓ Platform audit logs initialized.');
 
     console.log('\n======================================================');
-    console.log('🎉 Local MongoDB database populated successfully!');
+    console.log('🎉 Clean production database initialized successfully!');
     console.log('======================================================');
     mongoose.connection.close();
     process.exit(0);

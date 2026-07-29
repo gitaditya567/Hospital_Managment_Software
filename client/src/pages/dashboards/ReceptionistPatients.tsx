@@ -19,6 +19,7 @@ export function ReceptionistPatients() {
   // Quick check-in states
   const [checkInDoctorId, setCheckInDoctorId] = useState('');
   const [checkInFeeType, setCheckInFeeType] = useState('OPD Consultation Fee');
+  const [payNow, setPayNow] = useState(true);
   const [checkInSuccessData, setCheckInSuccessData] = useState<any>(null);
 
   // Vitals & diagnoses state for Quick Check-In
@@ -102,7 +103,8 @@ export function ReceptionistPatients() {
       gender: selectedPatient.gender || 'Male',
       doctorName,
       vitals,
-      pastDiagnoses
+      pastDiagnoses,
+      payNow
     });
 
     // Add Invoice
@@ -111,7 +113,7 @@ export function ReceptionistPatients() {
       patientName: selectedPatient.name,
       patientPhone: selectedPatient.phone,
       amount: feeAmount,
-      status: 'Pending',
+      status: payNow ? 'Paid' : 'Pending',
       doctorName,
       feeType: checkInFeeType
     });
@@ -122,6 +124,9 @@ export function ReceptionistPatients() {
       amount: feeAmount,
       feeType: checkInFeeType
     });
+
+    setVitals([]);
+    setPastDiagnoses('');
   };
 
   return (
@@ -474,6 +479,19 @@ export function ReceptionistPatients() {
                   <span className="text-slate-800 font-extrabold text-sm">
                     ₹{(checkInFeeType === 'Emergency Consultation Fee' ? 1200 : 500).toLocaleString('en-IN')}
                   </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-blue-50/50 border border-blue-100 rounded-xl px-3">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-extrabold text-slate-800">Collect Fee Upfront (Pay Now)</span>
+                    <span className="text-[8px] text-slate-500 font-bold">Paid status routes directly to Doctor Queue</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={payNow}
+                    onChange={e => setPayNow(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer"
+                  />
                 </div>
 
                 <div className="flex gap-2 pt-2">

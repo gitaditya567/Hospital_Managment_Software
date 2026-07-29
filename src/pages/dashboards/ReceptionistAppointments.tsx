@@ -3,24 +3,18 @@ import { useHospitalStore } from '../../store/useHospitalStore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { VitalsModal } from '../../components/VitalsModal';
-import { Calendar as CalendarIcon, Clock, Users, Plus, ChevronLeft, ChevronRight, Check, Activity } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Users, Plus, ChevronLeft, ChevronRight, Check, Activity, UserPlus, CreditCard } from 'lucide-react';
 
 export function ReceptionistAppointments() {
-  const { staff } = useHospitalStore();
+  const { staff, patients, registerPatient, addPatientInvoice } = useHospitalStore();
   const doctors = staff.filter(s => s.role === 'Doctor' && s.status === 'Active');
 
   const [selectedDoctor, setSelectedDoctor] = useState('All');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date().toDateString());
 
-  // Mock appointments for future days
-  const [appointments, setAppointments] = useState([
-    { id: '1', patientName: 'Arjun Mehta', phone: '9845019231', age: 34, doctorId: 'EMP-001', doctorName: 'Dr. Sarah Smith', date: new Date().toDateString(), time: '10:30 AM', status: 'Confirmed', type: 'Scheduled' },
-    { id: '2', patientName: 'Sita Verma', phone: '9120349812', age: 28, doctorId: 'EMP-002', doctorName: 'Dr. John Davis', date: new Date().toDateString(), time: '11:15 AM', status: 'Confirmed', type: 'Scheduled' },
-    { id: '3', patientName: 'Rajesh Malhotra', phone: '9922003311', age: 49, doctorId: 'EMP-001', doctorName: 'Dr. Sarah Smith', date: new Date().toDateString(), time: '12:00 PM', status: 'Confirmed', type: 'Walk-In' },
-    { id: '4', patientName: 'Neelam Gupta', phone: '9871234567', age: 52, doctorId: 'EMP-002', doctorName: 'Dr. John Davis', date: new Date(Date.now() + 86400000).toDateString(), time: '10:00 AM', status: 'Confirmed', type: 'Scheduled' },
-    { id: '5', patientName: 'Vijay Kulkarni', phone: '9001239841', age: 60, doctorId: 'EMP-001', doctorName: 'Dr. Sarah Smith', date: new Date(Date.now() + 86400000).toDateString(), time: '11:30 AM', status: 'Confirmed', type: 'Scheduled' },
-  ]);
+  // Real scheduled appointments list initialized empty (No hardcoded dummy entries)
+  const [appointments, setAppointments] = useState<any[]>([]);
 
   const [newAppt, setNewAppt] = useState({ name: '', phone: '', age: '', doctorId: '', time: '10:00 AM' });
   const [showAddForm, setShowAddForm] = useState(false);
@@ -30,31 +24,63 @@ export function ReceptionistAppointments() {
   const [pastDiagnoses, setPastDiagnoses] = useState('');
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
 
-  const handleCreateAppointment = (e: React.FormEvent) => {
+  const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     const doc = doctors.find(d => d.id === newAppt.doctorId);
     if (!doc) return;
 
-    const appt = {
-      id: `appt-${Date.now()}`,
-      patientName: newAppt.name,
+    // Save directly to Master Patient Directory & EMR database
+    const createdPatient = await registerPatient({
+      name: newAppt.name,
       phone: newAppt.phone,
       age: parseInt(newAppt.age) || 30,
-      doctorId: newAppt.doctorId,
+      gender: 'Male',
       doctorName: doc.name,
-      date: selectedDate,
-      time: newAppt.time,
-      status: 'Confirmed',
-      type: 'Scheduled',
       vitals,
-      pastDiagnoses
-    };
+      pastDiagnoses,
+      appointmentTime: newAppt.time,
+      payNow: false
+    });
 
-    setAppointments([...appointments, appt]);
+    addPatientInvoice({
+      patientName: newAppt.name,
+      patientPhone: newAppt.phone,
+      amount: 500,
+      status: 'Pending',
+      doctorName: doc.name,
+      feeType: 'OPD Consultation Fee'
+    });
+
     setNewAppt({ name: '', phone: '', age: '', doctorId: '', time: '10:00 AM' });
     setVitals([]);
     setPastDiagnoses('');
     setShowAddForm(false);
+  };
+
+  const handleApptCheckIn = async (appt: any, payNow: boolean) => {
+    const newPatient = await registerPatient({
+      name: appt.patientName,
+      phone: appt.phone,
+      age: appt.age,
+      gender: 'Male',
+      doctorName: appt.doctorName,
+      vitals: appt.vitals || [],
+      pastDiagnoses: appt.pastDiagnoses || '',
+      appointmentTime: appt.time,
+      payNow
+    });
+
+    addPatientInvoice({
+      patientName: appt.patientName,
+      patientPhone: appt.phone,
+      amount: 500,
+      status: payNow ? 'Paid' : 'Pending',
+      doctorName: appt.doctorName,
+      feeType: 'OPD Consultation Fee'
+    });
+
+    setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'Checked-In (Live Queue)' } : a));
+    alert(`Appointment for "${appt.patientName}" checked in into live OPD queue (Token: ${newPatient.tokenNumber})!`);
   };
 
   // Generate calendar days
@@ -80,7 +106,26 @@ export function ReceptionistAppointments() {
   const days = getDaysInMonth();
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const filteredAppointments = appointments.filter(appt => {
+  // Combine master patient directory records with scheduler
+  const allAppointments = [
+    ...patients.map(p => ({
+      id: p.id,
+      patientName: p.name,
+      phone: p.phone,
+      age: p.age,
+      doctorId: doctors.find(d => d.name === p.doctorName)?.id || 'EMP-001',
+      doctorName: p.doctorName,
+      date: p.createdAt ? new Date(p.createdAt).toDateString() : new Date().toDateString(),
+      time: p.appointmentTime || 'OPD Walk-In',
+      status: p.paymentStatus === 'Paid' ? 'Checked-In (Paid)' : 'Confirmed (Fee Pending)',
+      type: p.appointmentTime ? 'Scheduled' : 'Walk-In',
+      vitals: p.vitals || [],
+      pastDiagnoses: p.pastDiagnoses || ''
+    })),
+    ...appointments.filter(a => !patients.some(p => p.id === a.id))
+  ];
+
+  const filteredAppointments = allAppointments.filter(appt => {
     const matchesDoctor = selectedDoctor === 'All' || appt.doctorId === selectedDoctor;
     const matchesDate = appt.date === selectedDate;
     return matchesDoctor && matchesDate;
@@ -308,9 +353,31 @@ export function ReceptionistAppointments() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
-                      <Check size={10} /> {appt.status}
-                    </span>
+                    {appt.status.includes('Checked-In') ? (
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        <Check size={12} /> {appt.status}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleApptCheckIn(appt, true)}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all"
+                          title="Check-in with upfront fee collection into Doctor Queue (FIFO)"
+                        >
+                          <UserPlus size={11} /> Check-In (Paid)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleApptCheckIn(appt, false)}
+                          className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
+                          title="Check-in into Fee Pending List"
+                        >
+                          <CreditCard size={11} /> Unpaid
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

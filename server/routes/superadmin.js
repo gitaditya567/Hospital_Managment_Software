@@ -15,6 +15,7 @@ import { Prescription } from '../models/Prescription.js';
 import { PharmacyBill } from '../models/PharmacyBill.js';
 import { Department } from '../models/Department.js';
 import { DoctorSchedule } from '../models/DoctorSchedule.js';
+import { sendTenantWelcomeEmail } from '../utils/email.js';
 
 export const superadminRouter = express.Router();
 
@@ -86,7 +87,8 @@ superadminRouter.get('/tenants', async (req, res) => {
         bedChargePerDay: t.bedChargePerDay || 2500,
         status: t.status || 'Active',
         staffCreated: staffCount,
-        storageUsed: storageMB
+        storageUsed: storageMB,
+        createdAt: t.createdAt || new Date().toISOString()
       };
     }));
     res.json(enriched);
@@ -97,7 +99,7 @@ superadminRouter.get('/tenants', async (req, res) => {
 
 // Onboard a new Hospital Tenant node
 superadminRouter.post('/tenants', async (req, res) => {
-  const { hospitalName, adminEmail, adminPhone, adminPassword, address, licenseCodeUsed, subscriptionExpiryDate, planId } = req.body;
+  const { hospitalName, adminEmail, adminPersonalEmail, adminPhone, adminPassword, address, licenseCodeUsed, subscriptionExpiryDate, planId } = req.body;
   try {
     // 1. Check if the license code is valid and unused
     const license = await LicenseCode.findOne({ code: licenseCodeUsed });
@@ -115,6 +117,7 @@ superadminRouter.post('/tenants', async (req, res) => {
     const newTenant = new Tenant({
       hospitalName,
       adminEmail,
+      adminPersonalEmail: adminPersonalEmail || adminEmail,
       adminPhone: adminPhone || '',
       address,
       licenseCodeUsed,
@@ -128,6 +131,7 @@ superadminRouter.post('/tenants', async (req, res) => {
     const newAdminUser = new User({
       name: `${hospitalName} Admin`,
       email: adminEmail,
+      personalEmail: adminPersonalEmail || adminEmail,
       password: passwordToUse,
       role: 'HOSPITAL_ADMIN',
       hospitalId: newTenant._id.toString()
@@ -146,6 +150,24 @@ superadminRouter.post('/tenants', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     await activity.save();
+
+    // 5. Send Welcome & Onboarding Email via SMTP to Hospital Admin Personal Inbox
+    const targetPlan = await Plan.findOne({ id: planId });
+    const welcomeRecipient = adminPersonalEmail || adminEmail;
+
+    sendTenantWelcomeEmail({
+      toEmail: welcomeRecipient,
+      hospitalName: hospitalName,
+      adminUsername: adminEmail,
+      adminPassword: passwordToUse,
+      accessCode: licenseCodeUsed,
+      planName: targetPlan ? targetPlan.name : 'Standard Tier',
+      subscriptionExpiryDate: subscriptionExpiryDate,
+      maxDoctors: targetPlan ? targetPlan.maxDoctors : -1,
+      maxReceptionists: targetPlan ? targetPlan.maxReceptionists : -1,
+      maxPharmacists: targetPlan ? targetPlan.maxPharmacists : -1,
+      maxStorage: targetPlan ? targetPlan.maxStorage : 10
+    }).catch(err => console.error('Failed to dispatch tenant welcome email:', err));
 
     res.status(201).json({
       id: newTenant._id.toString(),
@@ -263,12 +285,26 @@ superadminRouter.get('/licenses', async (req, res) => {
 });
 
 superadminRouter.post('/licenses', async (req, res) => {
-  const { planId, validityMonths } = req.body;
+  let { planId, validityMonths } = req.body;
   try {
+    if (!planId) {
+      const defaultPlan = await Plan.findOne({});
+      planId = defaultPlan ? defaultPlan.id : 'plan-pro';
+    }
+    validityMonths = Number(validityMonths) || 12;
+
     const year = new Date().getFullYear();
-    const segment1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const segment2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const code = `HOSP-${year}-${segment1}-${segment2}`;
+    const totalCount = await LicenseCode.countDocuments({});
+    const nextSeq = String(totalCount + 1).padStart(3, '0');
+
+    // Generate unguessable 6-character cryptographic salt with Uppercase letters, Numbers, and Symbols
+    const secureSaltChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789#@$%!*";
+    let salt = "";
+    for (let i = 0; i < 6; i++) {
+      salt += secureSaltChars[Math.floor(Math.random() * secureSaltChars.length)];
+    }
+
+    const code = `HMS-${year}-${nextSeq}-${salt}`;
 
     const newLicense = new LicenseCode({
       code,
@@ -281,7 +317,7 @@ superadminRouter.post('/licenses', async (req, res) => {
 
     // Log activity
     const activity = new PlatformActivity({
-      description: `Generated new license code ${code} for Plan: "${planId}" (${validityMonths} Months).`,
+      description: `Generated new secure license code ${code} for Plan: "${planId}" (${validityMonths} Months).`,
       type: 'license',
       timestamp: new Date().toISOString()
     });
@@ -293,8 +329,9 @@ superadminRouter.post('/licenses', async (req, res) => {
   }
 });
 
-superadminRouter.put('/licenses/:code/revoke', async (req, res) => {
-  const { code } = req.params;
+superadminRouter.put('/licenses/*/revoke', async (req, res) => {
+  const rawCode = req.params[0];
+  const code = decodeURIComponent(rawCode);
   try {
     const license = await LicenseCode.findOne({ code });
     if (!license) return res.status(404).json({ message: 'License code not found.' });
@@ -324,8 +361,9 @@ superadminRouter.put('/licenses/:code/revoke', async (req, res) => {
   }
 });
 
-superadminRouter.delete('/licenses/:code', async (req, res) => {
-  const { code } = req.params;
+superadminRouter.delete('/licenses/*', async (req, res) => {
+  const rawCode = req.params[0];
+  const code = decodeURIComponent(rawCode);
   try {
     await LicenseCode.findOneAndDelete({ code });
 

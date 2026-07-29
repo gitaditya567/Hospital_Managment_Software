@@ -190,7 +190,7 @@ export function PharmacyDashboard() {
     const headerTitle = printSettings.showHeader
       ? `<div class="text-center pb-2 dashed-divider">
            ${printSettings.logoUrl ? `< div style = "text-align: center; margin-bottom: 6px;" > <img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div> ` : ''}
-           <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || 'MediSaaS Pharmacy Wing'}</h3>
+           <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || 'Smart Hospital Pharmacy'}</h3>
            <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Pharmacy Checkout Invoice</p>
            <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${dispensedBill.date}</p>
          </div>`
@@ -538,7 +538,7 @@ return (
             {printSettings.showHeader && (
               <div className="text-center pb-2 border-b border-dashed border-slate-300 space-y-1">
                 <h3 className="font-extrabold text-xs uppercase tracking-wide" style={{ color: printSettings.accentColor }}>
-                  🏥 {printSettings.customHeaderText || 'MediSaaS Pharmacy Wing'}
+                  🏥 {printSettings.customHeaderText || 'Smart Hospital Pharmacy'}
                 </h3>
                 <p className="text-[8px] text-slate-500">Live Pharmacy Checkout Invoice</p>
                 <p className="text-[7px] text-slate-400">Date: {dispensedBill.date}</p>

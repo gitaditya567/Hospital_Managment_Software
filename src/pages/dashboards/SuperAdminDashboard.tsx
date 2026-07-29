@@ -59,30 +59,29 @@ export function SuperAdminDashboard() {
   };
 
   // 2. Dynamic Real Telemetry computation for 12 months chart
-  const months = ['Jun 25', 'Jul 25', 'Aug 25', 'Sep 25', 'Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26'];
-  const monthKeys = [
-    { year: 2025, month: 5 }, // June
-    { year: 2025, month: 6 },
-    { year: 2025, month: 7 },
-    { year: 2025, month: 8 },
-    { year: 2025, month: 9 },
-    { year: 2025, month: 10 },
-    { year: 2025, month: 11 },
-    { year: 2026, month: 0 }, // January 2026
-    { year: 2026, month: 1 },
-    { year: 2026, month: 2 },
-    { year: 2026, month: 3 },
-    { year: 2026, month: 4 }  // May 2026
-  ];
+  const now = new Date();
+  const months: string[] = [];
+  const monthKeys: Array<{ year: number; month: number }> = [];
 
-  // Base mock curve to provide premium visual growth on a fresh seed DB
-  const mrrBase = [12, 18, 25, 22, 38, 48, 52, 60, 85, 98, 120, 140]; // in Thousands
-  const clinicsBase = [1, 2, 2, 1, 3, 2, 3, 2, 4, 3, 5, 4];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+    const yearShort = d.getFullYear().toString().slice(-2);
+    months.push(`${monthName} ${yearShort}`);
+    monthKeys.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
 
-  // Aggregate paid invoices by month
+  // Calculate real active clinics count per month
+  const realClinicPoints = monthKeys.map(mk => {
+    return tenants.filter(t => {
+      if (!t.createdAt) return t.status === 'Active';
+      const created = new Date(t.createdAt);
+      return created.getFullYear() < mk.year || (created.getFullYear() === mk.year && created.getMonth() <= mk.month);
+    }).length;
+  });
+
+  // Aggregate paid invoices revenue per month
   const monthlyInvoicesRevenue = new Array(12).fill(0);
-  const monthlyInvoicesCount = new Array(12).fill(0);
-
   (invoices || []).forEach(inv => {
     if (inv.status === 'Paid' && inv.date) {
       const d = new Date(inv.date);
@@ -92,34 +91,28 @@ export function SuperAdminDashboard() {
         const idx = monthKeys.findIndex(mk => mk.year === y && mk.month === m);
         if (idx !== -1) {
           monthlyInvoicesRevenue[idx] += inv.amount;
-          monthlyInvoicesCount[idx] += 1;
         }
       }
     }
   });
 
-  // Calculate cumulative real revenue and hospitals added
-  let cumulativeRevenue = 0;
-  let cumulativeCount = 0;
+  // Calculate MRR per month (in ₹ Thousands)
+  let cumulativeInvoiceRev = 0;
   const realMRRPoints = months.map((_, idx) => {
-    cumulativeRevenue += monthlyInvoicesRevenue[idx];
-    // Convert to Thousands to align with ₹ Thousands units
-    return mrrBase[idx] + (cumulativeRevenue / 1000);
-  });
-
-  const realClinicPoints = months.map((_, idx) => {
-    cumulativeCount += monthlyInvoicesCount[idx];
-    return clinicsBase[idx] + cumulativeCount;
+    cumulativeInvoiceRev += monthlyInvoicesRevenue[idx];
+    const hospitalCountForMonth = realClinicPoints[idx];
+    const currentActiveMRR = (liveMRR / 1000) * (hospitalCountForMonth > 0 ? (hospitalCountForMonth / Math.max(activeHospitalsCount, 1)) : 0);
+    return Math.max(currentActiveMRR, (cumulativeInvoiceRev / 1000));
   });
 
   // Dynamic scaling math:
-  const maxMRR = Math.max(...realMRRPoints, 100);
-  const maxClinics = Math.max(...realClinicPoints, 10);
+  const maxMRR = Math.max(...realMRRPoints, 10);
+  const maxClinics = Math.max(...realClinicPoints, 5);
 
   // Generate SVG coordinates for lines
   const pointsMRR = realMRRPoints.map((val, idx) => {
     const x = 10 + idx * 62;
-    const y = 220 - ((val / maxMRR) * 170); // Max height limit Y=50
+    const y = 220 - ((val / maxMRR) * 170);
     return { x, y };
   });
 
@@ -130,11 +123,11 @@ export function SuperAdminDashboard() {
   });
 
   // SVG Area Path for MRR Fill:
-  const mrrAreaPath = `M 10 220 L ${pointsMRR.map(p => `${ p.x } ${ p.y }`).join(' L ')} L 690 220 Z`;
+  const mrrAreaPath = `M 10 220 L ${pointsMRR.map(p => `${p.x} ${p.y}`).join(' L ')} L 690 220 Z`;
   // SVG Line Path for MRR:
-  const mrrLinePath = `M ${pointsMRR.map(p => `${ p.x } ${ p.y }`).join(' L ')}`;
+  const mrrLinePath = `M ${pointsMRR.map(p => `${p.x} ${p.y}`).join(' L ')}`;
   // SVG Line Path for Clinics:
-  const clinicsLinePath = `M ${pointsClinics.map(p => `${ p.x } ${ p.y }`).join(' L ')}`;
+  const clinicsLinePath = `M ${pointsClinics.map(p => `${p.x} ${p.y}`).join(' L ')}`;
 
   // Last points coordinates
   const lastMRRPoint = pointsMRR[pointsMRR.length - 1];
@@ -161,7 +154,7 @@ export function SuperAdminDashboard() {
             onClick={() => navigate('/super-admin/hospitals')}
             className="bg-transparent border-white/40 text-white hover:bg-white/10 text-sm font-extrabold h-11 px-5 rounded-full"
           >
-            Manage Tenants
+            Manage Hospitals & Clinics
           </Button>
         </div>
       </div>
@@ -172,7 +165,7 @@ export function SuperAdminDashboard() {
           title="Monthly Recurring Revenue (MRR)"
           value={`₹${Math.round(liveMRR).toLocaleString('en-IN')}`}
           icon={<CircleDollarSign size={22} />}
-          trend="8.4% monthly scale"
+          trend="Live database telemetry"
           trendUp={true}
           className="border-teal-100/50 hover:shadow-md hover:border-teal-200 transition-all duration-200"
         />
@@ -218,7 +211,7 @@ export function SuperAdminDashboard() {
               </div>
               <div className="flex items-center gap-1.5 text-cyan-500">
                 <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full inline-block"></span>
-                Clinics Added
+                Hospitals Added
               </div>
             </div>
           </div>
@@ -245,7 +238,7 @@ export function SuperAdminDashboard() {
 
               {/* MRR Area Fill */}
               <path
-                d={mrrAreaPath.replace('chartGradientBlue', 'chartGradientTeal')}
+                d={mrrAreaPath}
                 fill="url(#chartGradientTeal)"
               />
 

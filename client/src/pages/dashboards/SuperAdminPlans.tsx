@@ -76,7 +76,7 @@ export function SuperAdminPlans() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this subscription plan tier? This will not affect already activated tenants immediately, but new licenses cannot be generated with this plan.')) {
+    if (confirm('Are you sure you want to delete this subscription plan tier? This will not affect already activated hospitals immediately, but new licenses cannot be generated with this plan.')) {
       deletePlan(id);
     }
   };
@@ -198,7 +198,7 @@ export function SuperAdminPlans() {
         <div>
           <h4 className="text-sm font-semibold text-slate-800">Dynamic Feature-Flag Verification Info</h4>
           <p className="text-xs text-slate-600 leading-relaxed mt-1">
-            These database limits are verified automatically at the API layer. When a hospital administrator attempts to add an administrative receptionist or doctor account, the application queries their active Tenant Plan and blocks creation if limits are exceeded. This configuration-driven monetization requires no code updates when adjustment parameters are modified here.
+            These database limits are verified automatically at the API layer. When a hospital administrator attempts to add an administrative receptionist or doctor account, the application queries their active Hospital Plan and blocks creation if limits are exceeded. This configuration-driven monetization requires no code updates when adjustment parameters are modified here.
           </p>
         </div>
       </div>

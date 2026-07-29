@@ -25,6 +25,7 @@ export interface Tenant {
   id: string;
   hospitalName: string;
   adminEmail: string;
+  adminPersonalEmail?: string;
   adminPhone?: string;
   address: string;
   status: 'Active' | 'Suspended' | 'Past Due';
@@ -33,6 +34,7 @@ export interface Tenant {
   staffCreated: number;
   storageUsed: number; // in MB
   planId: string;
+  createdAt?: string;
 }
 
 export interface Invoice {
@@ -109,9 +111,9 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
   invoices: [],
   activities: [],
   settings: {
-    platformName: 'MediSaaS Central Control',
+    platformName: 'Smart Hospital Management Software - Central Operator',
     maintenanceMode: false,
-    supportEmail: 'superadmin.support@medisaas.com',
+    supportEmail: 'support@twinscloud.com',
     allowManualOnboarding: true,
     stripeEnabled: true,
     razorpayEnabled: true,
@@ -307,13 +309,17 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
     }
   },
 
-  updateSettings: async (settings) => {
+  updateSettings: async (newSettings) => {
     try {
-      await fetch('/api/superadmin/settings', {
+      const res = await fetch('/api/superadmin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(newSettings)
       });
+      const data = await res.json();
+      if (data && data.platformName) {
+        document.title = data.platformName;
+      }
       await get().fetchSuperAdminData();
     } catch (err) {
       console.error('Failed to update system configurations', err);
@@ -354,7 +360,7 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `medisaas_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `smarthospital_backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();

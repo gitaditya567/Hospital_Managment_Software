@@ -22,6 +22,12 @@ const patientSchema = new mongoose.Schema({
     }
   ],
   pastDiagnoses: { type: String, default: '' },
+  paymentStatus: { 
+    type: String, 
+    enum: ['Paid', 'Unpaid', 'Pending'], 
+    default: 'Paid' 
+  },
+  appointmentTime: { type: String, default: '' },
   hospitalId: { type: String, required: true }
 }, { timestamps: true });
 

@@ -19,6 +19,7 @@ import { HospitalAdminDepartments } from './pages/dashboards/HospitalAdminDepart
 import { HospitalAdminAppointments } from './pages/dashboards/HospitalAdminAppointments';
 import { HospitalAdminAnalytics } from './pages/dashboards/HospitalAdminAnalytics';
 import { HospitalAdminBilling } from './pages/dashboards/HospitalAdminBilling';
+import { HospitalAdminSettings } from './pages/dashboards/HospitalAdminSettings';
 
 import { ReceptionistDashboard } from './pages/dashboards/ReceptionistDashboard';
 import { ReceptionistAppointments } from './pages/dashboards/ReceptionistAppointments';
@@ -75,6 +76,7 @@ function App() {
           <Route path="appointments" element={<HospitalAdminAppointments />} />
           <Route path="analytics" element={<HospitalAdminAnalytics />} />
           <Route path="billing" element={<HospitalAdminBilling />} />
+          <Route path="settings" element={<HospitalAdminSettings />} />
         </Route>
 
         {/* Receptionist Routes */}
@@ -84,9 +86,12 @@ function App() {
           </RoleRoute>
         }>
           <Route index element={<ReceptionistDashboard />} />
+          <Route path="opd-queue" element={<ReceptionistDashboard />} />
           <Route path="appointments" element={<ReceptionistAppointments />} />
           <Route path="patients" element={<ReceptionistPatients />} />
+          <Route path="register-patient" element={<ReceptionistPatients />} />
           <Route path="invoices" element={<ReceptionistInvoices />} />
+          <Route path="billing" element={<ReceptionistInvoices />} />
         </Route>
 
         {/* Doctor Routes */}

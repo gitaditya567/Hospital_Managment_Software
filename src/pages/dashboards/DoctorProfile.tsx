@@ -74,10 +74,11 @@ export function DoctorProfile() {
 
       // Update global user name if it changed
       if (user) {
-        const userJson = localStorage.getItem('medisaas_user');
+        const userJson = localStorage.getItem('smarthospital_user') || localStorage.getItem('medisaas_user');
         if (userJson) {
           const userObj = JSON.parse(userJson);
           userObj.name = fullName;
+          localStorage.setItem('smarthospital_user', JSON.stringify(userObj));
           localStorage.setItem('medisaas_user', JSON.stringify(userObj));
         }
         // Force sync Zustand store
@@ -292,7 +293,7 @@ export function DoctorProfile() {
 
               <div className="flex items-center gap-2 z-10">
                 <span className="text-blue-600 font-black text-xs">✚</span>
-                <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider font-mono">MediSaaS ID</span>
+                <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider font-mono">Smart Hospital ID</span>
               </div>
               <span className="text-[8px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider z-10">
                 Verified Node 🟢

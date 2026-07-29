@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, User, LogOut, Search, AlertCircle, X, ShieldAlert } from 'lucide-react';
+import { Bell, User, LogOut, Search, AlertCircle, X, ShieldAlert, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useHospitalStore } from '../../store/useHospitalStore';
@@ -7,12 +7,13 @@ import { useNavigate } from 'react-router-dom';
 
 interface TopbarProps {
   onMenuClick: () => void;
+  isSidebarOpen?: boolean;
 }
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+export function Topbar({ onMenuClick, isSidebarOpen = true }: TopbarProps) {
   const { user, logout } = useAuthStore();
   const { searchQuery, setSearchQuery, activities, tenants, licenses } = useSuperAdminStore();
-  const { hospitalName: fetchedHospitalName, staff } = useHospitalStore();
+  const { hospitalName: fetchedHospitalName, hospitalLogo, staff } = useHospitalStore();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -43,7 +44,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     if (isSuperAdmin) {
       return 'Super Admin Control';
     }
-    return fetchedHospitalName || 'MediSaaS Portal';
+    return fetchedHospitalName || 'Smart Hospital Management Portal';
   }, [isSuperAdmin, fetchedHospitalName]);
 
   // Compute alerts (failed payments, expiring licenses, suspended accounts for Super Admin, or Tenant-specific alerts for Hospital Admin)
@@ -101,7 +102,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           if (diffDays <= 0) {
             alerts.push({
               id: 'hosp-alert-expired',
-              text: `Critical: Your MediSaaS subscription has expired on ${tenant.subscriptionExpiryDate}. Contact Super Admin!`,
+              text: `Critical: Your Smart Hospital Management Software subscription has expired on ${tenant.subscriptionExpiryDate}. Contact Central Administrator!`,
               time: 'Just now',
               type: 'error'
             });
@@ -141,10 +142,25 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="flex items-center flex-1 min-w-0 mr-4 gap-3">
         <button
           onClick={onMenuClick}
-          className="md:hidden p-2 -ml-2 mr-2 text-slate-500 hover:bg-teal-50 rounded-full shrink-0 transition-colors"
+          className="p-2 -ml-2 mr-1 text-slate-600 hover:text-teal-700 hover:bg-teal-50 rounded-xl shrink-0 transition-all border border-slate-200/60 shadow-sm flex items-center justify-center group active:scale-95"
+          title={isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
         >
-          <Menu size={20} />
+          {isSidebarOpen ? (
+            <PanelLeftClose size={20} className="group-hover:scale-110 transition-transform text-slate-600" />
+          ) : (
+            <PanelLeft size={20} className="group-hover:scale-110 transition-transform text-teal-600" />
+          )}
         </button>
+
+        {!isSuperAdmin && hospitalLogo ? (
+          <div className="w-9 h-9 rounded-full border-2 border-teal-500/80 p-0.5 bg-white shadow-[0_0_10px_rgba(20,184,166,0.25)] overflow-hidden shrink-0 flex items-center justify-center animate-in zoom-in-50 duration-300">
+            <img src={hospitalLogo} alt="Hospital Logo" className="w-full h-full object-contain rounded-full" />
+          </div>
+        ) : !isSuperAdmin ? (
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white shadow-[0_0_12px_rgba(20,184,166,0.3)] shrink-0 flex items-center justify-center font-extrabold text-sm border border-teal-300/40 animate-heartbeat">
+            ✚
+          </div>
+        ) : null}
 
         <h1 className="text-sm font-extrabold text-slate-800 hidden sm:block bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mr-3 shrink-0 max-w-[160px] lg:max-w-[240px] truncate uppercase tracking-wider text-glow-teal">
           {hospitalName}

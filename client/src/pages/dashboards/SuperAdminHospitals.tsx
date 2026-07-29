@@ -3,6 +3,7 @@ import { useSuperAdminStore, type Tenant } from '../../store/useSuperAdminStore'
 import { DataTable } from '../../components/ui/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { PasswordStrengthMeter } from '../../components/ui/PasswordStrengthMeter';
 import { Building2, Eye, Mail, MapPin, HardDrive, Users, Edit, Trash2, Calendar, Award } from 'lucide-react';
 
 export function SuperAdminHospitals() {
@@ -25,6 +26,7 @@ export function SuperAdminHospitals() {
   // Form State for manual onboarding
   const [hospitalName, setHospitalName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [adminPersonalEmail, setAdminPersonalEmail] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [address, setAddress] = useState('');
@@ -72,6 +74,7 @@ export function SuperAdminHospitals() {
     const result = await onboardHospital({
       hospitalName,
       adminEmail,
+      adminPersonalEmail: adminPersonalEmail || adminEmail,
       adminPhone,
       adminPassword,
       address,
@@ -90,6 +93,7 @@ export function SuperAdminHospitals() {
       });
       setHospitalName('');
       setAdminEmail('');
+      setAdminPersonalEmail('');
       setAdminPhone('');
       setAdminPassword('');
       setAddress('');
@@ -146,7 +150,7 @@ export function SuperAdminHospitals() {
   const handleDeleteTenant = (tenantId: string) => {
     const tenant = tenants.find(t => t.id === tenantId);
     if (!tenant) return;
-    if (confirm(`CRITICAL SYSTEM RESET: Are you sure you want to PERMANENTLY REMOVE "${tenant.hospitalName}" from the mediSaaS platform? \n\nThis will completely delete their directory registration and free up their license key "${tenant.licenseCodeUsed}". This action is irreversible.`)) {
+    if (confirm(`CRITICAL SYSTEM RESET: Are you sure you want to PERMANENTLY REMOVE "${tenant.hospitalName}" from the Smart Hospital Management Software platform? \n\nThis will completely delete their directory registration and free up their license key "${tenant.licenseCodeUsed}". This action is irreversible.`)) {
       deleteTenant(tenantId);
       setSelectedTenant(null);
     }
@@ -244,7 +248,7 @@ export function SuperAdminHospitals() {
             variant="outline"
             onClick={() => handleDeleteTenant(item.id)}
             className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 border-slate-200 hover:border-rose-200 flex items-center justify-center"
-            title="Delete Tenant"
+            title="Delete Hospital Organization"
           >
             <Trash2 size={13} />
           </Button>
@@ -258,9 +262,9 @@ export function SuperAdminHospitals() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Building2 className="text-blue-600" /> Hospitals & Tenants
+            <Building2 className="text-blue-600" /> Hospitals & Clinics
           </h1>
-          <p className="text-slate-500">Inspect registered clinics database status, telemetry capacity and access switches</p>
+          <p className="text-slate-500">Inspect registered hospital & clinic database status, telemetry capacity and access switches</p>
         </div>
         <Button onClick={() => setIsOnboardModalOpen(true)} className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center">
           <span className="text-base leading-none">+</span> Onboard New Hospital
@@ -283,7 +287,7 @@ export function SuperAdminHospitals() {
       <Modal
         isOpen={selectedTenant !== null && !isEditModalOpen}
         onClose={() => setSelectedTenant(null)}
-        title="Tenant Registry Telemetry"
+        title="Hospital Organization Telemetry"
         className="max-w-lg"
       >
         {selectedTenant && (
@@ -415,7 +419,7 @@ export function SuperAdminHospitals() {
       </Modal>
 
       {/* Modal - Onboard New Hospital */}
-      <Modal isOpen={isOnboardModalOpen} onClose={() => { setIsOnboardModalOpen(false); setOnboardStep(1); }} title="Onboard Tenant Clinic">
+      <Modal isOpen={isOnboardModalOpen} onClose={() => { setIsOnboardModalOpen(false); setOnboardStep(1); }} title="Onboard New Hospital / Clinic">
         {/* Step Indicator Header */}
         <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2">
@@ -448,7 +452,7 @@ export function SuperAdminHospitals() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Email</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Login Email / Username</label>
                   <input
                     type="email"
                     required
@@ -460,18 +464,30 @@ export function SuperAdminHospitals() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Phone No</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Personal Email (For Security Alerts)</label>
                   <input
-                    type="tel"
-                    required
-                    placeholder="10-digit mobile"
-                    value={adminPhone}
-                    onChange={(e) => setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    maxLength={10}
-                    pattern="[0-9]{10}"
+                    type="email"
+                    placeholder="administrator.personal@gmail.com"
+                    value={adminPersonalEmail}
+                    onChange={(e) => setAdminPersonalEmail(e.target.value)}
                     className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50/50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Contact Phone</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="10-digit mobile"
+                  value={adminPhone}
+                  onChange={(e) => setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  maxLength={10}
+                  pattern="[0-9]{10}"
+                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50/50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                />
+                <p className="text-[10px] text-slate-400">Security alert emails will be delivered to this personal inbox whenever hospital staff reset credentials.</p>
               </div>
 
               <div className="space-y-1">
@@ -535,6 +551,7 @@ export function SuperAdminHospitals() {
                   onChange={(e) => setAdminPassword(e.target.value)}
                   className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
                 />
+                <PasswordStrengthMeter password={adminPassword} onPasswordChange={setAdminPassword} />
               </div>
 
               <div className="space-y-1">

@@ -7,6 +7,9 @@ import { Invoice } from '../models/Invoice.js';
 import { Tenant } from '../models/Tenant.js';
 import { LicenseCode } from '../models/LicenseCode.js';
 import { User } from '../models/User.js';
+import { Plan } from '../models/Plan.js';
+import { SubscriptionInvoice } from '../models/SubscriptionInvoice.js';
+import { PlatformActivity } from '../models/PlatformActivity.js';
 
 export const hospitalRouter = express.Router();
 
@@ -26,8 +29,19 @@ hospitalRouter.get('/staff', async (req, res) => {
   const { hospitalId } = req.query;
   if (!hospitalId) return res.status(400).json({ message: 'hospitalId is required' });
   try {
-    const staffList = await Staff.find({ hospitalId });
-    res.json(staffList);
+    const staffList = await Staff.find({ hospitalId }).lean();
+    const processed = staffList.map(s => {
+      let history = s.roleHistory || [];
+      if (!history || history.length === 0) {
+        history = [{
+          previousRole: 'Initial Assignment',
+          newRole: s.role,
+          updatedAt: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString()
+        }];
+      }
+      return { ...s, roleHistory: history };
+    });
+    res.json(processed);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -35,7 +49,7 @@ hospitalRouter.get('/staff', async (req, res) => {
 
 // Add a staff member (with subscription tier license validation!)
 hospitalRouter.post('/staff', async (req, res) => {
-  const { name, role, department, contact, email, hospitalId } = req.body;
+  const { name, role, department, contact, email, personalEmail, hospitalId } = req.body;
   try {
     // Subscription limits check
     const tenant = await Tenant.findById(hospitalId);
@@ -43,17 +57,16 @@ hospitalRouter.post('/staff', async (req, res) => {
       return res.status(404).json({ message: 'Central Tenant Registration not found.' });
     }
 
-    // Determine plan limits
+    // Query dynamic plan limits from MongoDB
     let maxDoc = -1;
     let maxRecep = -1;
     let maxPharm = -1;
-    const plan = tenant.planId;
-    
-    if (plan === 'plan-basic') {
-      maxDoc = 2; maxRecep = 1; maxPharm = 1;
-    } else if (plan === 'plan-pro') {
-      maxDoc = 10; maxRecep = 5; maxPharm = 3;
-    } // plan-enterprise has unlimited (-1)
+    const planDoc = await Plan.findOne({ id: tenant.planId }) || await Plan.findById(tenant.planId);
+    if (planDoc) {
+      maxDoc = planDoc.maxDoctors;
+      maxRecep = planDoc.maxReceptionists;
+      maxPharm = planDoc.maxPharmacists;
+    }
 
     const currentCounts = await Staff.find({ hospitalId });
     
@@ -80,7 +93,13 @@ hospitalRouter.post('/staff', async (req, res) => {
       }
     }
 
-    const newStaff = new Staff({ name, role, department, contact, email, hospitalId, status: 'Active' });
+    const initialHistory = [{
+      previousRole: 'Initial Assignment',
+      newRole: role,
+      updatedAt: new Date().toISOString()
+    }];
+
+    const newStaff = new Staff({ name, role, department, contact, email, personalEmail: personalEmail || '', hospitalId, status: 'Active', roleHistory: initialHistory });
     await newStaff.save();
 
     // Dynamically generate credentials in User collection
@@ -90,6 +109,7 @@ hospitalRouter.post('/staff', async (req, res) => {
       const newUser = new User({
         name,
         email,
+        personalEmail: personalEmail || email,
         password: req.body.password || 'demo1234',
         role: userRole,
         hospitalId,
@@ -107,19 +127,43 @@ hospitalRouter.post('/staff', async (req, res) => {
 // Update staff member
 hospitalRouter.put('/staff/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, role, department, contact, email, password } = req.body;
+  const { name, role, department, contact, email, personalEmail, password } = req.body;
   try {
     const oldStaff = await Staff.findById(id);
     if (!oldStaff) return res.status(404).json({ message: 'Staff member not found.' });
 
     const oldEmail = oldStaff.email;
 
+    // Track role change history if role changed
+    if (role && role !== oldStaff.role) {
+      const currentRole = oldStaff.role;
+      let history = Array.isArray(oldStaff.roleHistory) ? [...oldStaff.roleHistory] : [];
+
+      if (history.length === 0) {
+        history.push({
+          previousRole: 'Initial Assignment',
+          newRole: currentRole,
+          updatedAt: oldStaff.createdAt ? new Date(oldStaff.createdAt).toISOString() : new Date().toISOString()
+        });
+      }
+
+      history.push({
+        previousRole: currentRole,
+        newRole: role,
+        updatedAt: new Date().toISOString()
+      });
+
+      oldStaff.roleHistory = history;
+      oldStaff.markModified('roleHistory');
+      oldStaff.role = role;
+    }
+
     // Update staff fields
     oldStaff.name = name || oldStaff.name;
-    oldStaff.role = role || oldStaff.role;
     oldStaff.department = department !== undefined ? department : oldStaff.department;
     oldStaff.contact = contact || oldStaff.contact;
     oldStaff.email = email || oldStaff.email;
+    if (personalEmail !== undefined) oldStaff.personalEmail = personalEmail;
     if (req.body.status) oldStaff.status = req.body.status;
 
     await oldStaff.save();
@@ -131,6 +175,7 @@ hospitalRouter.put('/staff/:id', async (req, res) => {
     if (userAccount) {
       userAccount.name = oldStaff.name;
       userAccount.email = oldStaff.email;
+      if (personalEmail !== undefined) userAccount.personalEmail = personalEmail || oldStaff.email;
       userAccount.role = userRole;
       if (password && password.trim() !== '') {
         userAccount.password = password.trim();
@@ -294,7 +339,7 @@ hospitalRouter.get('/patients', async (req, res) => {
 });
 
 hospitalRouter.post('/patients', async (req, res) => {
-  const { name, phone, age, gender, doctorName, hospitalId, vitals, pastDiagnoses } = req.body;
+  const { name, phone, age, gender, doctorName, hospitalId, vitals, pastDiagnoses, paymentStatus, payNow, appointmentTime } = req.body;
   try {
     // Generate token number: count patients under this doctor today
     const doctorPatientsCount = await Patient.countDocuments({ hospitalId, doctorName });
@@ -321,6 +366,8 @@ hospitalRouter.post('/patients', async (req, res) => {
       }
     }
 
+    let pStatus = paymentStatus || (payNow === false ? 'Unpaid' : 'Paid');
+
     const newPatient = new Patient({
       name,
       patientNo,
@@ -329,11 +376,13 @@ hospitalRouter.post('/patients', async (req, res) => {
       gender: gender || 'Male',
       doctorName,
       tokenNumber,
-      timeRegistered: 'Just now',
+      timeRegistered: appointmentTime ? `Appt ${appointmentTime}` : 'Just now',
       status: 'Waiting',
       waitTime: '0m',
       vitals: vitals || [],
       pastDiagnoses: pastDiagnoses || '',
+      paymentStatus: pStatus,
+      appointmentTime: appointmentTime || '',
       hospitalId
     });
 
@@ -406,7 +455,54 @@ hospitalRouter.put('/invoices/:id/collect', async (req, res) => {
   const { id } = req.params;
   try {
     const updated = await Invoice.findByIdAndUpdate(id, { status: 'Paid' }, { new: true });
+    if (updated) {
+      await Patient.updateMany(
+        { hospitalId: updated.hospitalId, phone: updated.patientPhone, paymentStatus: { $ne: 'Paid' } },
+        { paymentStatus: 'Paid' }
+      );
+    }
     res.json(updated);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+hospitalRouter.put('/patients/:id/collect-fee', async (req, res) => {
+  const { id } = req.params;
+  const { amount, feeType } = req.body;
+  try {
+    const patient = await Patient.findById(id);
+    if (!patient) return res.status(404).json({ message: 'Patient profile not found.' });
+
+    patient.paymentStatus = 'Paid';
+    await patient.save();
+
+    // Sync or create invoice
+    const existingInvoice = await Invoice.findOne({
+      hospitalId: patient.hospitalId,
+      patientPhone: patient.phone,
+      status: 'Pending'
+    });
+
+    if (existingInvoice) {
+      existingInvoice.status = 'Paid';
+      await existingInvoice.save();
+    } else {
+      const dateString = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const newInvoice = new Invoice({
+        patientName: patient.name,
+        patientPhone: patient.phone,
+        amount: Number(amount) || 500,
+        doctorName: patient.doctorName,
+        feeType: feeType || 'OPD Consultation Fee',
+        date: dateString,
+        status: 'Paid',
+        hospitalId: patient.hospitalId
+      });
+      await newInvoice.save();
+    }
+
+    res.json({ message: 'Consultation fee collected. Patient activated into Doctor Queue.', patient });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -465,7 +561,7 @@ hospitalRouter.get('/profile', async (req, res) => {
   try {
     const tenant = await Tenant.findById(hospitalId);
     if (!tenant) {
-      return res.json({ id: hospitalId, hospitalName: 'City Care Hospital' });
+      return res.json({ id: hospitalId, hospitalName: 'Smart Hospital' });
     }
     res.json({
       id: tenant._id.toString(),
@@ -480,7 +576,7 @@ hospitalRouter.get('/profile', async (req, res) => {
     });
   } catch (error) {
     // If ObjectId format invalid or tenant not found, fallback gracefully
-    res.json({ id: hospitalId, hospitalName: 'City Care Hospital' });
+    res.json({ id: hospitalId, hospitalName: 'Smart Hospital' });
   }
 });
 
@@ -531,4 +627,153 @@ hospitalRouter.put('/staff/profile/details', async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
+
+// GET Hospital Profile details by hospitalId
+hospitalRouter.get('/profile', async (req, res) => {
+  const { hospitalId } = req.query;
+  if (!hospitalId) return res.status(400).json({ message: 'hospitalId is required' });
+  try {
+    const tenant = await Tenant.findById(hospitalId);
+    if (!tenant) return res.status(404).json({ message: 'Hospital organization not found.' });
+
+    const license = await LicenseCode.findOne({ code: tenant.licenseCodeUsed });
+    const targetPlanId = (license && license.planId) || tenant.planId;
+
+    let plan = await Plan.findOne({ $or: [{ id: targetPlanId }, { name: targetPlanId }] });
+    if (!plan && tenant.planId) {
+      plan = await Plan.findOne({ $or: [{ id: tenant.planId }, { name: tenant.planId }] });
+    }
+    if (!plan) {
+      plan = await Plan.findOne({ id: 'plan-basic' }) || await Plan.findOne({});
+    }
+
+    // Auto-heal data sync between license and tenant
+    if (license && license.planId && tenant.planId !== license.planId) {
+      tenant.planId = license.planId;
+      await tenant.save();
+    }
+
+    res.json({
+      id: tenant._id.toString(),
+      hospitalName: tenant.hospitalName,
+      adminEmail: tenant.adminEmail,
+      adminPhone: tenant.adminPhone,
+      address: tenant.address,
+      hospitalLogo: tenant.hospitalLogo || '',
+      licenseCodeUsed: tenant.licenseCodeUsed,
+      subscriptionExpiryDate: tenant.subscriptionExpiryDate,
+      status: tenant.status,
+      planName: plan ? plan.name : 'Basic Plan',
+      maxDoctors: plan ? plan.maxDoctors : 2,
+      maxStorage: plan ? plan.maxStorage : 10,
+      validityMonths: license ? license.validityMonths : 12,
+      createdAt: tenant.createdAt
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// UPDATE Hospital Profile details
+hospitalRouter.put('/profile', async (req, res) => {
+  const { hospitalId, hospitalName, adminPhone, address, hospitalLogo } = req.body;
+  if (!hospitalId) return res.status(400).json({ message: 'hospitalId is required' });
+  try {
+    const tenant = await Tenant.findById(hospitalId);
+    if (!tenant) return res.status(404).json({ message: 'Hospital organization not found.' });
+
+    if (hospitalName !== undefined) tenant.hospitalName = hospitalName;
+    if (adminPhone !== undefined) tenant.adminPhone = adminPhone;
+    if (address !== undefined) tenant.address = address;
+    if (hospitalLogo !== undefined) tenant.hospitalLogo = hospitalLogo;
+
+    await tenant.save();
+    res.json({ success: true, message: 'Hospital profile updated successfully.', tenant });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Renew Hospital Subscription Plan using a License Code
+hospitalRouter.post('/renew-subscription', async (req, res) => {
+  const { hospitalId, licenseCode } = req.body;
+  if (!hospitalId || !licenseCode) {
+    return res.status(400).json({ message: 'Hospital ID and License Code are required.' });
+  }
+
+  try {
+    const cleanCode = licenseCode.trim();
+    const license = await LicenseCode.findOne({ code: cleanCode });
+    if (!license) {
+      return res.status(404).json({ message: `License Code "${cleanCode}" is invalid.` });
+    }
+
+    if (license.isUsed) {
+      return res.status(400).json({ message: `License Code "${cleanCode}" has already been used.` });
+    }
+
+    if (license.status === 'Expired') {
+      return res.status(400).json({ message: `License Code "${cleanCode}" has expired.` });
+    }
+
+    const tenant = await Tenant.findById(hospitalId);
+    if (!tenant) {
+      return res.status(404).json({ message: 'Hospital organization not found.' });
+    }
+
+    const targetPlan = await Plan.findOne({ id: license.planId }) || await Plan.findOne({ name: license.planId });
+    const validityMonths = license.validityMonths || (targetPlan ? targetPlan.durationMonths : 12);
+
+    let baseDate = new Date();
+    if (tenant.subscriptionExpiryDate) {
+      const currentExpiry = new Date(tenant.subscriptionExpiryDate);
+      if (currentExpiry > baseDate) {
+        baseDate = currentExpiry;
+      }
+    }
+    baseDate.setMonth(baseDate.getMonth() + validityMonths);
+    const newExpiryStr = baseDate.toISOString().split('T')[0];
+
+    tenant.licenseCodeUsed = cleanCode;
+    tenant.subscriptionExpiryDate = newExpiryStr;
+    if (license.planId) {
+      tenant.planId = license.planId;
+    }
+    tenant.status = 'Active';
+    await tenant.save();
+
+    license.isUsed = true;
+    license.status = 'Used';
+    license.activatedByHospitalId = hospitalId;
+    await license.save();
+
+    const inv = new SubscriptionInvoice({
+      hospitalName: tenant.hospitalName,
+      planName: targetPlan ? targetPlan.name : 'Subscription Renewal',
+      amount: targetPlan ? targetPlan.price : 0,
+      method: 'Manual Invoice',
+      status: 'Paid',
+      date: new Date().toISOString().split('T')[0]
+    });
+    await inv.save();
+
+    const activity = new PlatformActivity({
+      description: `Hospital "${tenant.hospitalName}" renewed subscription using License "${cleanCode}". New expiry: ${newExpiryStr}.`,
+      type: 'license',
+      timestamp: new Date().toISOString()
+    });
+    await activity.save();
+
+    res.json({
+      success: true,
+      message: `Subscription successfully renewed! Valid until ${newExpiryStr}.`,
+      newExpiryDate: newExpiryStr,
+      planName: targetPlan ? targetPlan.name : 'Active Plan',
+      tenant
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 

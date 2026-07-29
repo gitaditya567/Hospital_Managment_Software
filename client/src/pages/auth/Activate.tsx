@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Button } from '../../components/ui/Button';
+import { PasswordStrengthMeter } from '../../components/ui/PasswordStrengthMeter';
 import { Key, Building, User, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, MapPin } from 'lucide-react';
 
 export function Activate() {
@@ -114,13 +115,22 @@ export function Activate() {
 
       <div className="w-full max-w-lg z-10 animate-fade-in-up">
         {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center h-15 w-15 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-3xl font-extrabold mb-3.5 shadow-lg shadow-blue-500/20 animate-float">
+        <div className="text-center mb-8 flex flex-col items-center">
+          <div className="inline-flex items-center justify-center h-16 w-16 rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-3xl font-extrabold mb-4 shadow-lg shadow-blue-500/20 animate-float">
             ✚
           </div>
-          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-slate-800 to-slate-950 bg-clip-text text-transparent">MediSaaS Tenant Activation</h1>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-100/80 rounded-full mb-2.5 shadow-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+            <span className="text-[10px] text-blue-700 font-extrabold uppercase tracking-widest">Hospital Registration</span>
+          </div>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 leading-tight text-center">
+            Smart Hospital <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Management</span>
+          </h1>
+          <p className="text-blue-700 text-xs font-black uppercase tracking-[0.25em] mt-1">
+            Software Solution • Activation
+          </p>
           <p className="text-slate-400 mt-2 text-xs font-semibold uppercase tracking-wider">
-            Activate your custom hospital node in real-time
+            Register & activate your hospital organization in real-time
           </p>
         </div>
 
@@ -164,7 +174,7 @@ export function Activate() {
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g. HOSP-2026-R4T1-OP90"
+                    placeholder="e.g. HMS-2026-001-R4#1%P"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     required
@@ -314,6 +324,7 @@ export function Activate() {
                       className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-100 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
                     />
                   </div>
+                  <PasswordStrengthMeter password={adminPassword} onPasswordChange={setAdminPassword} />
                 </div>
               </div>
 
@@ -336,8 +347,10 @@ export function Activate() {
           )}
         </div>
 
-        <div className="mt-8 text-center text-xs text-slate-400 flex justify-between items-center px-3 font-semibold">
-          <span>MediSaaS Platform Gateway v1.0.0</span>
+        <div className="mt-8 text-center text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center gap-3 px-1 font-semibold">
+          <span className="px-3 py-1 bg-blue-50/90 border border-blue-200/80 text-blue-800 text-[11px] font-black rounded-full shadow-sm shadow-blue-500/10 flex items-center gap-1.5">
+            <span className="text-amber-500 font-extrabold">©</span> Copyright @twinsCloud • Smart Hospital Management Software v1.0.0
+          </span>
           <button
             onClick={() => navigate('/login')}
             className="text-blue-600 hover:text-blue-700 font-bold transition-colors active:scale-95"

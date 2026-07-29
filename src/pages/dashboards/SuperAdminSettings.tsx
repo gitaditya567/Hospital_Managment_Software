@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
 import { Settings, Shield, Mail, FileSpreadsheet, Server, DollarSign, ToggleLeft, ToggleRight, Check } from 'lucide-react';
 
 export function SuperAdminSettings() {
-  const { settings, updateSettings, addActivity, exportBackup, sendDiagnostics } = useSuperAdminStore();
+  const { settings, updateSettings, fetchSuperAdminData, addActivity, exportBackup, sendDiagnostics } = useSuperAdminStore();
   const [platformName, setPlatformName] = useState(settings.platformName);
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail);
   const [taxRate, setTaxRate] = useState(settings.taxRate);
@@ -17,9 +17,25 @@ export function SuperAdminSettings() {
   const [sendingDiagnostics, setSendingDiagnostics] = useState(false);
   const [diagnosticsToken, setDiagnosticsToken] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchSuperAdminData();
+  }, [fetchSuperAdminData]);
+
+  useEffect(() => {
+    if (settings) {
+      setPlatformName(settings.platformName || '');
+      setSupportEmail(settings.supportEmail || '');
+      setTaxRate(settings.taxRate ?? 18);
+      setMaintenanceMode(!!settings.maintenanceMode);
+      setAllowManualOnboarding(!!settings.allowManualOnboarding);
+      setStripeEnabled(!!settings.stripeEnabled);
+      setRazorpayEnabled(!!settings.razorpayEnabled);
+    }
+  }, [settings]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({
+    await updateSettings({
       platformName,
       supportEmail,
       taxRate: Number(taxRate),
@@ -28,6 +44,9 @@ export function SuperAdminSettings() {
       stripeEnabled,
       razorpayEnabled,
     });
+    if (platformName) {
+      document.title = platformName;
+    }
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -184,7 +203,7 @@ export function SuperAdminSettings() {
             <Shield size={18} className="text-rose-500" /> Central Security & Diagnosis
           </h2>
           <p className="text-xs text-slate-500">
-            For critical emergency incidents or security audits. Perform backups of entire tenant MongoDB records. (Clinical logs and patient histories are private and fully excluded from backup files to secure strict HIPAA boundaries).
+            For critical emergency incidents or security audits. Perform backups of entire hospital database records. (Clinical logs and patient histories are private and fully excluded from backup files to secure strict HIPAA boundaries).
           </p>
           <div className="flex flex-wrap gap-3 pt-2 items-center">
             <Button 

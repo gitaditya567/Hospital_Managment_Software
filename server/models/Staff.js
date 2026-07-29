@@ -10,6 +10,7 @@ const staffSchema = new mongoose.Schema({
   department: { type: String, default: '' },
   contact: { type: String, required: true },
   email: { type: String, required: true },
+  personalEmail: { type: String, default: '' },
   status: { 
     type: String, 
     enum: ['Active', 'Inactive', 'On Leave'], 
@@ -18,7 +19,14 @@ const staffSchema = new mongoose.Schema({
   hospitalId: { type: String, required: true },
   consultationFee: { type: Number, default: 500 },
   licenseNo: { type: String, default: '' },
-  signature: { type: String, default: '' }
+  signature: { type: String, default: '' },
+  roleHistory: [
+    {
+      previousRole: { type: String, required: true },
+      newRole: { type: String, required: true },
+      updatedAt: { type: String, default: () => new Date().toISOString() }
+    }
+  ]
 }, { timestamps: true });
 
 export const Staff = mongoose.model('Staff', staffSchema);

@@ -2,18 +2,24 @@ import { useEffect, useState } from 'react';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { CreditCard, CheckCircle, AlertTriangle, ShieldCheck, Download, Calendar, HardDrive, UserCheck, Printer, Sliders, Sparkles } from 'lucide-react';
+import { CreditCard, CheckCircle, AlertTriangle, ShieldCheck, Download, Calendar, HardDrive, UserCheck, Printer, Sliders, Sparkles, X, Key, Zap, PackageCheck, Check, Mail } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { getPrintSettings, savePrintSettings } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 
 export function HospitalAdminBilling() {
-  const { staff, fees } = useHospitalStore();
+  const { staff, fees, renewSubscription } = useHospitalStore();
   const { tenants, plans, invoices, fetchSuperAdminData } = useSuperAdminStore();
   const { user } = useAuthStore();
 
   const [printSettings, setPrintSettings] = useState<PrintSettings>(getPrintSettings());
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Modal & Renewal State
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [licenseInput, setLicenseInput] = useState('');
+  const [renewing, setRenewing] = useState(false);
+  const [renewStatus, setRenewStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     fetchSuperAdminData();
@@ -78,6 +84,24 @@ export function HospitalAdminBilling() {
 
   const storageUsed = currentHospital?.storageUsed || 1.15; // dynamically fetched from backend API (in MB)
 
+  const handleLicenseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!licenseInput.trim()) return;
+
+    setRenewing(true);
+    setRenewStatus(null);
+
+    const res = await renewSubscription(currentHospitalId, licenseInput.trim());
+    if (res.success) {
+      setRenewStatus({ type: 'success', message: res.message || 'Subscription renewed successfully!' });
+      setLicenseInput('');
+      await fetchSuperAdminData();
+    } else {
+      setRenewStatus({ type: 'error', message: res.error || 'Invalid or used License Key.' });
+    }
+    setRenewing(false);
+  };
+
   return (
     <div className="space-y-6">
 
@@ -91,12 +115,12 @@ export function HospitalAdminBilling() {
             <div className="space-y-1">
               <h2 className="text-base font-bold text-rose-800">Critical Warning: Subscription Expired!</h2>
               <p className="text-xs text-rose-600 font-semibold">
-                Your MediSaaS subscription ended on <span className="font-extrabold">{expiryDateStr}</span>. Administrative slots are locked.
+                Your Smart Hospital Management Software subscription ended on <span className="font-extrabold">{expiryDateStr}</span>. Administrative slots are locked.
               </p>
             </div>
           </div>
-          <Button className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-5 rounded-full">
-            Contact Super Admin to Renew
+          <Button onClick={() => setIsPlanModalOpen(true)} className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-5 rounded-full">
+            Renew Subscription Plan
           </Button>
         </div>
       ) : isExpiringSoon ? (
@@ -112,7 +136,7 @@ export function HospitalAdminBilling() {
               </p>
             </div>
           </div>
-          <Button className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs h-10 px-5 rounded-full">
+          <Button onClick={() => setIsPlanModalOpen(true)} className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs h-10 px-5 rounded-full">
             Renew Subscription Plan
           </Button>
         </div>
@@ -129,8 +153,8 @@ export function HospitalAdminBilling() {
               </p>
             </div>
           </div>
-          <Button variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 font-bold text-xs h-10 px-5 rounded-full">
-            Upgrade Plan Tier
+          <Button variant="outline" onClick={() => setIsPlanModalOpen(true)} className="border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 font-bold text-xs h-10 px-5 rounded-full">
+            View Available Plans / Upgrade
           </Button>
         </div>
       )}
@@ -247,10 +271,10 @@ export function HospitalAdminBilling() {
                 </p>
                 <p className="text-[10px] text-blue-700 mt-0.5">
                   {plan?.name === 'Enterprise Plan'
-                    ? 'Your hospital has priority 24/7 dedicated engineering support. Support emails: support@medisaas.com.'
+                    ? 'Your hospital has priority 24/7 dedicated engineering support. Support emails: support@twinscloud.com.'
                     : plan?.name === 'Pro Plan'
-                      ? 'Your hospital has priority email support with a 12-hour response guarantee. Support emails: support@medisaas.com.'
-                      : 'Your hospital has standard email support with a 24-hour response guarantee. Support emails: support@medisaas.com.'}
+                      ? 'Your hospital has priority email support with a 12-hour response guarantee. Support emails: support@twinscloud.com.'
+                      : 'Your hospital has standard email support with a 24-hour response guarantee. Support emails: support@twinscloud.com.'}
                 </p>
               </div>
             </div>
@@ -511,7 +535,7 @@ export function HospitalAdminBilling() {
                 type="text"
                 value={printSettings.customFooterText}
                 onChange={e => updateSetting('customFooterText', e.target.value)}
-                placeholder="Thank you for visiting! Powered by MediSaaS."
+                placeholder="Thank you for visiting! Powered by Smart Hospital Management Software • Copyright © twinsCloud"
                 className="w-full h-9 px-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700"
               />
             </div>
@@ -612,7 +636,7 @@ export function HospitalAdminBilling() {
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <CreditCard className="text-blue-500" size={20} /> SaaS Payments Invoice Ledger
           </h2>
-          <p className="text-xs text-slate-500">History of payments processed from this hospital node to MediSaaS operators.</p>
+          <p className="text-xs text-slate-500">History of payments processed from this hospital node to Smart Hospital Management Software operators.</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -668,6 +692,173 @@ export function HospitalAdminBilling() {
           </table>
         </div>
       </div>
+
+      {/* Available Subscription & Renewal Plans Modal */}
+      {isPlanModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-100 overflow-hidden my-8 animate-in zoom-in-95 duration-200">
+            
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 relative">
+              <button
+                onClick={() => { setIsPlanModalOpen(false); setRenewStatus(null); }}
+                className="absolute top-5 right-5 h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="flex items-center gap-3 mb-2">
+                <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Zap size={14} className="text-yellow-400 fill-yellow-400" /> SaaS Pricing & Upgrades
+                </span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Available Subscription Plans</h2>
+              <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-2xl">
+                Explore available plans or enter a License Key provided by Super Admin to extend your hospital software access.
+              </p>
+            </div>
+
+            <div className="p-6 sm:p-8 space-y-8 max-h-[75vh] overflow-y-auto">
+
+              {/* License Key Activation Section */}
+              <div className="bg-slate-50 border border-blue-100 p-5 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <Key size={16} className="text-blue-600" /> Have a Renewal License Key / Code?
+                  </h3>
+                  <span className="text-[10px] font-semibold text-slate-400">Instant Activation</span>
+                </div>
+
+                <form onSubmit={handleLicenseSubmit} className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={licenseInput}
+                    onChange={(e) => setLicenseInput(e.target.value)}
+                    placeholder="e.g. HMS-2026-001-A9X2K4"
+                    className="flex-1 h-11 px-4 border border-slate-300 rounded-xl text-xs font-mono font-bold uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={renewing || !licenseInput.trim()}
+                    className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/20 shrink-0"
+                  >
+                    {renewing ? 'Validating...' : 'Activate & Renew Plan'}
+                  </Button>
+                </form>
+
+                {renewStatus && (
+                  <div className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+                    renewStatus.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}>
+                    {renewStatus.type === 'success' ? <CheckCircle size={16} className="text-emerald-600 shrink-0" /> : <AlertTriangle size={16} className="text-rose-600 shrink-0" />}
+                    <span>{renewStatus.message}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Available Plans Grid */}
+              <div className="space-y-4">
+                <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                  <PackageCheck size={18} className="text-blue-600" /> Available SaaS Tiers ({plans.length})
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {plans.map((p) => {
+                    const isCurrent = plan?.id === p.id || plan?.name === p.name;
+                    return (
+                      <div
+                        key={p.id}
+                        className={`rounded-2xl p-5 border transition-all relative flex flex-col justify-between ${
+                          isCurrent
+                            ? 'border-blue-500 bg-blue-50/30 ring-2 ring-blue-500/20 shadow-md'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                        }`}
+                      >
+                        {isCurrent && (
+                          <span className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm uppercase tracking-wider">
+                            Current Active Plan
+                          </span>
+                        )}
+
+                        <div className="space-y-3">
+                          <div>
+                            <h4 className="text-base font-bold text-slate-900">{p.name}</h4>
+                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{p.durationMonths || 12} Months License Validity</p>
+                          </div>
+
+                          <div className="py-2 border-y border-slate-100">
+                            <span className="text-2xl font-black text-slate-900">₹{p.price.toLocaleString('en-IN')}</span>
+                            <span className="text-xs text-slate-400 font-semibold"> / {p.durationMonths || 12} mo</span>
+                          </div>
+
+                          <ul className="space-y-2 text-xs font-semibold text-slate-600">
+                            <li className="flex items-center gap-2">
+                              <Check size={14} className="text-emerald-500 shrink-0" />
+                              <span>Doctor Slots: <strong className="text-slate-800">{p.maxDoctors === -1 ? 'Unlimited' : `${p.maxDoctors} Doctors`}</strong></span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Check size={14} className="text-emerald-500 shrink-0" />
+                              <span>Receptionist Slots: <strong className="text-slate-800">{p.maxReceptionists === -1 ? 'Unlimited' : `${p.maxReceptionists} Accounts`}</strong></span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Check size={14} className="text-emerald-500 shrink-0" />
+                              <span>Pharmacy Slots: <strong className="text-slate-800">{p.maxPharmacists === -1 ? 'Unlimited' : `${p.maxPharmacists} Accounts`}</strong></span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Check size={14} className="text-emerald-500 shrink-0" />
+                              <span>Storage Quota: <strong className="text-slate-800">{p.maxStorage} GB</strong></span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        <div className="pt-5 mt-3 border-t border-slate-100">
+                          <Button
+                            onClick={() => {
+                              setLicenseInput('');
+                              setRenewStatus({
+                                type: 'success',
+                                message: `Selected ${p.name}. Enter your license key above to activate this plan.`
+                              });
+                            }}
+                            className={`w-full text-xs font-bold h-9 rounded-xl ${
+                              isCurrent
+                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                : 'bg-slate-900 hover:bg-slate-800 text-white'
+                            }`}
+                          >
+                            {isCurrent ? 'Active Plan' : `Select ${p.name}`}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Support Email Callout */}
+              <div className="bg-slate-900 text-white p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <Mail size={16} className="text-blue-400" /> Need a new License Key for Renewal?
+                  </h4>
+                  <p className="text-xs text-slate-300">
+                    Contact Super Admin or TwinsCloud support team to issue an offline license key for your hospital.
+                  </p>
+                </div>
+                <a
+                  href="mailto:support@twinscloud.com?subject=Subscription%20Renewal%20License%20Request"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5"
+                >
+                  Request License Key
+                </a>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

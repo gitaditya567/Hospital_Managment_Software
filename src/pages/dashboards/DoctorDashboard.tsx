@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '../../components/ui/Button';
-import { Mic, CheckCircle, Clock, Users, UserCheck, Eye, EyeOff, ShieldAlert, FileText, Phone, User, Activity, Search, Keyboard, Trash2, Edit, X, Plus } from 'lucide-react';
+import { Mic, CheckCircle, Clock, Users, UserCheck, Eye, EyeOff, ShieldAlert, FileText, Phone, User, Activity, Search, Keyboard, Trash2, Edit, X, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -18,6 +18,149 @@ export function DoctorDashboard() {
   const [pastVisits, setPastVisits] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
+  // Fullscreen Workspace State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleFullscreen = () => {
+    if (!isFullscreen) {
+      if (workspaceRef.current?.requestFullscreen) {
+        workspaceRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Advanced Medical Entity AI Voice Parser
+  const parseTranscriptText = (text: string) => {
+    if (!text || !text.trim()) return;
+    const lowerText = text.toLowerCase();
+
+    // Comprehensive Medicine Mapping Dictionary
+    const MEDICINE_DICTIONARY: Array<{
+      keywords: string[];
+      medName: string;
+      defaultDosage: string;
+      defaultDuration: string;
+    }> = [
+      { keywords: ['paracetamol 650', 'dolo 650', 'dolo'], medName: 'Paracetamol 650mg (Dolo)', defaultDosage: '1-1-1 (Post meals)', defaultDuration: '3 Days' },
+      { keywords: ['paracetamol 500', 'paracetamol', 'crocin', 'calpol', 'fever tab'], medName: 'Paracetamol 500mg', defaultDosage: '1-0-1 (Post meals)', defaultDuration: '3 Days' },
+      { keywords: ['amoxicillin 500', 'amox 500', 'mox 500'], medName: 'Amoxicillin 500mg', defaultDosage: '1-0-1', defaultDuration: '5 Days' },
+      { keywords: ['amoxicillin 250', 'amoxicillin', 'amox'], medName: 'Amoxicillin 250mg', defaultDosage: '1-0-1', defaultDuration: '5 Days' },
+      { keywords: ['ibuprofen', 'brufen', 'painkiller'], medName: 'Ibuprofen 400mg', defaultDosage: '1-0-1 (Post meals)', defaultDuration: '3 Days' },
+      { keywords: ['pantoprazole', 'pan d', 'pan-d', 'pan 40', 'pantocid', 'gas medicine'], medName: 'Pantoprazole 40mg (Pan-D)', defaultDosage: '1-0-0 (Empty stomach)', defaultDuration: '10 Days' },
+      { keywords: ['cetirizine', 'cetzine', 'okacet', 'allergy tab'], medName: 'Cetirizine 10mg', defaultDosage: '0-0-1 (Night)', defaultDuration: '5 Days' },
+      { keywords: ['azithromycin', 'azithral', 'azi 500'], medName: 'Azithromycin 500mg', defaultDosage: '1-0-0', defaultDuration: '3 Days' },
+      { keywords: ['montelukast', 'montair', 'montair-lc'], medName: 'Montelukast 10mg', defaultDosage: '0-0-1 (Night)', defaultDuration: '15 Days' },
+      { keywords: ['metformin', 'glycomet', 'sugar tab'], medName: 'Metformin 500mg', defaultDosage: '0-1-0 (Pre meals)', defaultDuration: '30 Days' },
+      { keywords: ['amlodipine', 'amlong', 'bp tab'], medName: 'Amlodipine 5mg', defaultDosage: '1-0-0 (Morning)', defaultDuration: '30 Days' },
+      { keywords: ['loperamide', 'imodium', 'loose motion'], medName: 'Loperamide 2mg', defaultDosage: '1-0-1', defaultDuration: '2 Days' }
+    ];
+
+    const extractDosage = (phrase: string, fallback: string) => {
+      if (phrase.includes('once a day') || phrase.includes('once daily') || phrase.includes('ek baar')) return '1-0-0';
+      if (phrase.includes('twice a day') || phrase.includes('twice daily') || phrase.includes('do baar') || phrase.includes('subah shaam')) return '1-0-1 (Twice a day)';
+      if (phrase.includes('thrice a day') || phrase.includes('three times') || phrase.includes('tin baar')) return '1-1-1 (Thrice a day)';
+      if (phrase.includes('four times')) return '1-1-1-1';
+      return fallback;
+    };
+
+    const extractDuration = (phrase: string, fallback: string) => {
+      const matchDays = phrase.match(/(\d+)\s*(day|days|din)/);
+      if (matchDays) return `${matchDays[1]} Days`;
+      const matchMonth = phrase.match(/(\d+)\s*(month|months|mahine)/);
+      if (matchMonth) return `${matchMonth[1]} Months`;
+      return fallback;
+    };
+
+    MEDICINE_DICTIONARY.forEach(entry => {
+      const matchedKeyword = entry.keywords.find(kw => lowerText.includes(kw));
+      if (matchedKeyword) {
+        setPrescriptions(prev => {
+          if (!prev.some(p => p.medicine.toLowerCase() === entry.medName.toLowerCase())) {
+            const dosage = extractDosage(lowerText, entry.defaultDosage);
+            const duration = extractDuration(lowerText, entry.defaultDuration);
+            return [...prev, {
+              medicine: entry.medName,
+              dosage,
+              duration
+            }];
+          }
+          return prev;
+        });
+      }
+    });
+  };
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-IN'; // Multi-language Indian English & Hinglish support
+
+      recognition.onresult = (event: any) => {
+        let currentTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript + ' ';
+        }
+        const cleaned = currentTranscript.trim();
+        setTranscript(cleaned);
+        parseTranscriptText(cleaned);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error !== 'no-speech') {
+          setIsDictating(false);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsDictating(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleDictation = () => {
+    if (isDictating) {
+      try {
+        recognitionRef.current?.stop();
+      } catch (err) {
+        console.error("Error stopping dictation:", err);
+      }
+      setIsDictating(false);
+    } else {
+      setTranscript('');
+      try {
+        recognitionRef.current?.start();
+        setIsDictating(true);
+      } catch (err) {
+        console.error("Could not start dictation:", err);
+        setIsDictating(false);
+      }
+    }
+  };
 
   // Smart Dual-mode Entry states
   const [entryMode, setEntryMode] = useState<'voice' | 'manual'>('voice');
@@ -98,8 +241,6 @@ export function DoctorDashboard() {
     } : p));
     setEditingIndex(null);
   };
-
-  const recognitionRef = useRef<any>(null);
 
   // Auto-deselect patient if DND mode is turned on
   // Load doctor DND status on mount
@@ -238,35 +379,55 @@ export function DoctorDashboard() {
   }, [selectedPatient?.id, user?.hospitalId]);
 
   // Filter patients allotted to this doctor who are either waiting or currently in consultation.
-  // Sort so that the patient in consultation is always at the top of the queue.
+  // Strictly sort by FIFO (First-In, First-Out): In Consultation patient first, then waiting paid patients ordered by createdAt timestamp ascending.
   const doctorQueue = patients
     .filter(p =>
-      p.doctorName.toLowerCase().trim() === user?.name?.toLowerCase().trim() &&
-      (p.status === 'Waiting' || p.status === 'In Consultation')
+      p.doctorName && user?.name &&
+      p.doctorName.toLowerCase().trim() === user.name.toLowerCase().trim() &&
+      (p.status === 'Waiting' || p.status === 'In Consultation') &&
+      (p.paymentStatus === 'Paid' || !p.paymentStatus)
     )
     .sort((a, b) => {
       if (a.status === 'In Consultation') return -1;
       if (b.status === 'In Consultation') return 1;
-      return 0;
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeA - timeB;
     });
 
   const waitingPatients = doctorQueue.filter(p => p.status === 'Waiting');
 
   const totalWaitingCount = doctorQueue.length;
   const checkedTodayCount = patients.filter(p =>
-    p.doctorName.toLowerCase().trim() === user?.name?.toLowerCase().trim() &&
+    p.doctorName && user?.name &&
+    p.doctorName.toLowerCase().trim() === user.name.toLowerCase().trim() &&
     p.status === 'Completed'
   ).length;
 
-  // Auto-select active consultation patient on mount/update if not already selected
+  // Auto-select and real-time live sync for selected patient details (vitals, pastDiagnoses, status)
   useEffect(() => {
-    if (!selectedPatient && !isDndMode) {
+    if (isDndMode) return;
+
+    if (selectedPatient) {
+      const updated = patients.find(p => p.id === selectedPatient.id);
+      if (updated) {
+        if (
+          updated.pastDiagnoses !== selectedPatient.pastDiagnoses ||
+          updated.status !== selectedPatient.status ||
+          JSON.stringify(updated.vitals) !== JSON.stringify(selectedPatient.vitals)
+        ) {
+          setSelectedPatient(updated);
+        }
+      }
+    } else {
       const activeConsult = doctorQueue.find(p => p.status === 'In Consultation');
       if (activeConsult) {
         setSelectedPatient(activeConsult);
+      } else if (doctorQueue.length > 0) {
+        setSelectedPatient(doctorQueue[0]);
       }
     }
-  }, [doctorQueue, selectedPatient, isDndMode]);
+  }, [patients, selectedPatient, isDndMode]);
 
   // Handle selecting a patient: updates clicked patient to In Consultation and resets others to Waiting
   const handleSelectPatient = async (patient: any) => {
@@ -295,76 +456,6 @@ export function DoctorDashboard() {
       }
     } catch (err) {
       console.error("Failed to transition patient statuses:", err);
-    }
-  };
-
-  useEffect(() => {
-    // Setup Speech Recognition
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      recognition.onresult = (event: any) => {
-        let currentTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          currentTranscript += event.results[i][0].transcript;
-        }
-        setTranscript(prev => {
-          const newText = prev + ' ' + currentTranscript;
-          parseTranscript(currentTranscript);
-          return newText;
-        });
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
-        setIsDictating(false);
-      };
-
-      recognition.onend = () => {
-        setIsDictating(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
-  }, []);
-
-  const toggleDictation = () => {
-    if (isDictating) {
-      recognitionRef.current?.stop();
-      setIsDictating(false);
-    } else {
-      setTranscript('');
-      recognitionRef.current?.start();
-      setIsDictating(true);
-    }
-  };
-
-  const parseTranscript = (text: string) => {
-    // A simplified keyword scanner for demonstration
-    // "Prescribing Paracetamol 500 milligram twice a day for five days"
-    const lowerText = text.toLowerCase();
-
-    if (lowerText.includes('paracetamol')) {
-      // Avoid duplicates
-      if (!prescriptions.some(p => p.medicine === 'Paracetamol 500mg')) {
-        setPrescriptions(prev => [...prev, {
-          medicine: 'Paracetamol 500mg',
-          dosage: '1-0-1 (Twice a day)',
-          duration: '5 Days'
-        }]);
-      }
-    }
-    if (lowerText.includes('amoxicillin')) {
-      if (!prescriptions.some(p => p.medicine === 'Amoxicillin 250mg')) {
-        setPrescriptions(prev => [...prev, {
-          medicine: 'Amoxicillin 250mg',
-          dosage: '1-1-1',
-          duration: '3 Days'
-        }]);
-      }
     }
   };
 
@@ -549,7 +640,7 @@ export function DoctorDashboard() {
                     )}>
                       {patient.status === 'In Consultation'
                         ? 'Consulting'
-                        : `Waiting No. ${waitingPatients.indexOf(patient) + 1}`
+                        : `Pos #${doctorQueue.indexOf(patient)} (${doctorQueue.indexOf(patient) === 1 ? 'Next' : 'Waiting'})`
                       }
                     </span>
                   </div>
@@ -582,7 +673,13 @@ export function DoctorDashboard() {
       </div>
 
       {/* Right Column: EMR / Workspace */}
-      <div className="flex-1 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden">
+      <div 
+        ref={workspaceRef}
+        className={cn(
+          "flex-1 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden transition-all duration-300",
+          isFullscreen && "fixed inset-0 z-[9999] rounded-none p-6 bg-slate-900/95 backdrop-blur-2xl w-screen h-screen"
+        )}
+      >
         {selectedPatient ? (
           <div className="flex flex-col h-full animate-in fade-in">
             {/* Patient Header */}
@@ -602,6 +699,17 @@ export function DoctorDashboard() {
               </div>
 
               <div className="flex items-center gap-3">
+                {/* 🖥️ Full Screen Toggle Button */}
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-extrabold rounded-full text-xs flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  title={isFullscreen ? "Exit Full Screen Mode" : "Enter Full Screen Mode"}
+                >
+                  {isFullscreen ? <Minimize2 size={13} className="text-teal-600" /> : <Maximize2 size={13} className="text-teal-600" />}
+                  <span>{isFullscreen ? "Exit Full Screen" : "Full Screen"}</span>
+                </button>
+
                 {/* ⏸️ Put on Hold (Recall Later) */}
                 <button
                   type="button"
@@ -869,34 +977,83 @@ export function DoctorDashboard() {
                 {entryMode === 'voice' && (
                   <div className="space-y-4 animate-in fade-in duration-200">
                     {/* Dictation Action */}
-                    <div className="flex flex-col items-center justify-center p-8 bg-teal-50/15 rounded-2xl border-2 border-dashed border-teal-100/60 shadow-inner">
+                    <div className="flex flex-col items-center justify-center p-6 bg-teal-50/15 rounded-2xl border-2 border-dashed border-teal-100/60 shadow-inner">
                       <button
                         type="button"
                         onClick={toggleDictation}
                         className={cn(
                           "w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all duration-300",
                           isDictating
-                            ? "bg-rose-500 text-white animate-pulse-fast shadow-rose-500/40 scale-110 pulse-ring"
-                            : "bg-teal-600 text-white hover:bg-teal-700 hover:scale-105 shadow-teal-500/10"
+                            ? "bg-rose-500 text-white animate-pulse shadow-rose-500/40 scale-110 ring-4 ring-rose-300"
+                            : "bg-teal-600 text-white hover:bg-teal-700 hover:scale-105 shadow-teal-500/20"
                         )}
                       >
                         <Mic size={32} />
                       </button>
-                      <p className="mt-4 font-medium text-slate-700">
-                        {isDictating ? 'Listening... Speak now' : 'Click to Start Dictation'}
+                      <p className="mt-4 font-bold text-slate-800 text-xs">
+                        {isDictating ? '🎙️ Listening... Speak prescription clearly' : 'Click Mic to Start Voice Dictation'}
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">Say "Prescribing Paracetamol..." to test</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Supports English, Hinglish, & Multi-Medicine Clinical Terms</p>
                     </div>
 
-                    {/* Transcript Text Box */}
+                    {/* Quick Sample Voice Prompts */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Quick Voice Prompts (Click to Test)
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          "Prescribe Dolo 650 twice a day for 5 days",
+                          "Give Pan-D once daily for 10 days",
+                          "Cetirizine 10mg at night for 5 days",
+                          "Amoxicillin 500mg twice a day for 5 days"
+                        ].map((promptText, pIdx) => (
+                          <button
+                            key={pIdx}
+                            type="button"
+                            onClick={() => {
+                              setTranscript(promptText);
+                              parseTranscriptText(promptText);
+                            }}
+                            className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 border border-teal-200/60 text-teal-800 rounded-lg text-[10px] font-semibold transition-all hover:scale-105"
+                          >
+                            ⚡ "{promptText}"
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Transcript Text Box & Action */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">AI Transcript</label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700">AI Speech Transcript</label>
+                        {transcript && (
+                          <button
+                            type="button"
+                            onClick={() => setTranscript('')}
+                            className="text-[10px] font-bold text-slate-400 hover:text-rose-500"
+                          >
+                            Clear Transcript
+                          </button>
+                        )}
+                      </div>
                       <textarea
                         className="w-full h-24 p-3 rounded-xl border border-teal-100/60 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 resize-none font-medium text-slate-700 text-xs outline-none transition-all duration-200 shadow-inner"
                         value={transcript}
-                        onChange={(e) => setTranscript(e.target.value)}
-                        placeholder="Voice transcript will appear here..."
+                        onChange={(e) => {
+                          setTranscript(e.target.value);
+                          parseTranscriptText(e.target.value);
+                        }}
+                        placeholder="Spoken words will appear here automatically..."
                       />
+                      <Button
+                        type="button"
+                        onClick={() => parseTranscriptText(transcript)}
+                        disabled={!transcript.trim()}
+                        className="w-full h-9 text-xs font-bold gap-2 bg-teal-600 hover:bg-teal-700 text-white"
+                      >
+                        <Mic size={13} /> Extract & Add Prescriptions from Voice Text
+                      </Button>
                     </div>
                   </div>
                 )}
