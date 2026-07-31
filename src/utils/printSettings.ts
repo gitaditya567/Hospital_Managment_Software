@@ -19,8 +19,8 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   paperSize: '80mm',
   showHeader: true,
   showFooter: true,
-  customHeaderText: 'Smart Hospital',
-  customFooterText: 'Thank you for visiting! Smart Hospital Management Software • Copyright © twinsCloud',
+  customHeaderText: '',
+  customFooterText: 'Thank you for visiting! Keep medicines out of reach of children.',
   logoUrl: ''
 };
 
@@ -51,4 +51,13 @@ export function savePrintSettings(settings: Partial<PrintSettings>): PrintSettin
   // Dispatch custom event to alert other components in real-time
   window.dispatchEvent(new CustomEvent(PRINT_SETTINGS_EVENT, { detail: updated }));
   return updated;
+}
+
+export function getHospitalDisplayName(): string {
+  const settings = getPrintSettings();
+  if (settings.customHeaderText && settings.customHeaderText.trim() !== '' && settings.customHeaderText !== 'Smart Hospital') {
+    return settings.customHeaderText;
+  }
+  const savedHospitalName = localStorage.getItem('medisaas_hospital_name');
+  return savedHospitalName || 'Apollo Hospital';
 }

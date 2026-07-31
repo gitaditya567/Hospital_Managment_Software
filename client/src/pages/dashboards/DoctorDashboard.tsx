@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '../../components/ui/Button';
-import { Mic, CheckCircle, Clock, Users, UserCheck, Eye, EyeOff, ShieldAlert, FileText, Phone, User, Activity, Search, Keyboard, Trash2, Edit, X, Plus, Maximize2, Minimize2 } from 'lucide-react';
+import { Mic, CheckCircle, Clock, Users, UserCheck, Eye, EyeOff, ShieldAlert, FileText, Phone, User, Activity, Search, Keyboard, Trash2, Edit, X, Plus, Maximize2, Minimize2, Printer } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../../components/ui/Modal';
+import { getPrintSettings, getHospitalDisplayName } from '../../utils/printSettings';
+import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
+import type { FilterState } from '../../components/common/DataNavigationToolbar';
 
 export function DoctorDashboard() {
   const { user } = useAuthStore();
   const { patients, updatePatientStatus, fetchHospitalData } = useHospitalStore();
+
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
 
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [isDictating, setIsDictating] = useState(false);
@@ -395,9 +400,9 @@ export function DoctorDashboard() {
       return timeA - timeB;
     });
 
-  const waitingPatients = doctorQueue.filter(p => p.status === 'Waiting');
-
+  const filteredDoctorQueue = applyDataFilters(doctorQueue, filters);
   const totalWaitingCount = doctorQueue.length;
+  const filteredWaitingCount = filteredDoctorQueue.length;
   const checkedTodayCount = patients.filter(p =>
     p.doctorName && user?.name &&
     p.doctorName.toLowerCase().trim() === user.name.toLowerCase().trim() &&
@@ -532,94 +537,218 @@ export function DoctorDashboard() {
     }
   };
 
+  // Print Prescription Slip
+  const handlePrintPrescription = (patientObj?: any, customRxCode?: string, medList?: any[]) => {
+    const pat = patientObj || selectedPatient;
+    if (!pat) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const settings = getPrintSettings();
+    const rxRef = customRxCode || `RX-${Math.floor(1000 + Math.random() * 9000)}`;
+    const itemsToPrint = medList && medList.length > 0 ? medList : prescriptions;
+
+    const medicinesHtml = itemsToPrint.map((med: any) => {
+      const medName = med.medicine || med.name || (typeof med === 'string' ? med : 'Medication');
+      const dosage = med.dosage || '1-0-1';
+      const duration = med.duration || '5 Days';
+      const qty = med.qty || 10;
+      return `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px; font-weight: bold; color: #1e293b; text-align: left;">${medName}</td>
+          <td style="padding: 10px; text-align: center; font-family: monospace; font-weight: 700; color: ${settings.accentColor}; background-color: #f8fafc; border-radius: 6px;">${dosage}</td>
+          <td style="padding: 10px; text-align: center; color: #64748b; font-weight: 500;">${duration}</td>
+          <td style="padding: 10px; text-align: center; font-family: monospace; font-weight: bold; color: #334155;">${qty}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const headerBlock = settings.showHeader
+      ? `<div class="header">
+          <div class="clinic-details">
+            <h1>${getHospitalDisplayName()}</h1>
+            <p>State-of-the-Art Digital EMR Clinical Prescription</p>
+          </div>
+          <div>
+            <p class="rx-title">R<sub>x</sub></p>
+          </div>
+        </div>`
+      : `<div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+          <p class="rx-title">R<sub>x</sub></p>
+        </div>`;
+
+    const footerBlock = settings.showFooter
+      ? `<div class="footer">
+          ${settings.customFooterText || 'This is an authentic computer-generated EMR prescription copy.'}
+        </div>`
+      : '';
+
+    const rawHtml = `
+      <html>
+        <head>
+          <title>Prescription Slip - ${rxRef}</title>
+          <style>
+            @page { size: A4 portrait; margin: ${settings.margin}mm; }
+            body { font-family: 'Inter', system-ui, -apple-system, sans-serif; padding: ${settings.padding * 2}px; color: #334155; line-height: 1.5; font-size: ${settings.fontSize}px; }
+            .header { display: flex; justify-content: space-between; border-bottom: 3px solid ${settings.accentColor}; padding-bottom: 20px; margin-bottom: 30px; }
+            .clinic-details h1 { margin: 0; font-size: 26px; font-weight: 850; color: #1e293b; letter-spacing: -0.02em; }
+            .clinic-details p { margin: 4px 0 0 0; font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+            .rx-title { font-size: 36px; font-weight: 900; color: ${settings.accentColor}; margin: 0; font-style: italic; font-family: serif; }
+            .meta-grid { display: grid; grid-template-cols: 1.2fr 0.8fr; gap: 20px; margin-bottom: 35px; background-color: #f8fafc; padding: 20px; border-radius: 14px; border: 1px solid #e2e8f0; }
+            .meta-item p { margin: 6px 0; font-size: 13.5px; font-weight: 600; color: #475569; }
+            .meta-item strong { color: #1e293b; font-weight: 800; }
+            table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+            th { background-color: #f1f5f9; padding: 14px 10px; text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #475569; font-weight: 800; border-bottom: 2.5px solid #cbd5e1; }
+            .footer { margin-top: 80px; border-top: 1px dashed #cbd5e1; padding-top: 20px; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 700; letter-spacing: 0.02em; }
+            .signature { margin-top: 60px; display: flex; justify-content: flex-end; }
+            .signature-box { border-top: 1.5px solid #1e293b; width: 220px; text-align: center; padding-top: 8px; font-size: 12px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: 0.02em; }
+          </style>
+        </head>
+        <body>
+          ${headerBlock}
+          <div class="meta-grid">
+            <div class="meta-item">
+              <p><strong>Patient Name:</strong> ${pat.name}</p>
+              <p><strong>Age / Gender:</strong> ${pat.age} Yrs / ${pat.gender || 'Not specified'}</p>
+              <p><strong>Contact Phone:</strong> ${pat.phone}</p>
+            </div>
+            <div class="meta-item" style="text-align: right;">
+              <p><strong>Prescription Date:</strong> ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+              <p><strong>Consulting Doctor:</strong> Dr. ${user?.name || 'Practitioner'}</p>
+              <p><strong>Rx Code Reference:</strong> <span style="font-family: monospace; font-weight: 800; color: ${settings.accentColor};">${rxRef}</span></p>
+            </div>
+          </div>
+          <h3 style="font-size: 14px; font-weight: 850; color: #1e293b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-left: 4px solid ${settings.accentColor}; padding-left: 8px;">Prescribed Medications</h3>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left; padding-left: 10px;">Medicine Name</th>
+                <th style="width: 130px;">Dosage</th>
+                <th style="width: 120px;">Duration</th>
+                <th style="width: 90px;">Total Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${medicinesHtml}
+            </tbody>
+          </table>
+          <div class="signature">
+            <div>
+              <div class="signature-box">Authorized Medical Practitioner</div>
+              <p style="margin: 4px 0 0 0; font-size: 12px; text-align: center; color: #475569; font-weight: 700;">Dr. ${user?.name || 'Doctor'}</p>
+            </div>
+          </div>
+          ${footerBlock}
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(rawHtml);
+    printWindow.document.close();
+  };
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-6 font-sans">
-      {/* Left Column: Waiting Room */}
-      <div className="w-1/3 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden">
-        {/* Header with DND Toggle */}
-        <div className="p-4 border-b border-teal-50 bg-teal-50/20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-2 h-2 rounded-full",
-              isDndMode ? "bg-rose-500 animate-pulse" : "bg-emerald-500 animate-pulse"
-            )} />
-            <h2 className="font-bold text-slate-800 tracking-tight text-sm text-glow-teal">Waiting Room</h2>
-          </div>
+    <div className="space-y-4 font-sans">
+      {/* Interactive Data Navigation & Filter Toolbar */}
+      <DataNavigationToolbar
+        filters={filters}
+        onFilterChange={setFilters}
+        totalRecordsCount={totalWaitingCount}
+        filteredCount={filteredWaitingCount}
+        title="Doctor Consultation Control & Data Filters"
+        subtitle="Filter waiting queue and historical visit records by Date Range, Patient Type, and Status"
+      />
 
-          {/* Toggle Switch */}
-          <button
-            onClick={() => {
-              const nextVal = !isDndMode;
-              setIsDndMode(nextVal);
-              updateDndStatus(nextVal);
-            }}
-            className={cn(
-              "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-              isDndMode ? "bg-rose-500" : "bg-emerald-500"
-            )}
-            role="switch"
-            aria-checked={isDndMode}
-          >
-            <span className="sr-only">Toggle DND Mode</span>
-            <span
+      <div className="flex h-[calc(100vh-14rem)] gap-6">
+        {/* Left Column: Waiting Room */}
+        <div className="w-1/3 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden">
+          {/* Header with DND Toggle */}
+          <div className="p-4 border-b border-teal-50 bg-teal-50/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                isDndMode ? "bg-rose-500 animate-pulse" : "bg-emerald-500 animate-pulse"
+              )} />
+              <h2 className="font-bold text-slate-800 tracking-tight text-sm text-glow-teal">Waiting Room</h2>
+            </div>
+
+            {/* Toggle Switch */}
+            <button
+              onClick={() => {
+                const nextVal = !isDndMode;
+                setIsDndMode(nextVal);
+                updateDndStatus(nextVal);
+              }}
               className={cn(
-                "pointer-events-none relative inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out flex items-center justify-center",
-                isDndMode ? "translate-x-5" : "translate-x-0"
+                "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                isDndMode ? "bg-rose-500" : "bg-emerald-500"
               )}
+              role="switch"
+              aria-checked={isDndMode}
             >
-              {isDndMode ? (
-                <EyeOff size={8} className="text-rose-600" />
-              ) : (
-                <Eye size={8} className="text-emerald-600" />
-              )}
-            </span>
-          </button>
-        </div>
-
-        {/* Stats Row - Always Visible */}
-        <div className="grid grid-cols-2 gap-2 p-3 bg-teal-50/10 border-b border-teal-100/50">
-          <div className="bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-teal-100/40 shadow-sm flex items-center gap-2 hover:border-teal-300 transition-colors">
-            <div className="p-1.5 bg-amber-50 rounded-lg text-amber-600">
-              <Users size={14} />
-            </div>
-            <div>
-              <p className="text-[9px] uppercase tracking-wider font-semibold text-slate-400">Total Waiting</p>
-              <p className="text-sm font-bold text-slate-800">{totalWaitingCount}</p>
-            </div>
+              <span className="sr-only">Toggle DND Mode</span>
+              <span
+                className={cn(
+                  "pointer-events-none relative inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out flex items-center justify-center",
+                  isDndMode ? "translate-x-5" : "translate-x-0"
+                )}
+              >
+                {isDndMode ? (
+                  <EyeOff size={8} className="text-rose-600" />
+                ) : (
+                  <Eye size={8} className="text-emerald-600" />
+                )}
+              </span>
+            </button>
           </div>
-          <div className="bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-teal-100/40 shadow-sm flex items-center gap-2 hover:border-teal-300 transition-colors">
-            <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
-              <UserCheck size={14} />
-            </div>
-            <div>
-              <p className="text-[9px] uppercase tracking-wider font-semibold text-slate-400">Checked Today</p>
-              <p className="text-sm font-bold text-slate-800">{checkedTodayCount}</p>
-            </div>
-          </div>
-        </div>
 
-        {/* Patient Queue Content or DND Mode View */}
-        <div className="flex-1 overflow-y-auto p-2 relative">
-          {isDndMode ? (
-            /* Premium Focus Block Overlay */
-            <div className="absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-200">
-              <div className="relative mb-3">
-                <div className="absolute -inset-1 rounded-full bg-rose-100 animate-ping opacity-75" />
-                <div className="relative p-3 bg-rose-50 rounded-full text-rose-500 border border-rose-100 shadow-sm">
-                  <ShieldAlert size={28} />
-                </div>
+          {/* Stats Row - Always Visible */}
+          <div className="grid grid-cols-2 gap-2 p-3 bg-teal-50/10 border-b border-teal-100/50">
+            <div className="bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-teal-100/40 shadow-sm flex items-center gap-2 hover:border-teal-300 transition-colors">
+              <div className="p-1.5 bg-amber-50 rounded-lg text-amber-600">
+                <Users size={14} />
               </div>
-              <h3 className="text-sm font-bold text-slate-800 mb-0.5">DND Mode Engaged</h3>
-              <p className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-semibold inline-block mb-2">
-                Clinical Focus Locked
-              </p>
-              <p className="text-[11px] text-slate-500 max-w-[200px] leading-relaxed">
-                Patient lists are hidden to ensure undisturbed workspace. Turn off DND above to resume patient intake.
-              </p>
+              <div>
+                <p className="text-[9px] uppercase tracking-wider font-semibold text-slate-400">Total Waiting</p>
+                <p className="text-sm font-bold text-slate-800">{filteredWaitingCount}</p>
+              </div>
             </div>
-          ) : (
-            doctorQueue.length > 0 ? (
-              doctorQueue.map((patient) => (
+            <div className="bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-teal-100/40 shadow-sm flex items-center gap-2 hover:border-teal-300 transition-colors">
+              <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
+                <UserCheck size={14} />
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-wider font-semibold text-slate-400">Checked Today</p>
+                <p className="text-sm font-bold text-slate-800">{checkedTodayCount}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Patient Queue Content or DND Mode View */}
+          <div className="flex-1 overflow-y-auto p-2 relative">
+            {isDndMode ? (
+              /* Premium Focus Block Overlay */
+              <div className="absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+                <div className="relative mb-3">
+                  <div className="absolute -inset-1 rounded-full bg-rose-100 animate-ping opacity-75" />
+                  <div className="relative p-3 bg-rose-50 rounded-full text-rose-500 border border-rose-100 shadow-sm">
+                    <ShieldAlert size={28} />
+                  </div>
+                </div>
+                <h3 className="font-extrabold text-slate-800 text-sm">Doctor Consultation Paused</h3>
+                <p className="text-slate-500 text-xs mt-1 max-w-xs leading-relaxed">
+                  Do Not Disturb mode active. OPD Queue updates are temporarily paused.
+                </p>
+              </div>
+            ) : (
+              filteredDoctorQueue.length > 0 ? (
+                filteredDoctorQueue.map((patient) => (
                 <div
                   key={patient.id}
                   onClick={() => handleSelectPatient(patient)}
@@ -930,10 +1059,16 @@ export function DoctorDashboard() {
                             </p>
                           </div>
 
-                          {/* Token & RxCode */}
+                          {/* Token & RxCode & Print */}
                           <div className="flex items-center justify-between mt-1.5 text-[9px] text-slate-400 font-mono">
-                            {visit.tokenNumber && <span>Token: {visit.tokenNumber}</span>}
-                            {visit.rxCode && <span className="text-teal-600 font-bold">Rx: {visit.rxCode}</span>}
+                            {visit.rxCode ? <span className="text-teal-600 font-bold">Rx: {visit.rxCode}</span> : <span>Token: {visit.tokenNumber || 'N/A'}</span>}
+                            <button
+                              type="button"
+                              onClick={() => handlePrintPrescription(selectedPatient, visit.rxCode, typeof visit.medicines === 'string' ? [{ name: visit.medicines }] : visit.medicines)}
+                              className="text-teal-600 hover:text-teal-800 font-bold flex items-center gap-0.5 hover:underline font-sans"
+                            >
+                              <Printer size={10} /> Print Rx
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -1272,9 +1407,26 @@ export function DoctorDashboard() {
             </div>
 
             {/* Footer Action */}
-            <div className="p-4 border-t border-slate-100 bg-white flex justify-end">
-              <Button size="lg" className="flex items-center gap-2" onClick={saveAndSend} disabled={prescriptions.length === 0}>
-                <CheckCircle size={20} /> Save & Send to Pharmacy
+            <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="flex items-center gap-2 border-teal-200 text-teal-700 hover:bg-teal-50"
+                onClick={() => handlePrintPrescription(selectedPatient)}
+                disabled={prescriptions.length === 0}
+              >
+                <Printer size={18} /> Print Rx Slip
+              </Button>
+
+              <Button
+                type="button"
+                size="lg"
+                className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={saveAndSend}
+                disabled={prescriptions.length === 0}
+              >
+                <CheckCircle size={18} /> Save & Send to Pharmacy
               </Button>
             </div>
           </div>
@@ -1374,7 +1526,71 @@ export function DoctorDashboard() {
               )}
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-100">
+            <div className="flex justify-between items-center pt-2 border-t border-slate-100 gap-2">
+              <button
+                onClick={() => {
+                  const hospitalTitle = getHospitalDisplayName();
+                  const printWindow = window.open('', '_blank');
+                  if (!printWindow) return;
+
+                  const visitsHtml = (pastVisits || []).map((v: any, idx: number) => `
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #cbd5e1;">${idx + 1}</td>
+                      <td style="padding: 8px; border: 1px solid #cbd5e1;">${v.date}</td>
+                      <td style="padding: 8px; border: 1px solid #cbd5e1;"><b>${v.doctor}</b></td>
+                      <td style="padding: 8px; border: 1px solid #cbd5e1;">${v.medicines}</td>
+                      <td style="padding: 8px; border: 1px solid #cbd5e1;">${v.status || 'COMPLETED'}</td>
+                    </tr>
+                  `).join('');
+
+                  printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <title>Clinical History - ${selectedPatient.name}</title>
+                        <style>
+                          body { font-family: sans-serif; padding: 25px; color: #1e293b; }
+                          h1 { font-size: 22px; color: #0d9488; margin: 0; }
+                          .box { background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; margin: 15px 0; font-size: 13px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+                          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+                          th { background: #f1f5f9; text-align: left; padding: 8px; border: 1px solid #cbd5e1; }
+                        </style>
+                      </head>
+                      <body>
+                        <h1>${hospitalTitle} - Longitudinal Patient EMR Summary</h1>
+                        <p style="font-size: 12px; color: #64748b; margin-top: 2px;">Printed by Dr. ${user?.name || 'Doctor'}</p>
+                        <div class="box">
+                          <div><b>Patient Name:</b> ${selectedPatient.name}</div>
+                          <div><b>Patient UID:</b> ${selectedPatient.patientNo || selectedPatient.id}</div>
+                          <div><b>Phone:</b> ${selectedPatient.phone}</div>
+                          <div><b>Age / Gender:</b> ${selectedPatient.age} Yrs / ${selectedPatient.gender || 'N/A'}</div>
+                        </div>
+                        <h3>EMR Clinical Visit History</h3>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Date</th>
+                              <th>Doctor</th>
+                              <th>Medication Plan</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${visitsHtml || '<tr><td colSpan="5">No prior visit records available.</td></tr>'}
+                          </tbody>
+                        </table>
+                        <script>window.onload = function() { window.print(); }</script>
+                      </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <Printer size={14} /> Print Patient Record
+              </button>
+
               <button
                 onClick={() => setIsHistoryModalOpen(false)}
                 className="px-5 py-2 bg-slate-800 text-white rounded-full text-xs font-bold hover:bg-slate-700 shadow-md shadow-slate-900/10 transition-colors w-full sm:w-auto"
@@ -1385,6 +1601,7 @@ export function DoctorDashboard() {
           </div>
         </Modal>
       )}
+      </div>
     </div>
   );
 }

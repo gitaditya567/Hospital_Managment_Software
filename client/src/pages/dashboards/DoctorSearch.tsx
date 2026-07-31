@@ -6,7 +6,7 @@ import {
 import { useState, useEffect } from 'react';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { getPrintSettings } from '../../utils/printSettings';
+import { getPrintSettings, getHospitalDisplayName } from '../../utils/printSettings';
 
 export function DoctorSearch() {
   const { patients } = useHospitalStore();
@@ -20,11 +20,17 @@ export function DoctorSearch() {
 
   // Aggregate unique patient profiles from patient records map
   const uniquePatientsMap = new Map<string, any>();
-  patients.forEach(p => {
-    const existing = uniquePatientsMap.get(p.phone);
-    // Prefer more detailed or recently updated patient logs
+  (patients || []).forEach(p => {
+    if (!p) return;
+    const key = (p.phone && p.phone.trim())
+      ? `phone:${p.phone.trim()}`
+      : (p.patientNo && p.patientNo.trim())
+        ? `no:${p.patientNo.trim()}`
+        : `id:${p.id || (p as any)._id || (p.name ? p.name.trim().toLowerCase() : Math.random().toString())}`;
+
+    const existing = uniquePatientsMap.get(key);
     if (!existing || (p.createdAt && new Date(p.createdAt) > new Date(existing.createdAt))) {
-      uniquePatientsMap.set(p.phone, p);
+      uniquePatientsMap.set(key, p);
     }
   });
   const uniquePatients = Array.from(uniquePatientsMap.values());
@@ -32,12 +38,20 @@ export function DoctorSearch() {
   // Filter patients based on query search (defaults to all if empty)
   const filteredPatients = uniquePatients.filter(p => {
     const query = search.trim().toLowerCase();
-    if (!query) return true; // Show all by default so doctors don't face a blank sidebar!
+    if (!query) return true;
+
+    const name = (p.name || '').toString().toLowerCase();
+    const phone = (p.phone || '').toString().toLowerCase();
+    const patientNo = (p.patientNo || '').toString().toLowerCase();
+    const id = (p.id || (p as any)._id || '').toString().toLowerCase();
+    const doctor = (p.doctorName || p.doctor || '').toString().toLowerCase();
+
     return (
-      p.name.toLowerCase().includes(query) ||
-      p.phone.includes(query) ||
-      (p.patientNo && p.patientNo.toLowerCase().includes(query)) ||
-      p.id.toLowerCase().includes(query)
+      name.includes(query) ||
+      phone.includes(query) ||
+      patientNo.includes(query) ||
+      id.includes(query) ||
+      doctor.includes(query)
     );
   });
 
@@ -59,7 +73,11 @@ export function DoctorSearch() {
       try {
         // Source 1: OPD registration records
         const completedVisits = patients
-          .filter(p => p.phone === selectedPatient.phone)
+          .filter(p => 
+            (selectedPatient.phone && p.phone === selectedPatient.phone) ||
+            (selectedPatient.patientNo && p.patientNo === selectedPatient.patientNo) ||
+            (selectedPatient.name && p.name && p.name.toLowerCase().trim() === selectedPatient.name.toLowerCase().trim())
+          )
           .map(p => ({
             date: p.createdAt
               ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -76,8 +94,11 @@ export function DoctorSearch() {
         // Source 2: Rich prescription logs
         let rxHistory: any[] = [];
         try {
+          const queryParam = selectedPatient.phone
+            ? `phone=${encodeURIComponent(selectedPatient.phone)}`
+            : `patientNo=${encodeURIComponent(selectedPatient.patientNo || selectedPatient.name)}`;
           const response = await fetch(
-            `/api/pharmacy/prescriptions/history?phone=${encodeURIComponent(selectedPatient.phone)}&hospitalId=${user.hospitalId}`
+            `/api/pharmacy/prescriptions/history?${queryParam}&hospitalId=${user.hospitalId}`
           );
           if (response.ok) {
             const data = await response.json();
@@ -181,7 +202,7 @@ export function DoctorSearch() {
     const headerBlock = settings.showHeader
       ? `<div class="header">
           <div class="clinic-details">
-            <h1>${settings.customHeaderText || (user?.hospitalId ? 'City Care Hospital' : 'EMR Medical Center')}</h1>
+            <h1>${getHospitalDisplayName()}</h1>
             <p>State-of-the-Art Digital EMR Clinical Record</p>
           </div>
           <div>

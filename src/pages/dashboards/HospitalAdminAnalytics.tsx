@@ -23,6 +23,8 @@ import {
   Eye,
   Printer
 } from 'lucide-react';
+import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
+import type { FilterState } from '../../components/common/DataNavigationToolbar';
 
 interface UnifiedTransaction {
   id: string;
@@ -40,6 +42,7 @@ export function HospitalAdminAnalytics() {
   const { staff, invoices, departments, hospitalName } = useHospitalStore();
   const { bills } = usePharmacyStore();
 
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedTimeline, setSelectedTimeline] = useState<'month' | 'year'>('month');
 
@@ -384,6 +387,16 @@ export function HospitalAdminAnalytics() {
           </button>
         </div>
       </div>
+
+      {/* Interactive Data Navigation & Filter Toolbar */}
+      <DataNavigationToolbar
+        filters={filters}
+        onFilterChange={setFilters}
+        totalRecordsCount={unifiedTransactions.length}
+        filteredCount={applyDataFilters(unifiedTransactions, filters).length}
+        title="Hospital Analytics & Financial Data Navigation"
+        subtitle="Filter clinical billing transactions, revenue records, and OPD/Pharmacy stats by Date Range, Patient Type, and Status"
+      />
 
       {/* 4 Premium KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -10,13 +10,11 @@ import {
   Users,
   Settings,
   CreditCard,
-  ClipboardList,
   Pill,
   ShoppingCart,
   LineChart,
   Calendar,
-  PanelLeftClose,
-  UserPlus
+  PanelLeftClose
 } from 'lucide-react';
 
 interface SidebarProps {

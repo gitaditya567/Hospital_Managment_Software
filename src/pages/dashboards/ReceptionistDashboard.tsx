@@ -13,8 +13,11 @@ import {
 import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
+import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
+import type { FilterState } from '../../components/common/DataNavigationToolbar';
 
 export function ReceptionistDashboard() {
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
   const { 
     patients, 
     staff, 
@@ -244,13 +247,14 @@ export function ReceptionistDashboard() {
     return (
       (p.name && p.name.toLowerCase().includes(query)) ||
       (p.phone && p.phone.includes(query)) ||
-      (p.tokenNumber && p.tokenNumber.toLowerCase().includes(query)) ||
-      (p.id && p.id.toLowerCase().includes(query))
+      (p.tokenNumber && p.tokenNumber.toLowerCase().includes(query))
     );
   });
 
+  const navFilteredPatients = applyDataFilters(filteredPatients, filters);
+
   // Strictly sort paidPatients by FIFO (First-In, First-Out: createdAt ascending timestamp)
-  const paidPatients = filteredPatients
+  const paidPatients = navFilteredPatients
     .filter(p => p.paymentStatus === 'Paid' || (!p.paymentStatus && !invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending')))
     .sort((a, b) => {
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -258,7 +262,7 @@ export function ReceptionistDashboard() {
       return timeA - timeB;
     });
 
-  const unpaidPatients = filteredPatients
+  const unpaidPatients = navFilteredPatients
     .filter(p => p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Pending' || invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending'))
     .sort((a, b) => {
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -318,15 +322,7 @@ export function ReceptionistDashboard() {
     setIsPrintModalOpen(true);
   };
 
-  // Quick POS Invoice Collect Payment click handler
-  const handleQuickPay = (e: React.MouseEvent, p: PatientRecord) => {
-    e.stopPropagation();
-    const linkedInvoice = invoices.find(inv => inv.patientPhone === p.phone && inv.status === 'Pending');
-    if (linkedInvoice) {
-      collectPatientFee(linkedInvoice.id);
-      setWsLogs(prev => [`Quick POS: Cleared outstanding ₹${linkedInvoice.amount} fee for "${p.name}".`, ...prev]);
-    }
-  };
+
 
   // Cancel Appointment check-in click handler
   const handleQuickCancel = (e: React.MouseEvent, p: PatientRecord) => {
@@ -342,6 +338,16 @@ export function ReceptionistDashboard() {
 
   return (
     <div className="space-y-6 h-full flex flex-col animate-in fade-in duration-200">
+      {/* Interactive Data Navigation & Filter Toolbar */}
+      <DataNavigationToolbar
+        filters={filters}
+        onFilterChange={setFilters}
+        totalRecordsCount={patients.length}
+        filteredCount={navFilteredPatients.length}
+        title="Receptionist Registry & Queue Navigation"
+        subtitle="Filter patient registrations, OPD queues, and pending invoices by Date Range, Patient Type, and Status"
+      />
+
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-10 gap-6 min-h-0">
         
         {/* Left Side: The Waiting Room (70% width -> span 7) */}

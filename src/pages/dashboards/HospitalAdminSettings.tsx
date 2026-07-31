@@ -1,163 +1,159 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useHospitalStore } from '../../store/useHospitalStore';
-import { useAuthStore } from '../../store/useAuthStore';
 import { Button } from '../../components/ui/Button';
-import { Settings, Building2, DollarSign, Check, Save } from 'lucide-react';
+import { Settings, Building, ShieldCheck, Mail, Phone, MapPin, Save, Bell } from 'lucide-react';
 
 export function HospitalAdminSettings() {
-  const user = useAuthStore((state) => state.user);
-  const { hospitalName, hospitalLogo, fees, updateFees, fetchHospitalData } = useHospitalStore();
+  const { hospitalName, setHospitalName, hospitalLogo, setHospitalLogo } = useHospitalStore();
 
-  const [name, setName] = useState(hospitalName || '');
+  const [name, setName] = useState(hospitalName || 'City Multi-Specialty Hospital');
+  const [email, setEmail] = useState('admin@cityhospital.com');
+  const [phone, setPhone] = useState('+91 98765 43210');
+  const [address, setAddress] = useState('123 Healthcare Boulevard, Tech City, IN');
   const [logoUrl, setLogoUrl] = useState(hospitalLogo || '');
-  const [opdFee, setOpdFee] = useState(fees?.opdFee ?? 500);
-  const [emergencyFee, setEmergencyFee] = useState(fees?.emergencyFee ?? 1200);
-  const [bedChargePerDay, setBedChargePerDay] = useState(fees?.bedChargePerDay ?? 2500);
-  const [isSaved, setIsSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [emailAlerts, setEmailAlerts] = useState(true);
+  const [smsAlerts, setSmsAlerts] = useState(true);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
-  useEffect(() => {
-    if (user?.hospitalId) {
-      fetchHospitalData(user.hospitalId);
-    }
-  }, [user?.hospitalId, fetchHospitalData]);
-
-  useEffect(() => {
-    setName(hospitalName || '');
-    setLogoUrl(hospitalLogo || '');
-    if (fees) {
-      setOpdFee(fees.opdFee ?? 500);
-      setEmergencyFee(fees.emergencyFee ?? 1200);
-      setBedChargePerDay(fees.bedChargePerDay ?? 2500);
-    }
-  }, [hospitalName, hospitalLogo, fees]);
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    try {
-      await updateFees({
-        opdFee: Number(opdFee),
-        emergencyFee: Number(emergencyFee),
-        bedChargePerDay: Number(bedChargePerDay),
-      });
-
-      if (name) {
-        localStorage.setItem('medisaas_hospital_name', name);
-      }
-      if (logoUrl) {
-        localStorage.setItem('medisaas_hospital_logo', logoUrl);
-      }
-
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
-    } catch (err) {
-      console.error('Failed to save settings', err);
-    } finally {
-      setSaving(false);
+    setHospitalName(name);
+    if (logoUrl) {
+      setHospitalLogo(logoUrl);
     }
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
   };
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Settings className="text-slate-700" /> Hospital Settings
+          <Settings className="text-slate-700" /> Hospital Configuration & Settings
         </h1>
-        <p className="text-slate-500">Manage hospital profile, consultation fees, and operational parameters</p>
+        <p className="text-slate-500 text-sm">Manage hospital metadata, contact information, branding, and notification preferences</p>
       </div>
 
+      {savedSuccess && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl flex items-center gap-2">
+          <ShieldCheck size={18} className="text-emerald-500" />
+          <span>Hospital settings updated successfully!</span>
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Hospital Branding */}
+        {/* Basic Metadata */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-50 pb-3">
-            <Building2 size={18} className="text-blue-500" /> Hospital Profile & Branding
+          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
+            <Building size={18} className="text-blue-600" /> Profile & Branding
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Hospital / Clinic Name</label>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Hospital Name</label>
               <input
                 type="text"
+                required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50 font-medium"
-                placeholder="e.g. MetroCare General Hospital"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Hospital Logo URL</label>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Custom Logo URL</label>
               <input
-                type="text"
+                type="url"
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
-                className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
                 placeholder="https://example.com/logo.png"
+                className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
               />
             </div>
-          </div>
 
-          {logoUrl && (
-            <div className="flex items-center gap-3 pt-2">
-              <span className="text-xs font-semibold text-slate-400">Logo Preview:</span>
-              <img src={logoUrl} alt="Hospital Logo" className="h-10 w-auto max-w-[150px] object-contain rounded border border-slate-200 p-1" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Admin Contact Email</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full h-10 pl-9 pr-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                />
+                <Mail size={16} className="absolute left-3 top-3 text-slate-400" />
+              </div>
             </div>
-          )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Helpline Phone Number</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full h-10 pl-9 pr-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                />
+                <Phone size={16} className="absolute left-3 top-3 text-slate-400" />
+              </div>
+            </div>
+
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Hospital Facility Address</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full h-10 pl-9 pr-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                />
+                <MapPin size={16} className="absolute left-3 top-3 text-slate-400" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Standard Operational Fees */}
+        {/* Notifications & System Preferences */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-50 pb-3">
-            <DollarSign size={18} className="text-emerald-500" /> Standard Operational Charges
+          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
+            <Bell size={18} className="text-blue-600" /> Notification Channels
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">OPD Consultation Fee (₹)</label>
+          <div className="space-y-3">
+            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Email Notifications</p>
+                <p className="text-xs text-slate-500">Send daily summaries and critical patient alert emails to admin staff</p>
+              </div>
               <input
-                type="number"
-                min="0"
-                value={opdFee}
-                onChange={(e) => setOpdFee(Number(e.target.value))}
-                className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                type="checkbox"
+                checked={emailAlerts}
+                onChange={(e) => setEmailAlerts(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
-            </div>
+            </label>
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Emergency Fee (₹)</label>
+            <label className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">SMS Gateway Alerts</p>
+                <p className="text-xs text-slate-500">Send automatic appointment SMS confirmations to patients</p>
+              </div>
               <input
-                type="number"
-                min="0"
-                value={emergencyFee}
-                onChange={(e) => setEmergencyFee(Number(e.target.value))}
-                className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                type="checkbox"
+                checked={smsAlerts}
+                onChange={(e) => setSmsAlerts(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Bed Charge / Day (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={bedChargePerDay}
-                onChange={(e) => setBedChargePerDay(Number(e.target.value))}
-                className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
-              />
-            </div>
+            </label>
           </div>
         </div>
 
-        {/* Submit & Status */}
-        <div className="flex items-center gap-4">
-          <Button type="submit" disabled={saving} className="shadow-lg shadow-blue-500/10 flex items-center gap-2">
-            <Save size={16} /> {saving ? 'Saving...' : 'Save Settings'}
+        <div className="flex justify-end">
+          <Button type="submit" className="flex items-center gap-2">
+            <Save size={16} /> Save Changes
           </Button>
-          {isSaved && (
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 animate-in fade-in duration-200">
-              <Check size={16} /> Settings saved successfully!
-            </div>
-          )}
         </div>
       </form>
     </div>

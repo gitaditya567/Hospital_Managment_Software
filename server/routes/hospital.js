@@ -355,13 +355,35 @@ hospitalRouter.post('/patients', async (req, res) => {
     }
     
     if (!patientNo) {
+      // Find highest existing PAT-XXXX sequence number for this hospital
+      const lastPatientWithNo = await Patient.findOne({ 
+        hospitalId, 
+        patientNo: { $regex: /^PAT-\d+$/ } 
+      }).sort({ createdAt: -1 });
+
+      let nextSeq = 1001;
+      if (lastPatientWithNo && lastPatientWithNo.patientNo) {
+        const numMatch = lastPatientWithNo.patientNo.match(/\d+/);
+        if (numMatch) {
+          const parsedNum = parseInt(numMatch[0], 10);
+          if (!isNaN(parsedNum)) {
+            nextSeq = parsedNum + 1;
+          }
+        }
+      } else {
+        const totalCount = await Patient.countDocuments({ hospitalId });
+        nextSeq = 1001 + totalCount;
+      }
+
       let isUnique = false;
       while (!isUnique) {
-        const candidate = `PAT-${Math.floor(10000 + Math.random() * 90000)}`;
+        const candidate = `PAT-${nextSeq}`;
         const duplicate = await Patient.findOne({ hospitalId, patientNo: candidate });
         if (!duplicate) {
           patientNo = candidate;
           isUnique = true;
+        } else {
+          nextSeq += 1;
         }
       }
     }

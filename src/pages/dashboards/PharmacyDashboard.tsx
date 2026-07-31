@@ -3,16 +3,20 @@ import { usePharmacyStore } from '../../store/usePharmacyStore';
 import { Button } from '../../components/ui/Button';
 import { Search, Printer, Pill, X, AlertTriangle, AlertOctagon, Terminal, ShoppingCart } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
-import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
+import { getPrintSettings, getHospitalDisplayName, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
+import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
+import type { FilterState } from '../../components/common/DataNavigationToolbar';
 
 export function PharmacyDashboard() {
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
   const {
     inventory,
     prescriptions,
     dispensePrescription,
-    transactionLogs
+    transactionLogs,
+    receiveStockBatch
   } = usePharmacyStore();
 
   const [searchCode, setSearchCode] = useState('');
@@ -22,7 +26,41 @@ export function PharmacyDashboard() {
   const [dispensedBill, setDispensedBill] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const [quickRestockMed, setQuickRestockMed] = useState<{ name: string; qty: number } | null>(null);
+  const [isRestocking, setIsRestocking] = useState(false);
+
   const [printSettings, setPrintSettings] = useState<PrintSettings>(getPrintSettings());
+
+  // Auto-sync stockAvailable for activePrescription whenever inventory updates
+  useEffect(() => {
+    if (activePrescription) {
+      const updatedItems = activePrescription.items.map((item: any) => {
+        const matchingMed = inventory.find(m => m.name.toLowerCase() === item.name.toLowerCase());
+        return {
+          ...item,
+          medicineId: matchingMed ? matchingMed.id : item.medicineId,
+          stockAvailable: matchingMed ? matchingMed.stock : item.stockAvailable,
+          price: matchingMed ? matchingMed.price : item.price
+        };
+      });
+      setActivePrescription((prev: any) => prev ? { ...prev, items: updatedItems } : null);
+    }
+  }, [inventory]);
+
+  const handleQuickRestockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickRestockMed) return;
+    setIsRestocking(true);
+    await receiveStockBatch({
+      medicineName: quickRestockMed.name,
+      supplier: 'POS Direct Restock',
+      batchNo: `BAT-${Math.floor(1000 + Math.random() * 9000)}`,
+      expiryDate: '2027-12-31',
+      qty: Number(quickRestockMed.qty) || 50
+    });
+    setIsRestocking(false);
+    setQuickRestockMed(null);
+  };
 
   useEffect(() => {
     const handleSettingsChange = (e: any) => {
@@ -190,7 +228,7 @@ export function PharmacyDashboard() {
     const headerTitle = printSettings.showHeader
       ? `<div class="text-center pb-2 dashed-divider">
            ${printSettings.logoUrl ? `< div style = "text-align: center; margin-bottom: 6px;" > <img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div> ` : ''}
-           <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || 'Smart Hospital Pharmacy'}</h3>
+           <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${getHospitalDisplayName()} Pharmacy</h3>
            <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Pharmacy Checkout Invoice</p>
            <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${dispensedBill.date}</p>
          </div>`
@@ -280,6 +318,16 @@ return (
       </div>
     </div>
 
+    {/* Interactive Data Navigation Toolbar */}
+    <DataNavigationToolbar
+      filters={filters}
+      onFilterChange={setFilters}
+      totalRecordsCount={prescriptions.length}
+      filteredCount={applyDataFilters(prescriptions, filters).length}
+      title="Pharmacy POS Prescription Navigation"
+      subtitle="Filter active prescriptions and billing logs by Date Range, Patient Type, and Status"
+    />
+
     {/* Hero Search Bar */}
     <div className="glass-card rounded-2xl border border-teal-100/50 p-6 shadow-[0_8px_30px_rgba(13,148,136,0.02)] max-w-3xl mx-auto bg-white/40">
       <form onSubmit={handleSearch} className="relative">
@@ -290,7 +338,7 @@ return (
           ref={searchInputRef}
           type="text"
           className="block w-full pl-12 pr-28 py-3.5 text-lg font-bold font-mono uppercase bg-white border border-teal-100/60 rounded-xl focus:ring-4 focus:ring-teal-500/15 focus:border-teal-500 focus:bg-white transition-all shadow-sm placeholder-slate-400 text-slate-800"
-          placeholder="ENTER RX-CODE, PHONE OR UNIQUE PATIENT NO (e.g. PAT-82910)..."
+          placeholder="ENTER RX-CODE, PHONE OR UNIQUE PATIENT NO (e.g. PAT-1001)..."
           value={searchCode}
           onChange={(e) => {
             const val = e.target.value;
@@ -434,9 +482,18 @@ return (
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         {isOutOfStock ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-rose-50 text-rose-700 rounded-full text-[10px] font-extrabold border border-rose-200">
-                            <AlertTriangle size={10} /> Stock Short ({item.stockAvailable} Left)
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-rose-50 text-rose-700 rounded-full text-[10px] font-extrabold border border-rose-200">
+                              <AlertTriangle size={10} /> Stock Short ({item.stockAvailable} Left)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setQuickRestockMed({ name: item.name, qty: 50 })}
+                              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200 transition-colors shadow-2xs"
+                            >
+                              + Add Stock
+                            </button>
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-extrabold border border-emerald-200">
                             🟢 Healthy ({item.stockAvailable})
@@ -604,11 +661,42 @@ return (
               <Printer size={16} /> Execute Print
             </Button>
           </div>
-
         </div>
       </Modal>
     )}
+      {quickRestockMed && (
+        <Modal
+          isOpen={!!quickRestockMed}
+          onClose={() => setQuickRestockMed(null)}
+          title={`Quick Add Stock: ${quickRestockMed.name}`}
+        >
+          <form onSubmit={handleQuickRestockSubmit} className="space-y-4">
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+              Update inventory stock for <strong>{quickRestockMed.name}</strong> to enable instant dispensing.
+            </div>
 
-  </div>
-);
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Quantity to Add</label>
+              <input
+                type="number"
+                required
+                min={1}
+                value={quickRestockMed.qty}
+                onChange={(e) => setQuickRestockMed({ ...quickRestockMed, qty: Number(e.target.value) })}
+                className="w-full h-10 border border-slate-300 rounded-lg px-3 text-sm font-bold font-mono focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setQuickRestockMed(null)}>Cancel</Button>
+              <Button type="submit" disabled={isRestocking}>
+                {isRestocking ? 'Updating Stock...' : 'Save & Update Stock'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+    </div>
+  );
 }

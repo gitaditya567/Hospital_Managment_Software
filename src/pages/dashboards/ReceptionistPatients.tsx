@@ -6,12 +6,16 @@ import { Modal } from '../../components/ui/Modal';
 import { VitalsModal } from '../../components/VitalsModal';
 import {
   Users, Search, FileText, UserPlus, Calendar, Shield, CheckCircle2,
-  TrendingUp, Award, UserCheck, Activity
+  TrendingUp, Award, UserCheck, Activity, Printer
 } from 'lucide-react';
+import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
+import type { FilterState } from '../../components/common/DataNavigationToolbar';
+import { getHospitalDisplayName } from '../../utils/printSettings';
 
 export function ReceptionistPatients() {
   const { patients, staff, registerPatient, invoices, addPatientInvoice } = useHospitalStore();
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'NEXT_APPOINTMENT' | 'FIRST_APPOINTMENT'>('ALL');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
@@ -33,13 +37,20 @@ export function ReceptionistPatients() {
   // Aggregate unique patients by phone number to create a true master patient directory
   const uniquePatientsMap = new Map<string, PatientRecord & { visitsCount: number; allVisits: PatientRecord[] }>();
 
-  patients.forEach(p => {
-    const existing = uniquePatientsMap.get(p.phone);
+  (patients || []).forEach(p => {
+    if (!p) return;
+    const key = (p.phone && p.phone.trim())
+      ? `phone:${p.phone.trim()}`
+      : (p.patientNo && p.patientNo.trim())
+        ? `no:${p.patientNo.trim()}`
+        : `id:${p.id || p.name ? p.name.trim().toLowerCase() : Math.random().toString()}`;
+
+    const existing = uniquePatientsMap.get(key);
     if (existing) {
       existing.visitsCount += 1;
       existing.allVisits.push(p);
     } else {
-      uniquePatientsMap.set(p.phone, {
+      uniquePatientsMap.set(key, {
         ...p,
         visitsCount: 1,
         allVisits: [p]
@@ -49,17 +60,148 @@ export function ReceptionistPatients() {
 
   const uniquePatients = Array.from(uniquePatientsMap.values());
 
-  // Filter unique patients based on search
-  const filteredPatients = uniquePatients.filter(p => {
+  // Counts for tabs
+  const countAll = uniquePatients.length;
+  const countFirst = uniquePatients.filter(p => p.visitsCount === 1).length;
+  const countNext = uniquePatients.filter(p => p.visitsCount > 1 || p.status === 'Waiting' || p.status === 'In Consultation' || p.appointmentTime).length;
+
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
+
+  // Filter unique patients based on toolbar filters (date, searchQuery), search & active tab
+  const filteredPatients = applyDataFilters(uniquePatients, filters).filter(p => {
+    // Tab filter logic
+    if (activeTab === 'FIRST_APPOINTMENT' && p.visitsCount !== 1) {
+      return false;
+    }
+    if (activeTab === 'NEXT_APPOINTMENT' && !(p.visitsCount > 1 || p.status === 'Waiting' || p.status === 'In Consultation' || p.appointmentTime)) {
+      return false;
+    }
+
     const query = search.trim().toLowerCase();
     if (!query) return true;
+
+    const name = (p.name || '').toString().toLowerCase();
+    const phone = (p.phone || '').toString().toLowerCase();
+    const patientNo = (p.patientNo || '').toString().toLowerCase();
+    const id = (p.id || '').toString().toLowerCase();
+
     return (
-      p.name.toLowerCase().includes(query) ||
-      p.phone.includes(query) ||
-      (p.patientNo && p.patientNo.toLowerCase().includes(query)) ||
-      p.id.toLowerCase().includes(query)
+      name.includes(query) ||
+      phone.includes(query) ||
+      patientNo.includes(query) ||
+      id.includes(query)
     );
   });
+
+  const handlePrintPatientRecord = (patient: any) => {
+    const hospitalTitle = getHospitalDisplayName();
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const visitsHtml = (patient.allVisits || []).map((v: any, idx: number) => `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${idx + 1}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${v.timeRegistered || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><b>${v.doctorName || 'General'}</b></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">Token #${v.tokenNumber || '-'}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${v.status || 'Registered'}</td>
+      </tr>
+    `).join('');
+
+    const billingHtml = (patient.billing || []).map((b: any) => `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${b.date || 'N/A'}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${b.feeType || 'OPD Fee'}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">₹${b.amount}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><b>${b.status}</b></td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Patient Medical Record - ${patient.name}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #1e293b; }
+            .header { border-bottom: 3px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+            .hospital-title { font-size: 24px; font-weight: 800; color: #1e293b; margin: 0; }
+            .sub { color: #64748b; font-size: 13px; font-weight: 600; }
+            .patient-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 15px; margin-bottom: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+            .field { font-size: 13px; }
+            .field label { font-weight: 700; color: #475569; display: block; font-size: 11px; text-transform: uppercase; }
+            .field span { font-weight: 800; color: #0f172a; font-size: 15px; }
+            h3 { color: #2563eb; font-size: 15px; font-weight: 800; margin-top: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+            th { background: #f1f5f9; text-align: left; padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: #334155; }
+            .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; pt: 15px; font-size: 11px; color: #94a3b8; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="hospital-title">${hospitalTitle}</h1>
+              <div class="sub">Official Patient Master Medical & Clinical Log Record</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; font-weight: 800; color: #2563eb;">CONFIDENTIAL</div>
+              <div style="font-size: 10px; color: #64748b;">Printed on: ${new Date().toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div class="patient-box">
+            <div class="field"><label>Patient Name</label><span>${patient.name}</span></div>
+            <div class="field"><label>Patient Unique No (UID)</label><span style="color:#2563eb;">${patient.patientNo || patient.id}</span></div>
+            <div class="field"><label>Contact Phone</label><span>${patient.phone}</span></div>
+            <div class="field"><label>Age / Gender</label><span>${patient.age} Yrs / ${patient.gender || 'Male'}</span></div>
+            <div class="field"><label>Total Visits Recorded</label><span>${patient.visitsCount || 1} Visits</span></div>
+            <div class="field"><label>Primary Assigned Physician</label><span>${patient.doctorName}</span></div>
+          </div>
+
+          <h3>Clinical Visit History</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Registration Date / Time</th>
+                <th>Doctor</th>
+                <th>Token</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${visitsHtml}
+            </tbody>
+          </table>
+
+          ${patient.billing && patient.billing.length > 0 ? `
+            <h3>Billing & Payment Records</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Fee Particular</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${billingHtml}
+              </tbody>
+            </table>
+          ` : ''}
+
+          <div class="footer">
+            Generated automatically by ${hospitalTitle} Medical Information System.
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   // Calculate stats
   const totalUnique = uniquePatients.length;
@@ -194,18 +336,77 @@ export function ReceptionistPatients() {
         </div>
       </div>
 
+      {/* Date & Interactive Toolbar Filter */}
+      <DataNavigationToolbar
+        filters={filters}
+        onFilterChange={setFilters}
+        totalRecordsCount={totalUnique}
+        filteredCount={filteredPatients.length}
+        title="Patient Master Database Filters"
+        subtitle="Filter clinical patient records by Date Range, Visit Type, or Query Search"
+      />
+
       {/* Main Database Table Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 flex flex-col flex-1 overflow-hidden">
-        {/* Search Header */}
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div className="relative w-full max-w-sm">
+        {/* Search & Subcategory Navigation Bar */}
+        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-slate-50/50">
+          {/* Subcategory Tabs */}
+          <div className="flex items-center bg-slate-200/60 p-1 rounded-xl gap-1">
+            <button
+              onClick={() => setActiveTab('ALL')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                activeTab === 'ALL'
+                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
+              }`}
+            >
+              <Users size={14} />
+              <span>All Patient</span>
+              <span className={`ml-1 text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'ALL' ? 'bg-blue-50 text-blue-700' : 'bg-slate-300 text-slate-700'}`}>
+                {countAll}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('NEXT_APPOINTMENT')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                activeTab === 'NEXT_APPOINTMENT'
+                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
+              }`}
+            >
+              <Calendar size={14} />
+              <span>Next Appointment</span>
+              <span className={`ml-1 text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'NEXT_APPOINTMENT' ? 'bg-blue-50 text-blue-700' : 'bg-slate-300 text-slate-700'}`}>
+                {countNext}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('FIRST_APPOINTMENT')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                activeTab === 'FIRST_APPOINTMENT'
+                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
+              }`}
+            >
+              <UserPlus size={14} />
+              <span>First Appointment</span>
+              <span className={`ml-1 text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'FIRST_APPOINTMENT' ? 'bg-blue-50 text-blue-700' : 'bg-slate-300 text-slate-700'}`}>
+                {countFirst}
+              </span>
+            </button>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search patients by name, phone or record ID..."
+              placeholder="Search patients by name, phone or ID..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700"
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700 bg-white"
             />
           </div>
         </div>
@@ -251,7 +452,16 @@ export function ReceptionistPatients() {
                     {patient.doctorName}
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-1.5 justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePrintPatientRecord(patient)}
+                        className="rounded-full text-[10px] h-8 font-bold text-slate-600 hover:text-blue-700 flex gap-1 items-center"
+                        title="Print Complete Patient Record"
+                      >
+                        <Printer size={12} /> Print
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -275,7 +485,11 @@ export function ReceptionistPatients() {
               {filteredPatients.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-slate-400 font-bold">
-                    No matching patient profiles in clinical records.
+                    {activeTab === 'FIRST_APPOINTMENT'
+                      ? 'No first-time (single visit) patient profiles found.'
+                      : activeTab === 'NEXT_APPOINTMENT'
+                      ? 'No repeat or upcoming appointment patient records found.'
+                      : 'No matching patient profiles in clinical records.'}
                   </td>
                 </tr>
               )}
@@ -378,10 +592,17 @@ export function ReceptionistPatients() {
               )}
             </div>
 
-            <div className="flex justify-end pt-3">
+            <div className="flex justify-between items-center pt-3 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => handlePrintPatientRecord(selectedPatient)}
+                className="font-bold rounded-full text-xs flex items-center gap-1.5 border-slate-300 text-slate-700 hover:text-blue-600"
+              >
+                <Printer size={14} /> Print Patient Record
+              </Button>
               <Button
                 onClick={() => setIsHistoryModalOpen(false)}
-                className="font-bold rounded-full w-full sm:w-auto"
+                className="font-bold rounded-full"
               >
                 Close Profile
               </Button>

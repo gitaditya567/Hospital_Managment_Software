@@ -30,7 +30,7 @@ export function ReceptionistAppointments() {
     if (!doc) return;
 
     // Save directly to Master Patient Directory & EMR database
-    const createdPatient = await registerPatient({
+    await registerPatient({
       name: newAppt.name,
       phone: newAppt.phone,
       age: parseInt(newAppt.age) || 30,

@@ -103,6 +103,8 @@ interface HospitalState {
   collectPatientFeeDirectly: (patientId: string, amount?: number, feeType?: string) => Promise<void>;
   cancelPatient: (patientId: string) => Promise<void>;
   renewSubscription: (hospitalId: string, licenseCode: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  setHospitalName: (name: string) => void;
+  setHospitalLogo: (logo: string) => void;
 }
 
 export const useHospitalStore = create<HospitalState>((set, get) => ({
@@ -115,6 +117,16 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
   hospitalName: localStorage.getItem('medisaas_hospital_name') || 'Smart Hospital',
   hospitalLogo: localStorage.getItem('medisaas_hospital_logo') || '',
   loading: false,
+
+  setHospitalName: (name: string) => {
+    localStorage.setItem('medisaas_hospital_name', name);
+    set({ hospitalName: name });
+  },
+
+  setHospitalLogo: (logo: string) => {
+    localStorage.setItem('medisaas_hospital_logo', logo);
+    set({ hospitalLogo: logo });
+  },
 
   fetchHospitalData: async (hospitalId) => {
     set({ loading: true });
@@ -462,7 +474,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
     }
   },
 
-  cancelPatient: async (patientId) => {
+  cancelPatient: async (patientId: string) => {
     const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
     try {
       await fetch(`/api/hospital/patients/${patientId}`, { method: 'DELETE' });

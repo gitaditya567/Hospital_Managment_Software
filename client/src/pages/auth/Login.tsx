@@ -336,7 +336,7 @@ export function Login() {
       <RecoverCredentialsModal
         isOpen={isRecoverModalOpen}
         onClose={() => setIsRecoverModalOpen(false)}
-        onSuccess={(recoveredEmail, newPass) => {
+        onSuccess={(recoveredEmail: string, newPass: string) => {
           setEmail(recoveredEmail);
           setPassword(newPass);
         }}
