@@ -344,22 +344,22 @@ export function HospitalAdminAnalytics() {
   const currentSelectedDept = hoveredIndex !== null ? departmentRevenueData.sectors[hoveredIndex] : null;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 font-sans">
 
       {/* Header telemetry band */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-6 rounded-2xl shadow-xl border border-slate-700/50 relative overflow-hidden">
-        <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-indigo-500/10 rounded-full blur-3xl -z-10"></div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 relative overflow-hidden text-white shadow-blue-500/10">
+        <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-white/10 rounded-full blur-3xl -z-10"></div>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
-            <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 animate-pulse"></span>
+            <span className="text-xs font-bold text-blue-100 uppercase tracking-widest flex items-center gap-1">
               <Sparkles size={12} /> Live Performance Telemetry
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <PieIcon className="text-indigo-400" /> Analytics Portal
+            <PieIcon className="text-blue-100" /> Analytics Portal
           </h1>
-          <p className="text-slate-300 text-sm font-medium">
+          <p className="text-blue-50 text-sm font-medium">
             Financial auditing, department shares, and billing diagnostics for {hospitalName}.
           </p>
         </div>
@@ -369,8 +369,8 @@ export function HospitalAdminAnalytics() {
             onClick={() => setSelectedTimeline('month')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
               selectedTimeline === 'month' 
-                ? 'bg-white text-slate-800 border-white shadow-md' 
-                : 'text-slate-300 border-slate-700/60 hover:bg-slate-800'
+                ? 'bg-white text-[#060606] border-white shadow-sm' 
+                : 'text-white border-white/30 hover:bg-white/10'
             }`}
           >
             This Calendar Month
@@ -379,8 +379,8 @@ export function HospitalAdminAnalytics() {
             onClick={() => setSelectedTimeline('year')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
               selectedTimeline === 'year' 
-                ? 'bg-white text-slate-800 border-white shadow-md' 
-                : 'text-slate-300 border-slate-700/60 hover:bg-slate-800'
+                ? 'bg-white text-[#060606] border-white shadow-sm' 
+                : 'text-white border-white/30 hover:bg-white/10'
             }`}
           >
             Full Audited Ledger
@@ -402,43 +402,43 @@ export function HospitalAdminAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
         {/* Card 1: This Month Amount */}
-        <div className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between">
+        <div className="bg-white border border-[#D8D8D8] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">This Month Amount</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+              <p className="text-[10px] font-bold text-[#3683F8] uppercase tracking-wider">This Month Amount</p>
+              <h3 className="text-2xl font-black text-[#060606] tracking-tight">
                 ₹{kpis.thisMonthTotal.toLocaleString('en-IN')}
               </h3>
             </div>
-            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 border border-indigo-200/50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-[#EBF3FE] text-[#3683F8] border border-blue-200 flex items-center justify-center">
               <Calendar size={20} />
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100/50 flex items-center justify-between text-[10px]">
+          <div className="mt-4 pt-3 border-t border-[#D8D8D8] flex items-center justify-between text-[10px]">
             <span className="text-slate-500 font-semibold flex items-center gap-1">
-              <ArrowUpRight size={12} className="text-indigo-600" />
+              <ArrowUpRight size={12} className="text-[#3683F8]" />
               OPD: ₹{kpis.thisMonthOPD.toLocaleString('en-IN')}
             </span>
-            <span className="text-indigo-600 font-extrabold">
+            <span className="text-[#3683F8] font-extrabold">
               Pharmacy: ₹{kpis.thisMonthPharmacy.toLocaleString('en-IN')}
             </span>
           </div>
         </div>
 
         {/* Card 2: Collected (Paid Invoices & Pharmacy) */}
-        <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between">
+        <div className="bg-white border border-[#D8D8D8] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Collected Revenue</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+              <h3 className="text-2xl font-black text-[#060606] tracking-tight">
                 ₹{kpis.collectedOverall.toLocaleString('en-IN')}
               </h3>
             </div>
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-200/50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
               <CheckCircle2 size={20} />
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100/50 flex items-center justify-between text-[10px]">
+          <div className="mt-4 pt-3 border-t border-[#D8D8D8] flex items-center justify-between text-[10px]">
             <span className="text-emerald-700 font-bold">
               This Month: ₹{kpis.collectedThisMonth.toLocaleString('en-IN')}
             </span>
@@ -449,19 +449,19 @@ export function HospitalAdminAnalytics() {
         </div>
 
         {/* Card 3: Pending Invoices */}
-        <div className="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between">
+        <div className="bg-white border border-[#D8D8D8] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Outstanding Dues</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+              <h3 className="text-2xl font-black text-[#060606] tracking-tight">
                 ₹{kpis.pendingOverall.toLocaleString('en-IN')}
               </h3>
             </div>
-            <div className="h-10 w-10 rounded-xl bg-rose-500/10 text-rose-600 border border-rose-200/50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center">
               <Clock size={20} className="animate-pulse" />
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100/50 flex items-center justify-between text-[10px]">
+          <div className="mt-4 pt-3 border-t border-[#D8D8D8] flex items-center justify-between text-[10px]">
             <span className="text-rose-600 font-extrabold flex items-center gap-1">
               <ArrowDownRight size={12} className="text-rose-500" />
               This Month: ₹{kpis.pendingThisMonth.toLocaleString('en-IN')}
@@ -473,23 +473,23 @@ export function HospitalAdminAnalytics() {
         </div>
 
         {/* Card 4: Today's Revenue */}
-        <div className="bg-gradient-to-br from-sky-50 to-white border border-sky-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between">
+        <div className="bg-white border border-[#D8D8D8] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Today's Revenue</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+              <p className="text-[10px] font-bold text-[#3683F8] uppercase tracking-wider">Today's Revenue</p>
+              <h3 className="text-2xl font-black text-[#060606] tracking-tight">
                 ₹{kpis.todayTotal.toLocaleString('en-IN')}
               </h3>
             </div>
-            <div className="h-10 w-10 rounded-xl bg-sky-500/10 text-sky-600 border border-sky-200/50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-[#EBF3FE] text-[#3683F8] border border-blue-200 flex items-center justify-center">
               <Activity size={20} />
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100/50 flex items-center justify-between text-[10px]">
+          <div className="mt-4 pt-3 border-t border-[#D8D8D8] flex items-center justify-between text-[10px]">
             <span className="text-slate-500 font-semibold">
               OPD: ₹{kpis.todayOPD.toLocaleString('en-IN')}
             </span>
-            <span className="text-sky-700 font-extrabold">
+            <span className="text-[#3683F8] font-extrabold">
               Pharmacy: ₹{kpis.todayPharmacy.toLocaleString('en-IN')}
             </span>
           </div>
@@ -501,12 +501,12 @@ export function HospitalAdminAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
         {/* Left Card: Pie Chart Segment shares */}
-        <div className="lg:col-span-7 bg-white rounded-2xl shadow-md border border-slate-200/80 p-6 flex flex-col justify-between relative">
+        <div className="lg:col-span-7 bg-white rounded-2xl shadow-xs border border-[#D8D8D8] p-6 flex flex-col justify-between relative">
 
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Briefcase className="text-indigo-600" size={18} /> Department Revenue Share
+              <h2 className="text-lg font-bold text-[#060606] flex items-center gap-2">
+                <Briefcase className="text-[#3683F8]" size={18} /> Department Revenue Share
               </h2>
               <p className="text-xs text-slate-500 font-medium">OPD and Pharmacy audited contributions</p>
             </div>
@@ -523,8 +523,8 @@ export function HospitalAdminAnalytics() {
             <div className="flex justify-center items-center relative">
               <svg width="220" height="220" viewBox="0 0 120 120" className="overflow-visible select-none">
                 {/* Background glow circle */}
-                <circle cx={60} cy={60} r={46} fill="#f8fafc" />
-                <circle cx={60} cy={60} r={44} fill="transparent" stroke="#f1f5f9" strokeWidth={1} />
+                <circle cx={60} cy={60} r={46} fill="#EBF3FE" />
+                <circle cx={60} cy={60} r={44} fill="transparent" stroke="#D8D8D8" strokeWidth={1} />
 
                 {/* Sector render mapping */}
                 {departmentRevenueData.sectors.map((sec, idx) => {
@@ -566,23 +566,23 @@ export function HospitalAdminAnalytics() {
                       }}
                       onMouseEnter={() => setHoveredIndex(idx)}
                       onMouseLeave={() => setHoveredIndex(null)}
-                      className="drop-shadow-sm hover:drop-shadow-md"
+                      className="drop-shadow-xs hover:drop-shadow-md"
                     />
                   );
                 })}
               </svg>
 
               {/* Central text display for hovered slice */}
-              <div className="absolute flex flex-col justify-center items-center text-center pointer-events-none w-[110px] h-[110px] rounded-full bg-white/95 backdrop-blur-sm border border-slate-100 shadow-inner">
+              <div className="absolute flex flex-col justify-center items-center text-center pointer-events-none w-[110px] h-[110px] rounded-full bg-white/95 backdrop-blur-xs border border-[#D8D8D8] shadow-inner">
                 {currentSelectedDept ? (
                   <>
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate max-w-[95px]">
                       {currentSelectedDept.name}
                     </span>
-                    <span className="text-sm font-extrabold text-slate-800 mt-0.5">
+                    <span className="text-sm font-extrabold text-[#060606] mt-0.5">
                       ₹{currentSelectedDept.value.toLocaleString('en-IN')}
                     </span>
-                    <span className="text-[10px] font-black px-1.5 py-0.5 bg-slate-100 rounded-md text-slate-600 mt-1">
+                    <span className="text-[10px] font-black px-1.5 py-0.5 bg-[#EBF3FE] rounded-md text-[#3683F8] mt-1">
                       {Math.round(currentSelectedDept.percent * 100)}% Share
                     </span>
                   </>
@@ -591,10 +591,10 @@ export function HospitalAdminAnalytics() {
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
                       TOTAL VOLUME
                     </span>
-                    <span className="text-base font-black text-slate-800 leading-tight">
+                    <span className="text-base font-black text-[#060606] leading-tight">
                       ₹{departmentRevenueData.totalSum.toLocaleString('en-IN')}
                     </span>
-                    <span className="text-[9px] text-indigo-600 font-bold mt-0.5">
+                    <span className="text-[9px] text-[#3683F8] font-bold mt-0.5">
                       Hover segments
                     </span>
                   </>
@@ -604,7 +604,7 @@ export function HospitalAdminAnalytics() {
 
             {/* Department stats block lists */}
             <div className="space-y-3">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-[#D8D8D8] pb-2">
                 Revenue Breakdown
               </h3>
               <div className="space-y-2">
@@ -613,8 +613,8 @@ export function HospitalAdminAnalytics() {
                     key={idx}
                     className={`p-2.5 rounded-xl border transition-all flex items-center justify-between text-xs font-medium cursor-pointer ${
                       hoveredIndex === idx 
-                        ? 'bg-slate-50 border-slate-300 shadow-sm' 
-                        : 'bg-transparent border-transparent hover:bg-slate-50/50'
+                        ? 'bg-[#EBF3FE]/50 border-blue-200 shadow-xs' 
+                        : 'bg-transparent border-transparent hover:bg-[#EBF3FE]/30'
                     }`}
                     onMouseEnter={() => setHoveredIndex(idx)}
                     onMouseLeave={() => setHoveredIndex(null)}
@@ -623,7 +623,7 @@ export function HospitalAdminAnalytics() {
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: sec.color }} />
                       <span className="font-bold truncate max-w-[100px]">{sec.name}</span>
                     </span>
-                    <span className="text-slate-800 font-extrabold font-mono text-right flex flex-col">
+                    <span className="text-[#060606] font-extrabold font-mono text-right flex flex-col">
                       <span>₹{sec.value.toLocaleString('en-IN')}</span>
                       <span className="text-[9px] text-slate-400 font-bold">
                         ({Math.round(sec.percent * 100)}%)
@@ -636,18 +636,18 @@ export function HospitalAdminAnalytics() {
 
           </div>
 
-          <div className="text-[10px] text-slate-400 font-bold border-t border-slate-100 pt-3 mt-4 text-center">
+          <div className="text-[10px] text-slate-400 font-bold border-t border-[#D8D8D8] pt-3 mt-4 text-center">
             Interactive SVGs. Real-time updates bound to billing invoice records.
           </div>
         </div>
 
         {/* Right Card: Performance Telemetry Progress Bars */}
-        <div className="lg:col-span-5 bg-white rounded-2xl shadow-md border border-slate-200/80 p-6 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white rounded-2xl shadow-xs border border-[#D8D8D8] p-6 flex flex-col justify-between">
           <div className="space-y-6">
 
             <div>
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Users className="text-indigo-600" size={18} /> Telemetry Progress
+              <h2 className="text-lg font-bold text-[#060606] flex items-center gap-2">
+                <Users className="text-[#3683F8]" size={18} /> Telemetry Progress
               </h2>
               <p className="text-xs text-slate-500 font-medium">Target volume analysis against max contributions</p>
             </div>
@@ -663,12 +663,12 @@ export function HospitalAdminAnalytics() {
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: sec.color }} />
                         {sec.name}
                       </span>
-                      <span className="font-mono font-bold text-slate-800">
+                      <span className="font-mono font-bold text-[#060606]">
                         {percentInt}% of Total
                       </span>
                     </div>
 
-                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="h-2.5 w-full bg-[#EBF3FE] rounded-full overflow-hidden flex">
                       <div
                         className="h-full rounded-full transition-all duration-700 ease-out"
                         style={{
@@ -685,16 +685,16 @@ export function HospitalAdminAnalytics() {
           </div>
 
           {/* Quick Metrics Details */}
-          <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
+          <div className="mt-6 pt-5 border-t border-[#D8D8D8] space-y-3">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Billing Insights</h4>
-            <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/60 font-medium text-[11px] text-slate-600 space-y-2">
+            <div className="bg-[#EBF3FE]/30 rounded-xl p-3.5 border border-[#D8D8D8] font-medium text-[11px] text-slate-600 space-y-2">
               <div className="flex justify-between">
                 <span>Active Doctors Allocated:</span>
-                <span className="font-bold text-slate-800">{staff.filter(s => s.role === 'Doctor').length}</span>
+                <span className="font-bold text-[#060606]">{staff.filter(s => s.role === 'Doctor').length}</span>
               </div>
               <div className="flex justify-between">
                 <span>Active Departments:</span>
-                <span className="font-bold text-slate-800">{departments.filter(d => d.status === 'Active').length}</span>
+                <span className="font-bold text-[#060606]">{departments.filter(d => d.status === 'Active').length}</span>
               </div>
               <div className="flex justify-between">
                 <span>Monthly Clearance:</span>
@@ -708,14 +708,14 @@ export function HospitalAdminAnalytics() {
       </div>
 
       {/* COMPULSORY FEATURE: Financial Transaction Audit Ledger Table with Custom Date Filter */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xs border border-[#D8D8D8] overflow-hidden">
 
         {/* Table Header and Control Panels */}
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
+        <div className="p-6 border-b border-[#D8D8D8] bg-[#EBF3FE]/30 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
 
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Receipt className="text-indigo-600" size={20} /> Departmental Audited Transactions
+            <h2 className="text-lg font-bold text-[#060606] flex items-center gap-2">
+              <Receipt className="text-[#3683F8]" size={20} /> Departmental Audited Transactions
             </h2>
             <p className="text-xs text-slate-500 font-medium">
               Comprehensive registry tracking generated bills, patient metrics, departments, and specific billing operators.
@@ -733,31 +733,31 @@ export function HospitalAdminAnalytics() {
                 placeholder="Search patient, operator, receipt..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700 bg-white"
+                className="w-full pl-9 pr-4 py-2 border border-[#D8D8D8] rounded-xl focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] outline-none text-xs font-semibold text-[#060606] bg-white"
               />
             </div>
 
             {/* Date Picker Input */}
-            <div className="flex items-center gap-2 border border-slate-200 bg-white px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 w-full sm:w-auto">
-              <Filter size={14} className="text-indigo-500 shrink-0" />
+            <div className="flex items-center gap-2 border border-[#D8D8D8] bg-white px-3 py-1.5 rounded-xl text-xs font-bold text-[#060606] w-full sm:w-auto">
+              <Filter size={14} className="text-[#3683F8] shrink-0" />
               <span className="shrink-0 text-slate-400 font-medium">Date:</span>
               <input
                 type="date"
                 value={filterDate}
                 onChange={e => setFilterDate(e.target.value)}
-                className="border-none outline-none focus:ring-0 p-0 text-xs font-extrabold text-slate-800 cursor-pointer w-full sm:w-auto"
+                className="border-none outline-none focus:ring-0 p-0 text-xs font-extrabold text-[#060606] cursor-pointer w-full sm:w-auto"
               />
             </div>
 
             {/* Quick Filter Presets */}
-            <div className="flex gap-1 bg-slate-200/60 p-1 rounded-xl border border-slate-200/50">
+            <div className="flex gap-1 bg-[#EBF3FE] p-1 rounded-xl border border-[#D8D8D8]">
               <button
                 type="button"
                 onClick={() => setFilterDate(todayStr)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${
                   filterDate === todayStr 
-                    ? 'bg-white text-slate-800 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-[#3683F8] text-white shadow-xs' 
+                    : 'text-slate-600 hover:text-[#060606]'
                 }`}
                 title="Filter by Today's Transactions"
               >
@@ -768,8 +768,8 @@ export function HospitalAdminAnalytics() {
                 onClick={() => setFilterDate('')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${
                   filterDate === '' 
-                    ? 'bg-white text-slate-800 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-[#3683F8] text-white shadow-xs' 
+                    : 'text-slate-600 hover:text-[#060606]'
                 }`}
                 title="Show all transaction history"
               >
@@ -785,7 +785,7 @@ export function HospitalAdminAnalytics() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+              <tr className="bg-[#EBF3FE]/50 border-b border-[#D8D8D8] text-slate-600 text-[10px] font-bold uppercase tracking-wider">
                 <th className="px-6 py-4">Receipt No</th>
                 <th className="px-6 py-4">Patient Details</th>
                 <th className="px-6 py-4">Department</th>
@@ -796,25 +796,24 @@ export function HospitalAdminAnalytics() {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700 text-xs font-semibold">
-
+            <tbody className="divide-y divide-[#D8D8D8]/60 text-slate-700 text-xs font-semibold">
               {filteredTransactions.map((tx) => {
                 const isPaid = tx.status === 'Paid';
                 const isPharmacy = tx.type === 'Pharmacy';
 
                 return (
-                  <tr key={tx.id} className="hover:bg-slate-50/30 transition-colors">
+                  <tr key={tx.id} className="hover:bg-[#EBF3FE]/20 transition-colors">
 
                     {/* Receipt No */}
                     <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg font-black font-mono shadow-sm">
+                      <span className="px-2.5 py-1 bg-[#EBF3FE] border border-blue-200 text-[#3683F8] rounded-lg font-black font-mono shadow-xs">
                         {tx.id}
                       </span>
                     </td>
 
                     {/* Patient Details */}
                     <td className="px-6 py-4">
-                      <div className="font-extrabold text-slate-800">{tx.patientName}</div>
+                      <div className="font-extrabold text-[#060606]">{tx.patientName}</div>
                       <div className="text-[10px] text-slate-400 font-bold font-mono mt-0.5">📞 {tx.patientPhone}</div>
                     </td>
 
@@ -822,10 +821,10 @@ export function HospitalAdminAnalytics() {
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
                         isPharmacy 
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
-                          : 'bg-indigo-50 text-indigo-700 border-indigo-200/50'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : 'bg-[#EBF3FE] text-[#3683F8] border-blue-200'
                       }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${isPharmacy ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
+                        <span className={`h-1.5 w-1.5 rounded-full ${isPharmacy ? 'bg-emerald-500' : 'bg-[#3683F8]'}`} />
                         {tx.department}
                       </span>
                     </td>
@@ -833,11 +832,11 @@ export function HospitalAdminAnalytics() {
                     {/* Billing Operator Name */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-lg bg-slate-100 border border-slate-200/60 text-slate-600 flex items-center justify-center">
-                          <UserCheck size={14} className="text-slate-500" />
+                        <div className="h-7 w-7 rounded-lg bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
+                          <UserCheck size={14} className="text-[#3683F8]" />
                         </div>
                         <div>
-                          <div className="font-bold text-slate-800">{tx.operatorName}</div>
+                          <div className="font-bold text-[#060606]">{tx.operatorName}</div>
                           <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
                             {isPharmacy ? 'Pharmacy Desk' : 'Front Counter'}
                           </div>
@@ -855,7 +854,7 @@ export function HospitalAdminAnalytics() {
                     </td>
 
                     {/* Amount */}
-                    <td className="px-6 py-4 text-slate-900 font-black text-sm">
+                    <td className="px-6 py-4 text-[#060606] font-black text-sm">
                       ₹{tx.amount.toLocaleString('en-IN')}
                     </td>
 
@@ -863,8 +862,8 @@ export function HospitalAdminAnalytics() {
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
                         isPaid 
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
-                          : 'bg-rose-50 text-rose-700 border-rose-200/50 animate-pulse'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
                       }`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                         {tx.status}
@@ -880,7 +879,7 @@ export function HospitalAdminAnalytics() {
                           setSelectedTxId(tx.id);
                           setIsModalOpen(true);
                         }}
-                        className="rounded-full text-[10px] font-extrabold h-8 px-3 border-indigo-200 text-indigo-700 hover:bg-indigo-50/50 flex gap-1 items-center ml-auto"
+                        className="rounded-xl text-[10px] font-extrabold h-8 px-3 border-[#D8D8D8] text-[#3683F8] hover:bg-[#EBF3FE] flex gap-1 items-center ml-auto"
                         title="View Detailed virtual receipt"
                       >
                         <Eye size={12} />
@@ -898,7 +897,7 @@ export function HospitalAdminAnalytics() {
                   <td colSpan={8} className="text-center py-16 text-slate-400">
                     <div className="max-w-md mx-auto flex flex-col items-center justify-center space-y-3">
                       <FolderHeart size={44} className="text-slate-300 animate-bounce" />
-                      <p className="font-extrabold text-slate-700 text-sm">No Audit Transactions Logged</p>
+                      <p className="font-extrabold text-[#060606] text-sm">No Audit Transactions Logged</p>
                       <p className="text-[11px] text-slate-400 font-medium">
                         No transactions registered under selected date ({filterDate || 'All History'}) or query. Change filters to resume diagnostics.
                       </p>
@@ -909,7 +908,7 @@ export function HospitalAdminAnalytics() {
                             setFilterDate(todayStr);
                             setSearchQuery('');
                           }}
-                          className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold transition-all flex items-center gap-1 mt-2"
+                          className="px-3 py-1.5 bg-[#EBF3FE] hover:bg-blue-100 text-[#3683F8] border border-blue-200 rounded-full text-xs font-bold transition-all flex items-center gap-1 mt-2"
                         >
                           <RefreshCw size={12} /> Reset Ledger to Today
                         </button>
@@ -936,20 +935,20 @@ export function HospitalAdminAnalytics() {
         className="max-w-sm"
       >
         {selectedTransaction && (
-          <div className="space-y-5">
+          <div className="space-y-5 font-sans">
 
             {/* Visual virtual thermal paper design */}
-            <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200/80 flex justify-center">
-              <div className="w-[72mm] bg-white border border-slate-300/80 p-4 shadow-sm text-slate-900 font-mono text-[10px] space-y-4 rounded-md relative overflow-hidden">
+            <div className="bg-[#EBF3FE]/40 p-4 rounded-2xl border border-[#D8D8D8] flex justify-center">
+              <div className="w-[72mm] bg-white border border-[#D8D8D8] p-4 shadow-xs text-[#060606] font-mono text-[10px] space-y-4 rounded-xl relative overflow-hidden">
 
                 {/* Visual Watermark */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none transform -rotate-45">
-                  <span className="text-3xl font-black uppercase tracking-widest text-slate-900">AUDITED</span>
+                  <span className="text-3xl font-black uppercase tracking-widest text-[#060606]">AUDITED</span>
                 </div>
 
                 {/* Thermal Header */}
-                <div className="text-center pb-2.5 border-b border-dashed border-slate-300 space-y-1">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800">🏥 {hospitalName}</h3>
+                <div className="text-center pb-2.5 border-b border-dashed border-[#D8D8D8] space-y-1">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[#060606]">🏥 {hospitalName}</h3>
                   <p className="text-[8px] text-slate-500">Live Clinical Registry Receipt</p>
                   <p className="text-[7px] text-slate-400 font-semibold font-mono">
                     Date: {new Date(selectedTransaction.date).toLocaleDateString('en-IN', {
@@ -961,16 +960,16 @@ export function HospitalAdminAnalytics() {
                 </div>
 
                 {/* Receipt Identification Ticket */}
-                <div className="text-center py-2.5 bg-slate-50 border border-slate-200 rounded space-y-1">
+                <div className="text-center py-2.5 bg-[#EBF3FE]/50 border border-[#D8D8D8] rounded-xl space-y-1">
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Transaction Ref</p>
-                  <h2 className="text-xs font-black leading-none font-mono text-indigo-700">
+                  <h2 className="text-xs font-black leading-none font-mono text-[#3683F8]">
                     {selectedTransaction.id}
                   </h2>
                   <div className="pt-1">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${
                       selectedTransaction.status === 'Paid' 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
-                        : 'bg-rose-50 text-rose-700 border-rose-200/50 animate-pulse'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
                     }`}>
                       {selectedTransaction.status === 'Paid' ? 'PAID & SETTLED' : 'PENDING DUE'}
                     </span>
@@ -978,27 +977,27 @@ export function HospitalAdminAnalytics() {
                 </div>
 
                 {/* Patient Audit Segment */}
-                <div className="space-y-1.5 border-b border-dashed border-slate-300 pb-2.5">
+                <div className="space-y-1.5 border-b border-dashed border-[#D8D8D8] pb-2.5">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Patient:</span>
-                    <span className="font-bold text-slate-800">{selectedTransaction.patientName}</span>
+                    <span className="font-bold text-[#060606]">{selectedTransaction.patientName}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Contact:</span>
-                    <span className="font-bold text-slate-800">{selectedTransaction.patientPhone}</span>
+                    <span className="font-bold text-[#060606]">{selectedTransaction.patientPhone}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Department:</span>
-                    <span className="font-bold text-slate-800">{selectedTransaction.department}</span>
+                    <span className="font-bold text-[#060606]">{selectedTransaction.department}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Billing Clerk:</span>
-                    <span className="font-bold text-indigo-600">{selectedTransaction.operatorName}</span>
+                    <span className="font-bold text-[#3683F8]">{selectedTransaction.operatorName}</span>
                   </div>
                 </div>
 
                 {/* Itemized list details block */}
-                <div className="space-y-2 border-b border-dashed border-slate-300 pb-2.5">
+                <div className="space-y-2 border-b border-dashed border-[#D8D8D8] pb-2.5">
                   <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Itemized Billing</div>
 
                   {selectedTransaction.type === 'Pharmacy' && pharmacyBillDetails ? (
@@ -1008,7 +1007,7 @@ export function HospitalAdminAnalytics() {
                           <span className="text-slate-600 truncate max-w-[130px]">
                             {item.name} <span className="text-slate-400">x{item.qty}</span>
                           </span>
-                          <span className="font-bold text-slate-800">
+                          <span className="font-bold text-[#060606]">
                             ₹{(item.price * item.qty).toLocaleString('en-IN')}
                           </span>
                         </div>
@@ -1017,7 +1016,7 @@ export function HospitalAdminAnalytics() {
                   ) : (
                     <div className="flex justify-between text-[9px]">
                       <span className="text-slate-600">OPD Clinical Fees</span>
-                      <span className="font-bold text-slate-800">
+                      <span className="font-bold text-[#060606]">
                         ₹{selectedTransaction.amount.toLocaleString('en-IN')}
                       </span>
                     </div>
@@ -1026,15 +1025,15 @@ export function HospitalAdminAnalytics() {
 
                 {/* Grand Total */}
                 <div className="space-y-1 pb-1">
-                  <div className="flex justify-between font-black text-xs pt-1.5 text-slate-900 border-t border-slate-900 mt-1">
+                  <div className="flex justify-between font-black text-xs pt-1.5 text-[#060606] border-t border-[#060606] mt-1">
                     <span>Total Amount:</span>
                     <span>₹{selectedTransaction.amount.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
 
                 {/* Barcode representation */}
-                <div className="text-center pt-2.5 border-t border-dashed border-slate-300 space-y-1.5">
-                  <div className="h-6 w-full bg-slate-900 mx-auto flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold">
+                <div className="text-center pt-2.5 border-t border-dashed border-[#D8D8D8] space-y-1.5">
+                  <div className="h-6 w-full bg-[#060606] mx-auto flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold">
                     |||||||||||||||||||||||
                   </div>
                   <p className="text-[7px] text-slate-400 uppercase tracking-wider">
@@ -1053,7 +1052,7 @@ export function HospitalAdminAnalytics() {
                 onClick={() => {
                   window.print();
                 }}
-                className="flex-1 font-bold rounded-full bg-indigo-600 hover:bg-indigo-700 flex gap-2 items-center justify-center text-xs h-10"
+                className="flex-1 font-bold rounded-xl bg-[#3683F8] hover:bg-blue-600 text-white flex gap-2 items-center justify-center text-xs h-10 shadow-md"
               >
                 <Printer size={14} /> Execute Print
               </Button>
@@ -1063,7 +1062,7 @@ export function HospitalAdminAnalytics() {
                   setIsModalOpen(false);
                   setSelectedTxId(null);
                 }}
-                className="flex-1 font-bold rounded-full text-xs h-10"
+                className="flex-1 font-bold rounded-xl text-xs h-10 border-[#D8D8D8]"
               >
                 Close Preview
               </Button>

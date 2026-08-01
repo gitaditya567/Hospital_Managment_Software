@@ -61,72 +61,75 @@ export function ReceptionistInvoices() {
   };
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
-      {/* Header and Summary */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Receipt className="text-blue-600" /> OPD Billing & Receipts
+    <div className="space-y-6 flex flex-col h-full font-sans pb-16">
+      {/* Header and Summary Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 text-white relative overflow-hidden">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
+            <Receipt size={22} className="text-blue-100" /> OPD Billing &amp; Receipts Ledger
           </h1>
-          <p className="text-slate-500">Manage patient payments, collect dues, and print thermal receipts</p>
+          <p className="text-blue-50 text-xs">Manage patient payments, collect dues, and print thermal receipts</p>
+        </div>
+        <div className="text-xs bg-white/15 px-4 py-2.5 rounded-xl border border-white/20 text-white font-semibold backdrop-blur-xs">
+          Clearance Rate: <span className="font-extrabold text-emerald-300">{clearanceRate}%</span>
         </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Total Invoiced */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Invoiced</p>
-            <h3 className="text-xl font-extrabold text-slate-800 mt-1">₹{totalInvoiced.toLocaleString('en-IN')}</h3>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">Total revenue generated</p>
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">Total Invoiced</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">₹{totalInvoiced.toLocaleString('en-IN')}</h3>
+            <p className="text-[10px] text-slate-400 font-semibold">Total revenue generated</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
-            <DollarSign size={20} />
+          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
+            <DollarSign size={22} />
           </div>
         </div>
 
         {/* Total Collected */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Collected</p>
-            <h3 className="text-xl font-extrabold text-emerald-700 mt-1">₹{totalCollected.toLocaleString('en-IN')}</h3>
-            <p className="text-[10px] text-emerald-600 font-semibold mt-1">Cleared in-cash receipts</p>
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Total Collected</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">₹{totalCollected.toLocaleString('en-IN')}</h3>
+            <p className="text-[10px] text-emerald-600 font-semibold">Cleared in-cash receipts</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-            <CheckCircle2 size={20} />
+          <div className="h-12 w-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
+            <CheckCircle2 size={22} />
           </div>
         </div>
 
         {/* Outstanding Dues */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Outstanding Dues</p>
-            <h3 className="text-xl font-extrabold text-rose-700 mt-1">₹{totalPending.toLocaleString('en-IN')}</h3>
-            <p className="text-[10px] text-rose-600 font-semibold mt-1">Awaiting checkout desks</p>
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Outstanding Dues</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">₹{totalPending.toLocaleString('en-IN')}</h3>
+            <p className="text-[10px] text-rose-600 font-semibold">Awaiting checkout desks</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
-            <Clock size={20} />
+          <div className="h-12 w-12 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
+            <Clock size={22} />
           </div>
         </div>
 
         {/* Clearance Rate */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Clearance Rate</p>
-            <h3 className="text-xl font-extrabold text-indigo-700 mt-1">{clearanceRate}%</h3>
-            <p className="text-[10px] text-indigo-600 font-semibold mt-1">Paid vs outstanding ratio</p>
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">Clearance Rate</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{clearanceRate}%</h3>
+            <p className="text-[10px] text-blue-600 font-semibold">Paid vs outstanding ratio</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-            <TrendingUp size={20} />
+          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
+            <TrendingUp size={22} />
           </div>
         </div>
       </div>
 
       {/* Main Data Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 flex flex-col flex-1 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xs border border-[#D8D8D8] flex flex-col flex-1 overflow-hidden">
         {/* Filter and Search Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3 justify-between items-center bg-slate-50/50">
+        <div className="p-4 border-b border-[#D8D8D8] flex flex-col sm:flex-row gap-3 justify-between items-center bg-[#EBF3FE]/30">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -134,19 +137,19 @@ export function ReceptionistInvoices() {
               placeholder="Search invoice, patient, doctor..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold text-slate-700"
+              className="w-full pl-9 pr-4 py-2 border border-[#D8D8D8] rounded-xl focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] outline-none text-xs font-semibold text-[#060606] bg-white"
             />
           </div>
 
-          <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/60 w-full sm:w-auto">
+          <div className="flex gap-1.5 p-1 bg-white rounded-xl border border-[#D8D8D8] w-full sm:w-auto">
             {(['All', 'Paid', 'Pending'] as const).map(status => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
                 className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   filterStatus === status 
-                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' 
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-[#3683F8] text-white shadow-xs' 
+                    : 'text-slate-600 hover:bg-[#EBF3FE]/50'
                 }`}
               >
                 {status} Invoices
@@ -159,45 +162,45 @@ export function ReceptionistInvoices() {
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+              <tr className="bg-[#EBF3FE]/50 border-b border-[#D8D8D8] text-slate-600 text-[10px] font-bold uppercase tracking-wider">
                 <th className="px-5 py-3.5">Invoice ID</th>
                 <th className="px-5 py-3.5">Patient Details</th>
-                <th className="px-5 py-3.5">Assigned Doctor & Fee Type</th>
+                <th className="px-5 py-3.5">Assigned Doctor &amp; Fee Type</th>
                 <th className="px-5 py-3.5">Billing Date</th>
                 <th className="px-5 py-3.5">Amount</th>
                 <th className="px-5 py-3.5">Status</th>
                 <th className="px-5 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700 text-xs font-semibold">
+            <tbody className="divide-y divide-[#D8D8D8]/60 text-slate-700 text-xs font-semibold">
               {filteredInvoices.map((invoice) => {
                 const isPaid = invoice.status === 'Paid';
                 return (
-                  <tr key={invoice.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={invoice.id} className="hover:bg-[#EBF3FE]/20 transition-colors">
                     <td className="px-5 py-4">
-                      <span className="px-2 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg font-bold font-mono">
+                      <span className="px-2.5 py-1 bg-[#EBF3FE] border border-blue-200 text-[#3683F8] rounded-lg font-bold font-mono text-[10px]">
                         {invoice.id}
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="font-extrabold text-slate-800">{invoice.patientName}</div>
+                      <div className="font-extrabold text-[#060606]">{invoice.patientName}</div>
                       <div className="text-[10px] text-slate-400 font-bold font-mono mt-0.5">{invoice.patientPhone}</div>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="font-bold text-slate-700">{invoice.doctorName}</div>
+                      <div className="font-bold text-[#060606]">{invoice.doctorName}</div>
                       <div className="text-[10px] text-slate-500 font-medium mt-0.5">{invoice.feeType}</div>
                     </td>
                     <td className="px-5 py-4 text-slate-500 font-medium">
                       {invoice.date}
                     </td>
-                    <td className="px-5 py-4 text-slate-800 font-extrabold text-sm">
+                    <td className="px-5 py-4 text-[#060606] font-extrabold text-sm">
                       ₹{invoice.amount.toLocaleString('en-IN')}
                     </td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         isPaid 
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
-                          : 'bg-rose-50 text-rose-700 border-rose-200/50 animate-pulse'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
                       }`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                         {invoice.status}
@@ -209,7 +212,7 @@ export function ReceptionistInvoices() {
                           <Button
                             size="sm"
                             onClick={() => handleCollect(invoice.id)}
-                            className="bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] h-8 font-bold flex gap-1 items-center"
+                            className="bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] h-8 font-bold flex gap-1 items-center shadow-xs"
                           >
                             <CreditCard size={12} /> Collect
                           </Button>
@@ -218,7 +221,7 @@ export function ReceptionistInvoices() {
                           variant="outline"
                           size="sm"
                           onClick={() => handlePrint(invoice)}
-                          className="rounded-full text-[10px] h-8 font-bold text-slate-600 hover:text-slate-800 flex gap-1 items-center"
+                          className="rounded-xl text-[10px] h-8 font-bold text-[#3683F8] border-[#D8D8D8] hover:bg-[#EBF3FE] flex gap-1 items-center"
                         >
                           <Printer size={12} /> Slip
                         </Button>
@@ -248,11 +251,11 @@ export function ReceptionistInvoices() {
         className="max-w-xs sm:max-w-sm"
       >
         {printInvoiceData && (
-          <div className="space-y-5">
-            <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 flex justify-center">
+          <div className="space-y-5 font-sans">
+            <div className="bg-[#EBF3FE]/40 p-4 rounded-2xl border border-[#D8D8D8] flex justify-center">
               <div
                 id="thermal-slip-template"
-                className="bg-white border shadow-sm text-slate-900 transition-all duration-250 max-h-[380px] overflow-y-auto"
+                className="bg-white border border-[#D8D8D8] shadow-xs text-[#060606] transition-all duration-250 max-h-[380px] overflow-y-auto font-mono text-[10px] rounded-xl"
                 style={{
                   width: printSettings.paperSize === 'A4' ? '260px' : '190px',
                   padding: `${printSettings.padding}px`,
@@ -263,7 +266,7 @@ export function ReceptionistInvoices() {
                 }}
               >
                 {printSettings.showHeader && (
-                  <div className="text-center pb-2 border-b border-dashed border-slate-350 space-y-1">
+                  <div className="text-center pb-2 border-b border-dashed border-[#D8D8D8] space-y-1">
                     <h3 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: printSettings.accentColor }}>
                       🏥 {printSettings.customHeaderText || hospitalName}
                     </h3>
@@ -272,7 +275,7 @@ export function ReceptionistInvoices() {
                   </div>
                 )}
 
-                <div className="text-center py-2 border rounded my-2 bg-slate-50/50 space-y-0.5" style={{ borderColor: `${printSettings.accentColor}30` }}>
+                <div className="text-center py-2 border rounded-xl my-2 bg-[#EBF3FE]/50 space-y-0.5" style={{ borderColor: `${printSettings.accentColor}30` }}>
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Transaction Status</p>
                   <h2 className={`text-sm font-black leading-none ${printInvoiceData.status === 'Paid' ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {printInvoiceData.status === 'Paid' ? 'PAID & CLEARED' : 'PENDING DUE'}
@@ -280,7 +283,7 @@ export function ReceptionistInvoices() {
                   <p className="text-[8px] font-extrabold text-slate-500">{printInvoiceData.doctorName}</p>
                 </div>
 
-                <div className="space-y-1 border-b border-dashed border-slate-300 pb-2 text-[0.9em]">
+                <div className="space-y-1 border-b border-dashed border-[#D8D8D8] pb-2 text-[0.9em]">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Patient:</span>
                     <span className="font-bold">{printInvoiceData.patientName}</span>
@@ -307,8 +310,8 @@ export function ReceptionistInvoices() {
                 </div>
 
                 {printSettings.showFooter && (
-                  <div className="text-center pt-3 border-t border-dashed border-slate-300 space-y-1.5">
-                    <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded" style={{ backgroundColor: printSettings.accentColor }}>
+                  <div className="text-center pt-3 border-t border-dashed border-[#D8D8D8] space-y-1.5">
+                    <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded-lg" style={{ backgroundColor: printSettings.accentColor }}>
                       |||||||||||||||||||||||
                     </div>
                     <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">
@@ -324,25 +327,25 @@ export function ReceptionistInvoices() {
                 onClick={() => {
                   const headerTitle = printSettings.showHeader
                     ? `<div class="text-center pb-2 dashed-divider">
-                         ${printSettings.logoUrl ? `< div style = "text-align: center; margin-bottom: 6px;" > <img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
-            <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || hospitalName}</h3>
-            <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Clinical Registry Slip</p>
-            <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${printInvoiceData.date}</p>
-          </div>`
+                         ${printSettings.logoUrl ? `<div style="text-align: center; margin-bottom: 6px;"><img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
+                         <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || hospitalName}</h3>
+                         <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Clinical Registry Slip</p>
+                         <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${printInvoiceData.date}</p>
+                       </div>`
                     : '';
 
                   const footerContent = printSettings.showFooter
-                    ? `< div class="text-center pt-3 dashed-divider">
-        <div class="barcode-container brand-accent-bg">|||||||||||||||||||||||</div>
-        <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase; leading-height: 1.3;">
-          ${printSettings.customFooterText || (printInvoiceData.status === 'Paid' ? 'Thank you for cooperation' : 'Please settle outstanding payment')}
-        </p>
-    </div>`
+                    ? `<div class="text-center pt-3 dashed-divider">
+                         <div class="barcode-container brand-accent-bg">|||||||||||||||||||||||</div>
+                         <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase; leading-height: 1.3;">
+                           ${printSettings.customFooterText || (printInvoiceData.status === 'Paid' ? 'Thank you for cooperation' : 'Please settle outstanding payment')}
+                         </p>
+                       </div>`
                     : '';
 
                   const slipHtml = `
-    < div style = "font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;" >
-                      ${ headerTitle }
+                    <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
+                      ${headerTitle}
 
                       <div class="text-center py-3 my-2" style="border: 1px solid ${printSettings.accentColor}30; border-radius: 8px; background-color: #f8fafc;">
                         <p style="margin: 0; font-size: 0.75em; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Transaction Status</p>
@@ -382,21 +385,21 @@ export function ReceptionistInvoices() {
                         </div>
                       </div>
 
-                      ${ footerContent }
-                    </div >
-    `;
+                      ${footerContent}
+                    </div>
+                  `;
 
                   printIsolatedHtml("OPD Billing Receipt", slipHtml);
                   setIsPrintModalOpen(false);
                 }} 
-                className="flex-1 font-bold rounded-full"
+                className="flex-1 font-bold rounded-xl bg-[#3683F8] hover:bg-blue-600 text-white"
               >
                 <Printer size={16} className="mr-1.5" /> Execute Print
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setIsPrintModalOpen(false)}
-                className="flex-1 font-bold rounded-full"
+                className="flex-1 font-bold rounded-xl border-[#D8D8D8]"
               >
                 Close Preview
               </Button>

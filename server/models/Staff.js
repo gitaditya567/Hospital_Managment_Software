@@ -4,7 +4,7 @@ const staffSchema = new mongoose.Schema({
   name: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['Doctor', 'Receptionist', 'Pharmacy', 'Lab Technician'], 
+    enum: ['Doctor', 'Receptionist', 'Pharmacy'], 
     required: true 
   },
   department: { type: String, default: '' },

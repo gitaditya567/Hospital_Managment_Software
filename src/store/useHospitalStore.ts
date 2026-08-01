@@ -4,7 +4,7 @@ import { useAuthStore } from './useAuthStore';
 export interface StaffMember {
   id: string;
   name: string;
-  role: 'Doctor' | 'Receptionist' | 'Pharmacy' | 'Lab Technician';
+  role: 'Doctor' | 'Receptionist' | 'Pharmacy';
   department?: string; // Optional for non-doctors
   contact: string;
   email: string;
@@ -198,7 +198,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
           appointmentTime: p.appointmentTime || ''
         })),
         invoices: invData.map((i: any) => ({
-          id: i._id || i.id,
+          id: i.invoiceNo || i._id || i.id,
           patientName: i.patientName,
           patientPhone: i.patientPhone,
           date: i.date,

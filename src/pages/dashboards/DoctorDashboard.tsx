@@ -1095,7 +1095,7 @@ export function DoctorDashboard() {
                     entryMode === 'voice' ? 'border-teal-600 text-teal-600 font-extrabold text-glow-teal' : 'border-transparent hover:text-slate-550'
                   }`}
                   >
-                    <Mic size={14} className={entryMode === 'voice' ? 'text-teal-600' : ''} /> Voice Prescription (AI Speak)
+                    <Mic size={14} className={entryMode === 'voice' ? 'text-teal-600' : ''} /> Voice Prescription
                   </button>
                   <button
                     type="button"
@@ -1104,7 +1104,7 @@ export function DoctorDashboard() {
                     entryMode === 'manual' ? 'border-teal-600 text-teal-600 font-extrabold text-glow-teal' : 'border-transparent hover:text-slate-550'
                   }`}
                   >
-                    <Keyboard size={14} className={entryMode === 'manual' ? 'text-teal-600' : ''} /> Manual Smart Prescription (AI Search)
+                    <Keyboard size={14} className={entryMode === 'manual' ? 'text-teal-600' : ''} /> Manual Prescription Search
                   </button>
                 </div>
 
@@ -1161,7 +1161,7 @@ export function DoctorDashboard() {
                     {/* Transcript Text Box & Action */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-700">AI Speech Transcript</label>
+                        <label className="text-xs font-bold text-slate-700">Speech Transcript</label>
                         {transcript && (
                           <button
                             type="button"
@@ -1199,7 +1199,7 @@ export function DoctorDashboard() {
                     {/* Search Bar */}
                     <div className="relative">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                        Search Medicine (AI Autocomplete)
+                        Search Medicine (Quick Autocomplete)
                       </label>
                       <div className="relative">
                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -1230,7 +1230,7 @@ export function DoctorDashboard() {
 
                               <div className="text-right">
                                 <span className="text-[10px] text-teal-600 font-bold font-mono uppercase bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">
-                                  💡 AI Recommended
+                                  💡 Verified Medicine
                                 </span>
                               </div>
                             </div>

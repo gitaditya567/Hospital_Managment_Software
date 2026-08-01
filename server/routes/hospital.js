@@ -441,12 +441,40 @@ hospitalRouter.delete('/patients/:id', async (req, res) => {
 // 5. BILLING & INVOICES OPERATIONS
 // ----------------------------------------------------
 
+// Helper function to generate sequential Invoice ID (INV-1001, INV-1002...)
+const generateSequentialInvoiceNo = async (hospitalId) => {
+  const count = await Invoice.countDocuments({ hospitalId });
+  let nextSeq = 1001 + count;
+  
+  // Double-check highest existing invoice number to prevent duplicate collision
+  const lastInvoice = await Invoice.findOne({ hospitalId, invoiceNo: { $regex: /^INV-/ } }).sort({ createdAt: -1 });
+  if (lastInvoice && lastInvoice.invoiceNo) {
+    const parsedNum = parseInt(lastInvoice.invoiceNo.replace('INV-', ''));
+    if (!isNaN(parsedNum) && parsedNum >= nextSeq) {
+      nextSeq = parsedNum + 1;
+    }
+  }
+  return `INV-${nextSeq}`;
+};
+
 hospitalRouter.get('/invoices', async (req, res) => {
   const { hospitalId } = req.query;
   try {
     const query = hospitalId ? { hospitalId } : {};
-    const list = await Invoice.find(query).sort({ createdAt: -1 });
-    res.json(list);
+    let list = await Invoice.find(query).sort({ createdAt: -1 }).lean();
+    
+    // Auto-fix legacy invoices without invoiceNo
+    let counter = 1001;
+    const processed = list.map((inv) => {
+      if (!inv.invoiceNo) {
+        inv.invoiceNo = `INV-${counter++}`;
+      }
+      return {
+        ...inv,
+        id: inv.invoiceNo || inv._id
+      };
+    });
+    res.json(processed);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -456,7 +484,10 @@ hospitalRouter.post('/invoices', async (req, res) => {
   const { patientName, patientPhone, amount, doctorName, feeType, hospitalId, status } = req.body;
   try {
     const dateString = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const invoiceNo = await generateSequentialInvoiceNo(hospitalId);
+    
     const newInvoice = new Invoice({
+      invoiceNo,
       patientName,
       patientPhone,
       amount: Number(amount),
@@ -467,7 +498,10 @@ hospitalRouter.post('/invoices', async (req, res) => {
       hospitalId
     });
     await newInvoice.save();
-    res.status(201).json(newInvoice);
+    
+    const responseObj = newInvoice.toObject();
+    responseObj.id = invoiceNo;
+    res.status(201).json(responseObj);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -476,7 +510,12 @@ hospitalRouter.post('/invoices', async (req, res) => {
 hospitalRouter.put('/invoices/:id/collect', async (req, res) => {
   const { id } = req.params;
   try {
-    const updated = await Invoice.findByIdAndUpdate(id, { status: 'Paid' }, { new: true });
+    // Support matching by _id OR invoiceNo
+    const updated = await Invoice.findOneAndUpdate(
+      { $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { invoiceNo: id }] },
+      { status: 'Paid' },
+      { new: true }
+    );
     if (updated) {
       await Patient.updateMany(
         { hospitalId: updated.hospitalId, phone: updated.patientPhone, paymentStatus: { $ne: 'Paid' } },
@@ -511,7 +550,10 @@ hospitalRouter.put('/patients/:id/collect-fee', async (req, res) => {
       await existingInvoice.save();
     } else {
       const dateString = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const invoiceNo = await generateSequentialInvoiceNo(patient.hospitalId);
+      
       const newInvoice = new Invoice({
+        invoiceNo,
         patientName: patient.name,
         patientPhone: patient.phone,
         amount: Number(amount) || 500,

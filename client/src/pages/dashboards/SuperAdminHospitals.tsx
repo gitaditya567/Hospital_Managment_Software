@@ -258,28 +258,28 @@ export function SuperAdminHospitals() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Building2 className="text-blue-600" /> Hospitals & Clinics
+          <h1 className="text-2xl font-bold text-[#060606] flex items-center gap-2">
+            <Building2 className="text-[#3683F8]" /> Hospitals & Clinics
           </h1>
           <p className="text-slate-500">Inspect registered hospital & clinic database status, telemetry capacity and access switches</p>
         </div>
-        <Button onClick={() => setIsOnboardModalOpen(true)} className="h-11 px-6 text-sm font-extrabold gap-2 shadow-lg shadow-blue-500/15 flex items-center">
+        <Button onClick={() => setIsOnboardModalOpen(true)} className="h-11 px-6 text-sm font-extrabold gap-2 shadow-md bg-[#3683F8] hover:bg-blue-600 text-white flex items-center rounded-xl">
           <span className="text-base leading-none">+</span> Onboard New Hospital
         </Button>
       </div>
 
       {searchQuery && (
-        <div className="bg-blue-50 border border-blue-100 p-3.5 rounded-xl text-xs text-blue-700 flex items-center justify-between">
+        <div className="bg-[#EBF3FE] border border-[#D8D8D8] p-3.5 rounded-xl text-xs text-[#3683F8] flex items-center justify-between">
           <span>Filtering directory by query: <strong>"{searchQuery}"</strong></span>
           <span className="font-semibold">{filteredTenants.length} clinics matching</span>
         </div>
       )}
 
       {/* Directory Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#D8D8D8] shadow-xs overflow-hidden">
         <DataTable columns={columns} data={filteredTenants} className="border-0 shadow-none rounded-none" />
       </div>
 
@@ -293,9 +293,9 @@ export function SuperAdminHospitals() {
         {selectedTenant && (
           <div className="space-y-6">
             {/* Header info */}
-            <div className="flex justify-between items-start bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div className="flex justify-between items-start bg-[#EBF3FE]/50 p-4 rounded-xl border border-[#D8D8D8]">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">{selectedTenant.hospitalName}</h3>
+                <h3 className="text-lg font-bold text-[#060606]">{selectedTenant.hospitalName}</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Central MongoDB ID: {selectedTenant.id}</p>
               </div>
               <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
@@ -309,20 +309,20 @@ export function SuperAdminHospitals() {
 
             {/* General Info */}
             <div className="space-y-3.5">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">General Information</h4>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">General Information</h4>
 
               <div className="flex items-center gap-3 text-xs text-slate-600">
-                <Mail size={16} className="text-slate-400 shrink-0" />
+                <Mail size={16} className="text-[#3683F8] shrink-0" />
                 <div>
-                  <p className="font-semibold text-slate-700">{selectedTenant.adminEmail}</p>
+                  <p className="font-semibold text-[#060606]">{selectedTenant.adminEmail}</p>
                   <p className="text-[10px] text-slate-400">Hospital Admin Email</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3 text-xs text-slate-600">
-                <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                <MapPin size={16} className="text-[#3683F8] shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-slate-700 leading-relaxed">{selectedTenant.address}</p>
+                  <p className="font-semibold text-[#060606] leading-relaxed">{selectedTenant.address}</p>
                   <p className="text-[10px] text-slate-400">Physical Location Address</p>
                 </div>
               </div>
@@ -330,21 +330,21 @@ export function SuperAdminHospitals() {
 
             {/* Subscription Metrics */}
             <div className="space-y-3.5">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">SaaS Usage telemetry Metrics</h4>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">SaaS Usage telemetry Metrics</h4>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
-                  <Users className="text-blue-500 shrink-0" size={18} />
+                <div className="flex items-center gap-3 p-3 bg-[#EBF3FE]/30 border border-[#D8D8D8] rounded-xl">
+                  <Users className="text-[#3683F8] shrink-0" size={18} />
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{selectedTenant.staffCreated} Accounts</p>
+                    <p className="text-sm font-bold text-[#060606]">{selectedTenant.staffCreated} Accounts</p>
                     <p className="text-[10px] text-slate-400 font-medium">Doctors & staff slots used</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                <div className="flex items-center gap-3 p-3 bg-[#EBF3FE]/30 border border-[#D8D8D8] rounded-xl">
                   <HardDrive className="text-emerald-500 shrink-0" size={18} />
                   <div>
-                    <p className="text-sm font-bold text-slate-800">
+                    <p className="text-sm font-bold text-[#060606]">
                       {(() => {
                         const plan = plans.find(p => p.id === selectedTenant.planId);
                         const limitGB = plan ? plan.maxStorage : 10;
@@ -369,23 +369,23 @@ export function SuperAdminHospitals() {
             </div>
 
             {/* Plan metrics */}
-            <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="space-y-3 p-4 rounded-xl bg-[#EBF3FE]/40 border border-[#D8D8D8]">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">License string used</span>
-                <span className="font-mono font-bold text-slate-700">{selectedTenant.licenseCodeUsed}</span>
+                <span className="text-slate-500 font-medium">License string used</span>
+                <span className="font-mono font-bold text-[#060606]">{selectedTenant.licenseCodeUsed}</span>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">Subscription expires on</span>
-                <span className="font-bold text-slate-700">{selectedTenant.subscriptionExpiryDate}</span>
+                <span className="text-slate-500 font-medium">Subscription expires on</span>
+                <span className="font-bold text-[#060606]">{selectedTenant.subscriptionExpiryDate}</span>
               </div>
             </div>
 
             {/* Controls panel in view modal */}
-            <div className="pt-4 border-t border-slate-100 flex gap-2.5">
+            <div className="pt-4 border-t border-[#D8D8D8] flex gap-2.5">
               <Button
                 variant="outline"
                 onClick={() => openEditModal(selectedTenant)}
-                className="h-11 flex-1 flex items-center justify-center gap-2 font-bold text-sm border-slate-300 text-slate-700"
+                className="h-11 flex-1 flex items-center justify-center gap-2 font-bold text-sm border-[#D8D8D8] text-slate-700 hover:bg-[#EBF3FE]"
               >
                 <Edit size={15} /> Edit Hospital
               </Button>
@@ -399,10 +399,10 @@ export function SuperAdminHospitals() {
               </Button>
               <Button
                 onClick={() => handleToggleStatus(selectedTenant.id)}
-                className={`h-11 flex-[2] flex items-center justify-center gap-2 font-extrabold text-sm shadow-md ${
+                className={`h-11 flex-[2] flex items-center justify-center gap-2 font-extrabold text-sm shadow-md rounded-xl ${
                   selectedTenant.status === 'Active' 
-                    ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-rose-500/20' 
-                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-500/20'
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white' 
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 }`}
               >
                 {selectedTenant.status === 'Active' ? '⚠ Suspend (Kill Switch)' : '✓ Restore Access'}
@@ -421,17 +421,17 @@ export function SuperAdminHospitals() {
       {/* Modal - Onboard New Hospital */}
       <Modal isOpen={isOnboardModalOpen} onClose={() => { setIsOnboardModalOpen(false); setOnboardStep(1); }} title="Onboard New Hospital / Clinic">
         {/* Step Indicator Header */}
-        <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+        <div className="flex items-center justify-between mb-6 border-b border-[#D8D8D8] pb-4">
           <div className="flex items-center gap-2">
-            <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${onboardStep === 1 ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-slate-100 text-slate-500'}`}>1</span>
-            <span className={`text-xs font-semibold ${onboardStep === 1 ? 'text-blue-600' : 'text-slate-500'}`}>Hospital Info</span>
+            <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${onboardStep === 1 ? 'bg-[#3683F8] text-white ring-4 ring-blue-100' : 'bg-slate-100 text-slate-500'}`}>1</span>
+            <span className={`text-xs font-semibold ${onboardStep === 1 ? 'text-[#3683F8]' : 'text-slate-500'}`}>Hospital Info</span>
           </div>
-          <div className="flex-1 h-[2px] bg-slate-100 mx-4 rounded-full overflow-hidden relative">
-            <div className={`absolute top-0 left-0 h-full bg-blue-500 transition-all duration-500 ${onboardStep === 2 ? 'w-full' : 'w-0'}`}></div>
+          <div className="flex-1 h-[2px] bg-[#D8D8D8] mx-4 rounded-full overflow-hidden relative">
+            <div className={`absolute top-0 left-0 h-full bg-[#3683F8] transition-all duration-500 ${onboardStep === 2 ? 'w-full' : 'w-0'}`}></div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${onboardStep === 2 ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-slate-100 text-slate-500'}`}>2</span>
-            <span className={`text-xs font-semibold ${onboardStep === 2 ? 'text-blue-600' : 'text-slate-500'}`}>Credentials & License</span>
+            <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${onboardStep === 2 ? 'bg-[#3683F8] text-white ring-4 ring-blue-100' : 'bg-slate-100 text-slate-500'}`}>2</span>
+            <span className={`text-xs font-semibold ${onboardStep === 2 ? 'text-[#3683F8]' : 'text-slate-500'}`}>Credentials & License</span>
           </div>
         </div>
 
@@ -446,7 +446,7 @@ export function SuperAdminHospitals() {
                   placeholder="e.g. City Care Multi-Specialty Clinic"
                   value={hospitalName}
                   onChange={(e) => setHospitalName(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50/50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-[#EBF3FE]/30 text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
                 />
               </div>
 
@@ -459,18 +459,18 @@ export function SuperAdminHospitals() {
                     placeholder="admin@hospital.com"
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50/50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                    className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-[#EBF3FE]/30 text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Personal Email (For Security Alerts)</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Personal Email (Security)</label>
                   <input
                     type="email"
                     placeholder="administrator.personal@gmail.com"
                     value={adminPersonalEmail}
                     onChange={(e) => setAdminPersonalEmail(e.target.value)}
-                    className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50/50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                    className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-[#EBF3FE]/30 text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
                   />
                 </div>
               </div>
@@ -485,7 +485,7 @@ export function SuperAdminHospitals() {
                   onChange={(e) => setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   maxLength={10}
                   pattern="[0-9]{10}"
-                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50/50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-[#EBF3FE]/30 text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
                 />
                 <p className="text-[10px] text-slate-400">Security alert emails will be delivered to this personal inbox whenever hospital staff reset credentials.</p>
               </div>
@@ -498,7 +498,7 @@ export function SuperAdminHospitals() {
                   placeholder="Street, City, State, ZIP..."
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50/50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="w-full px-3 py-2 border border-[#D8D8D8] rounded-xl text-sm bg-[#EBF3FE]/30 text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
                 />
               </div>
 
@@ -507,7 +507,7 @@ export function SuperAdminHospitals() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsOnboardModalOpen(false)}
-                  className="h-11 px-5 font-bold text-sm"
+                  className="h-11 px-5 font-bold text-sm border-[#D8D8D8]"
                 >
                   Cancel
                 </Button>
@@ -520,7 +520,7 @@ export function SuperAdminHospitals() {
                     }
                     setOnboardStep(2);
                   }}
-                  className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center shadow-lg shadow-blue-500/20"
+                  className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl shadow-md"
                 >
                   Next Step: Credentials <span className="text-base leading-none">→</span>
                 </Button>
@@ -535,7 +535,7 @@ export function SuperAdminHospitals() {
                   required
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed focus:outline-none font-mono"
+                  className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-[#EBF3FE]/50 text-slate-600 cursor-not-allowed focus:outline-none font-mono"
                   disabled
                 />
                 <p className="text-[10px] text-slate-400">Prefilled from Step 1 email. Serves as login username.</p>
@@ -549,7 +549,7 @@ export function SuperAdminHospitals() {
                   placeholder="Enter manual secure password (e.g. MySecretPass123)"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
                 />
                 <PasswordStrengthMeter password={adminPassword} onPasswordChange={setAdminPassword} />
               </div>
@@ -557,7 +557,7 @@ export function SuperAdminHospitals() {
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex justify-between">
                   <span>Allocate Unused License Code</span>
-                  <span className="text-[10px] text-blue-600 font-bold lowercase">
+                  <span className="text-[10px] text-[#3683F8] font-bold lowercase">
                     ({unusedLicenses.length} available)
                   </span>
                 </label>
@@ -565,7 +565,7 @@ export function SuperAdminHospitals() {
                   required
                   value={licenseCodeUsed}
                   onChange={(e) => setLicenseCodeUsed(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
                 >
                   <option value="">-- Choose License Code --</option>
                   {unusedLicenses.map(lic => {
@@ -584,14 +584,14 @@ export function SuperAdminHospitals() {
                   type="button"
                   variant="outline"
                   onClick={() => setOnboardStep(1)}
-                  className="h-11 px-5 font-bold text-sm gap-1.5 flex items-center"
+                  className="h-11 px-5 font-bold text-sm gap-1.5 flex items-center border-[#D8D8D8]"
                 >
                   <span className="text-base leading-none">←</span> Back
                 </Button>
                 <Button
                   type="submit"
                   disabled={!licenseCodeUsed || !adminPassword}
-                  className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20"
+                  className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl shadow-md"
                 >
                   <span className="text-base leading-none">✓</span> Activate SaaS & Complete
                 </Button>
@@ -612,7 +612,7 @@ export function SuperAdminHospitals() {
               placeholder="e.g. Apollo Super Speciality"
               value={editHospitalName}
               onChange={(e) => setEditHospitalName(e.target.value)}
-              className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none"
             />
           </div>
 
@@ -624,7 +624,7 @@ export function SuperAdminHospitals() {
               placeholder="admin@hospital.com"
               value={editAdminEmail}
               onChange={(e) => setEditAdminEmail(e.target.value)}
-              className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none"
             />
           </div>
 
@@ -636,7 +636,7 @@ export function SuperAdminHospitals() {
               placeholder="Address..."
               value={editAddress}
               onChange={(e) => setEditAddress(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full px-3 py-2 border border-[#D8D8D8] rounded-xl text-sm text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none"
             />
           </div>
 
@@ -650,7 +650,7 @@ export function SuperAdminHospitals() {
                 required
                 value={editSubscriptionExpiryDate}
                 onChange={(e) => setEditSubscriptionExpiryDate(e.target.value)}
-                className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none bg-white"
               />
             </div>
 
@@ -661,7 +661,7 @@ export function SuperAdminHospitals() {
               <select
                 value={editPlanId}
                 onChange={(e) => setEditPlanId(e.target.value)}
-                className="w-full h-10 px-3 border border-slate-200 bg-white rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full h-10 px-3 border border-[#D8D8D8] bg-white rounded-xl text-sm text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none"
               >
                 {plans.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -675,13 +675,13 @@ export function SuperAdminHospitals() {
               type="button"
               variant="outline"
               onClick={() => setIsEditModalOpen(false)}
-              className="h-11 px-5 font-bold text-sm"
+              className="h-11 px-5 font-bold text-sm border-[#D8D8D8]"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center shadow-lg shadow-blue-500/20"
+              className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl shadow-md"
             >
               Save Changes
             </Button>
@@ -697,18 +697,18 @@ export function SuperAdminHospitals() {
         className="max-w-md"
       >
         {onboardSuccessData && (
-          <div className="space-y-5 text-slate-800 animate-in fade-in zoom-in-95">
+          <div className="space-y-5 text-[#060606] animate-in fade-in zoom-in-95">
             <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm leading-relaxed text-center font-medium">
               Hospital Node registration is active inside the central database! Custom administrator profile has been saved successfully.
             </div>
 
-            <div className="space-y-3 bg-slate-50 border border-slate-200/60 p-5 rounded-2xl">
+            <div className="space-y-3 bg-[#EBF3FE]/40 border border-[#D8D8D8] p-5 rounded-2xl">
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Hospital Name</label>
-                <span className="text-sm font-semibold text-slate-800 block mt-0.5">{onboardSuccessData.hospitalName}</span>
+                <span className="text-sm font-semibold text-[#060606] block mt-0.5">{onboardSuccessData.hospitalName}</span>
               </div>
 
-              <hr className="border-slate-200/50" />
+              <hr className="border-[#D8D8D8]/50" />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -721,18 +721,18 @@ export function SuperAdminHospitals() {
                 </div>
               </div>
 
-              <hr className="border-slate-200/50" />
+              <hr className="border-[#D8D8D8]/50" />
 
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Manual Admin Password</label>
-                <span className="text-sm font-bold font-mono text-indigo-600 block mt-0.5">{onboardSuccessData.generatedPassword}</span>
+                <span className="text-sm font-bold font-mono text-[#3683F8] block mt-0.5">{onboardSuccessData.generatedPassword}</span>
               </div>
 
-              <hr className="border-slate-200/50" />
+              <hr className="border-[#D8D8D8]/50" />
 
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Allotted Access Code (License)</label>
-                <span className="text-sm font-extrabold font-mono text-emerald-600 bg-emerald-50/50 border border-emerald-100 px-2 py-0.5 rounded block w-fit mt-0.5">{onboardSuccessData.accessCode}</span>
+                <span className="text-sm font-extrabold font-mono text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded block w-fit mt-0.5">{onboardSuccessData.accessCode}</span>
               </div>
             </div>
 
@@ -748,7 +748,7 @@ export function SuperAdminHospitals() {
                   );
                   alert('Credentials copied to clipboard! ✓');
                 }}
-                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-2 rounded-full shadow-lg shadow-blue-500/15"
+                className="w-full h-11 bg-[#3683F8] hover:bg-blue-600 text-white font-bold flex items-center justify-center gap-2 rounded-xl shadow-md"
               >
                 Copy All Credentials & Code
               </Button>

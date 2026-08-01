@@ -272,66 +272,69 @@ export function ReceptionistPatients() {
   };
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
-      {/* Header and Action */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Users className="text-blue-600" /> Patient Master List
+    <div className="space-y-6 flex flex-col h-full font-sans pb-16">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 text-white relative overflow-hidden">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
+            <Users size={22} className="text-blue-100" /> Patient Master Directory
           </h1>
-          <p className="text-slate-500">Comprehensive index of all patient profiles, historical check-ins, and diagnostics</p>
+          <p className="text-blue-50 text-xs">Comprehensive index of all patient profiles, historical check-ins, and diagnostics</p>
+        </div>
+        <div className="text-xs bg-white/15 px-4 py-2.5 rounded-xl border border-white/20 text-white font-semibold backdrop-blur-xs">
+          Return Visit Rate: <span className="font-extrabold text-emerald-300">{returningRate}%</span>
         </div>
       </div>
 
       {/* Stats Summary Rows */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Total Patients */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Patients</p>
-            <h3 className="text-xl font-extrabold text-slate-800 mt-1">{totalUnique} Profiles</h3>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">Unique contacts stored</p>
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">Total Patients</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{totalUnique} Profiles</h3>
+            <p className="text-[10px] text-slate-400 font-semibold">Unique contacts stored</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
-            <Users size={20} />
+          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
+            <Users size={22} />
           </div>
         </div>
 
         {/* New Patients Today */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Onboarded Today</p>
-            <h3 className="text-xl font-extrabold text-indigo-700 mt-1">+{newPatientsToday} New</h3>
-            <p className="text-[10px] text-indigo-600 font-semibold mt-1">First-time walk-ins</p>
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">Onboarded Today</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">+{newPatientsToday} New</h3>
+            <p className="text-[10px] text-blue-600 font-semibold">First-time walk-ins</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-            <UserCheck size={20} />
+          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
+            <UserCheck size={22} />
           </div>
         </div>
 
         {/* Return Patient Rate */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Return Visit Rate</p>
-            <h3 className="text-xl font-extrabold text-emerald-700 mt-1">{returningRate}%</h3>
-            <p className="text-[10px] text-emerald-600 font-semibold mt-1">Patients with &gt; 1 check-in</p>
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Return Visit Rate</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{returningRate}%</h3>
+            <p className="text-[10px] text-emerald-600 font-semibold">Patients with &gt; 1 check-in</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-            <TrendingUp size={20} />
+          <div className="h-12 w-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
+            <TrendingUp size={22} />
           </div>
         </div>
 
         {/* Standard Medical Grade Badge */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Security Clearance</p>
-            <h3 className="text-sm font-extrabold text-slate-800 mt-1.5 flex items-center gap-1">
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Security Clearance</p>
+            <h3 className="text-sm font-extrabold text-[#060606] mt-1.5 flex items-center gap-1">
               <Shield size={14} className="text-emerald-500" /> AES-256 Compliant
             </h3>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">HIPAA compliant records encryption</p>
+            <p className="text-[10px] text-slate-400 font-medium mt-1">HIPAA compliant records</p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-200">
-            <Award size={20} />
+          <div className="h-12 w-12 rounded-xl bg-slate-50 border border-[#D8D8D8] text-slate-600 flex items-center justify-center">
+            <Award size={22} />
           </div>
         </div>
       </div>

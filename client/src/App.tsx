@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from './store/useAuthStore';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { initSecurityProtections } from './utils/securityProtection';
 import { Login } from './pages/auth/Login';
 import { Activate } from './pages/auth/Activate';
 import { DashboardLayout } from './components/layout/DashboardLayout';
@@ -40,6 +41,7 @@ function App() {
 
   useEffect(() => {
     initialize();
+    initSecurityProtections();
   }, [initialize]);
 
   return (

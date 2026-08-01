@@ -8,16 +8,13 @@ import { Modal } from '../../components/ui/Modal';
 import { VitalsModal } from '../../components/VitalsModal';
 import { 
   UserPlus, Clock, Printer, CreditCard, Check, 
-  Wifi, CheckCircle2, Keyboard, Trash2, Activity
+  Wifi, CheckCircle2, Keyboard, Trash2, Activity, Users
 } from 'lucide-react';
 import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
-import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
-import type { FilterState } from '../../components/common/DataNavigationToolbar';
 
 export function ReceptionistDashboard() {
-  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
   const { 
     patients, 
     staff, 
@@ -251,10 +248,8 @@ export function ReceptionistDashboard() {
     );
   });
 
-  const navFilteredPatients = applyDataFilters(filteredPatients, filters);
-
   // Strictly sort paidPatients by FIFO (First-In, First-Out: createdAt ascending timestamp)
-  const paidPatients = navFilteredPatients
+  const paidPatients = filteredPatients
     .filter(p => p.paymentStatus === 'Paid' || (!p.paymentStatus && !invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending')))
     .sort((a, b) => {
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -262,7 +257,7 @@ export function ReceptionistDashboard() {
       return timeA - timeB;
     });
 
-  const unpaidPatients = navFilteredPatients
+  const unpaidPatients = filteredPatients
     .filter(p => p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Pending' || invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending'))
     .sort((a, b) => {
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -337,24 +332,91 @@ export function ReceptionistDashboard() {
   };
 
   return (
-    <div className="space-y-6 h-full flex flex-col animate-in fade-in duration-200">
-      {/* Interactive Data Navigation & Filter Toolbar */}
-      <DataNavigationToolbar
-        filters={filters}
-        onFilterChange={setFilters}
-        totalRecordsCount={patients.length}
-        filteredCount={navFilteredPatients.length}
-        title="Receptionist Registry & Queue Navigation"
-        subtitle="Filter patient registrations, OPD queues, and pending invoices by Date Range, Patient Type, and Status"
-      />
+    <div className="space-y-6 h-full flex flex-col animate-in fade-in duration-200 font-sans pb-16">
+      
+      {/* Top Header Banner Card */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 text-white relative overflow-hidden">
+        <div className="space-y-1 relative z-10">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">OPD Receptionist Desk</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/30 backdrop-blur-xs">
+              Live Front Desk Mode
+            </span>
+          </div>
+          <p className="text-blue-50 text-xs font-medium">Real-time patient search, OPD queue allocation, fee collection &amp; token printing desk</p>
+        </div>
+
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="text-right hidden md:block">
+            <p className="text-[10px] font-bold text-blue-100 uppercase tracking-wider">Queue Manager</p>
+            <p className="text-xs font-extrabold text-white">{waitingCount} Waiting • {completedCount} Done</p>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white backdrop-blur-xs">
+            <Users size={20} />
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 1: Top KPI Telemetry Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Today */}
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">Today's Walk-Ins</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{totalCount}</h3>
+            <p className="text-[10px] text-slate-400 font-semibold">Registered patients</p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
+            <UserPlus size={22} />
+          </div>
+        </div>
+
+        {/* Currently Waiting */}
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Active In Queue</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{waitingCount}</h3>
+            <p className="text-[10px] text-slate-400 font-semibold">Waiting for doctor</p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
+            <Clock size={22} />
+          </div>
+        </div>
+
+        {/* Completed */}
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Completed OPD</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{completedCount}</h3>
+            <p className="text-[10px] text-slate-400 font-semibold">Consultations finished</p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
+            <CheckCircle2 size={22} />
+          </div>
+        </div>
+
+        {/* Fee Revenue Collected */}
+        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">OPD Collections</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">₹{(paidPatients.length * 500).toLocaleString('en-IN')}</h3>
+            <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Paid OPD Receipts
+            </p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
+            <CreditCard size={22} />
+          </div>
+        </div>
+      </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-10 gap-6 min-h-0">
         
-        {/* Left Side: The Waiting Room (70% width -> span 7) */}
-        <div className="lg:col-span-7 bg-white text-slate-800 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        {/* Left Side: Today's Live Queue (70% width -> span 7) */}
+        <div className="lg:col-span-7 bg-white text-[#060606] rounded-2xl shadow-xs border border-[#D8D8D8] flex flex-col overflow-hidden">
+          <div className="p-5 border-b border-[#D8D8D8] flex justify-between items-center bg-[#EBF3FE]/30">
             <div>
-              <h2 className="text-base font-extrabold text-slate-800 tracking-tight">Today's Live Queue</h2>
+              <h2 className="text-base font-extrabold text-[#060606] tracking-tight">Today's Live Doctor Queue</h2>
               <p className="text-xs text-slate-500 font-medium">Real-time walk-in registration queue tracker</p>
             </div>
             <div className="flex items-center gap-3">
@@ -374,33 +436,33 @@ export function ReceptionistDashboard() {
               </button>
 
               {searchQuery && (
-                <span className="text-[10px] font-bold px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100 animate-pulse">
+                <span className="text-[10px] font-bold px-2.5 py-0.5 bg-[#EBF3FE] text-[#3683F8] rounded-full border border-blue-200 animate-pulse">
                   Filtered: {filteredPatients.length} Matches
                 </span>
               )}
             </div>
           </div>
 
-          {/* Interactive Appointment Dashboard Chart (Identical to Screenshot) */}
-          <div className="m-5 bg-slate-50/50 text-slate-700 p-5 rounded-2xl border border-slate-200/85 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+          {/* Interactive Appointment Dashboard Chart */}
+          <div className="m-5 bg-[#EBF3FE]/20 text-[#060606] p-5 rounded-2xl border border-[#D8D8D8] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#D8D8D8]">
               <div>
-                <h3 className="text-sm font-extrabold text-slate-800 tracking-tight font-sans">Receptionist Appointment Dashboard</h3>
-                <p className="text-[10px] text-slate-500 font-semibold font-sans mt-0.5">Interactive queue metrics bar visualizer</p>
+                <h3 className="text-sm font-extrabold text-[#060606] tracking-tight">Receptionist Appointment Dashboard</h3>
+                <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Interactive queue metrics bar visualizer</p>
               </div>
               
               {/* Legend with Color Blocks */}
               <div className="flex gap-4 text-xs font-bold text-slate-600">
                 <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 bg-[#3b82f6] inline-block rounded-sm"></span>
+                  <span className="h-3 w-3 bg-[#3683F8] inline-block rounded-xs"></span>
                   Waiting
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 bg-[#10b981] inline-block rounded-sm"></span>
+                  <span className="h-3 w-3 bg-[#10b981] inline-block rounded-xs"></span>
                   In Consultation
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 bg-[#f59e0b] inline-block rounded-sm"></span>
+                  <span className="h-3 w-3 bg-[#f59e0b] inline-block rounded-xs"></span>
                   Completed
                 </span>
               </div>
@@ -424,11 +486,11 @@ export function ReceptionistDashboard() {
                 
                 {/* Horizontal Gridlines */}
                 <div className="absolute inset-x-0 bottom-6 top-2 flex flex-col justify-between pointer-events-none opacity-20">
-                  <div className="border-t border-slate-300 w-full"></div>
-                  <div className="border-t border-slate-300 w-full"></div>
-                  <div className="border-t border-slate-300 w-full"></div>
-                  <div className="border-t border-slate-300 w-full"></div>
-                  <div className="border-t border-slate-300 w-full"></div>
+                  <div className="border-t border-[#D8D8D8] w-full"></div>
+                  <div className="border-t border-[#D8D8D8] w-full"></div>
+                  <div className="border-t border-[#D8D8D8] w-full"></div>
+                  <div className="border-t border-[#D8D8D8] w-full"></div>
+                  <div className="border-t border-[#D8D8D8] w-full"></div>
                 </div>
 
                 {/* Vertical Bars container */}
@@ -436,12 +498,12 @@ export function ReceptionistDashboard() {
                   
                   {/* Waiting Bar */}
                   <div className="flex flex-col items-center gap-1.5 w-24 group select-none">
-                    <span className="text-[11px] font-extrabold text-[#3b82f6] font-mono transition-transform group-hover:scale-110">
+                    <span className="text-[11px] font-extrabold text-[#3683F8] font-mono transition-transform group-hover:scale-110">
                       {waitingCount}
                     </span>
                     <div 
                       style={{ height: `${(waitingCount / maxVal) * 85}%` }}
-                      className="w-12 bg-[#3b82f6] rounded-t shadow-[0_0_8px_rgba(59,130,246,0.15)] transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
+                      className="w-12 bg-[#3683F8] rounded-t shadow-xs transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
                     ></div>
                   </div>
 
@@ -452,7 +514,7 @@ export function ReceptionistDashboard() {
                     </span>
                     <div 
                       style={{ height: `${(consultingCount / maxVal) * 85}%` }}
-                      className="w-12 bg-[#10b981] rounded-t shadow-[0_0_8px_rgba(16,185,129,0.15)] transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
+                      className="w-12 bg-[#10b981] rounded-t shadow-xs transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
                     ></div>
                   </div>
 
@@ -463,14 +525,14 @@ export function ReceptionistDashboard() {
                     </span>
                     <div 
                       style={{ height: `${(completedCount / maxVal) * 85}%` }}
-                      className="w-12 bg-[#f59e0b] rounded-t shadow-[0_0_8px_rgba(245,158,11,0.15)] transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
+                      className="w-12 bg-[#f59e0b] rounded-t shadow-xs transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
                     ></div>
                   </div>
 
                 </div>
 
                 {/* X-Axis Labels */}
-                <div className="h-6 border-t border-slate-200 flex justify-around items-center text-[10px] font-extrabold text-slate-500 uppercase tracking-wider select-none">
+                <div className="h-6 border-t border-[#D8D8D8] flex justify-around items-center text-[10px] font-extrabold text-slate-500 uppercase tracking-wider select-none">
                   <span className="w-24 text-center">Waiting</span>
                   <span className="w-24 text-center">In Consultation</span>
                   <span className="w-24 text-center">Completed</span>
@@ -481,15 +543,15 @@ export function ReceptionistDashboard() {
           </div>
 
           {/* OPD Queue Payment Filter Tabs */}
-          <div className="px-5 py-3 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="px-5 py-3 border-b border-[#D8D8D8] bg-[#EBF3FE]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex gap-2 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setQueueTab('PAID')}
                 className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all ${
                   queueTab === 'PAID'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    ? 'bg-[#3683F8] text-white border-[#3683F8] shadow-xs'
+                    : 'bg-white text-slate-600 border-[#D8D8D8] hover:bg-slate-50'
                 }`}
               >
                 <CheckCircle2 size={14} />
@@ -506,7 +568,7 @@ export function ReceptionistDashboard() {
                 onClick={() => setQueueTab('UNPAID')}
                 className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all ${
                   queueTab === 'UNPAID'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
                     : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
                 }`}
               >
@@ -531,17 +593,17 @@ export function ReceptionistDashboard() {
           <div className="flex-1 overflow-y-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
+                <tr className="bg-[#EBF3FE]/50 border-b border-[#D8D8D8] text-slate-600 text-[10px] font-extrabold uppercase tracking-wider">
                   <th className="px-5 py-3.5">Token No</th>
                   <th className="px-5 py-3.5">Patient Name</th>
                   <th className="px-5 py-3.5">Age/Gender</th>
                   <th className="px-5 py-3.5">Assigned Doctor</th>
-                  <th className="px-5 py-3.5">Payment & Status</th>
+                  <th className="px-5 py-3.5">Payment &amp; Status</th>
                   <th className="px-5 py-3.5 text-right">Wait Time</th>
                   <th className="px-5 py-3.5 text-right">Quick Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 text-xs font-semibold">
+              <tbody className="divide-y divide-[#D8D8D8]/60 text-slate-700 text-xs font-semibold">
                 {displayedPatients.map((patient) => {
                   const isSelected = selectedPatient?.id === patient.id;
                   const isWaiting = patient.status === 'Waiting';
@@ -555,20 +617,20 @@ export function ReceptionistDashboard() {
                         setSelectedPatient(patient);
                         setActiveTab('details');
                       }}
-                      className={`cursor-pointer hover:bg-slate-50/80 transition-all duration-150 ${
-                        isSelected ? 'bg-blue-50/50 border-l-4 border-l-blue-600' : ''
+                      className={`cursor-pointer hover:bg-[#EBF3FE]/20 transition-all duration-150 ${
+                        isSelected ? 'bg-[#EBF3FE]/60 border-l-4 border-l-[#3683F8]' : ''
                       }`}
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg font-bold font-mono">
+                          <span className="px-2.5 py-1 bg-[#EBF3FE] border border-blue-200 text-[#3683F8] rounded-lg font-bold font-mono">
                             {patient.tokenNumber}
                           </span>
                           {queueTab === 'PAID' && (
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold whitespace-nowrap ${
                               patient.status === 'In Consultation'
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-blue-50 text-blue-700 border border-blue-100'
+                                : 'bg-[#EBF3FE] text-[#3683F8] border border-blue-200'
                             }`}>
                               {patient.status === 'In Consultation' ? 'Active' : `Pos #${paidPatients.filter(p => p.status === 'Waiting').indexOf(patient) + 1}`}
                             </span>
@@ -576,10 +638,10 @@ export function ReceptionistDashboard() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
-                        <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                        <div className="font-extrabold text-[#060606] flex items-center gap-1.5">
                           {patient.name}
                           {patient.patientNo && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[9px] font-bold font-mono">
+                            <span className="px-1.5 py-0.5 bg-[#EBF3FE] text-[#3683F8] border border-blue-200 rounded text-[9px] font-bold font-mono">
                               {patient.patientNo}
                             </span>
                           )}
@@ -590,7 +652,7 @@ export function ReceptionistDashboard() {
                         {patient.age} Yrs / <span className="font-semibold text-slate-500">{patient.gender || 'Male'}</span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="text-slate-800 font-extrabold">{patient.doctorName}</span>
+                        <span className="text-[#060606] font-extrabold">{patient.doctorName}</span>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex flex-col gap-1 items-start">
@@ -598,13 +660,13 @@ export function ReceptionistDashboard() {
                             onClick={(e) => handleStatusCycle(e, patient)}
                             title="Click directly to cycle status"
                             className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-extrabold border transition-all hover:scale-105 ${
-                              isWaiting ? 'bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/30 hover:bg-[#3b82f6]/20' :
-                              isConsulting ? 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30 hover:bg-[#10b981]/20' :
-                              'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/30 hover:bg-[#f59e0b]/20'
+                              isWaiting ? 'bg-[#3683F8]/10 text-[#3683F8] border-blue-300 hover:bg-blue-100' :
+                              isConsulting ? 'bg-[#10b981]/10 text-[#10b981] border-emerald-300 hover:bg-emerald-100' :
+                              'bg-[#f59e0b]/10 text-[#f59e0b] border-amber-300 hover:bg-amber-100'
                             }`}
                           >
                             <span className={`h-1.5 w-1.5 rounded-full ${
-                              isWaiting ? 'bg-[#3b82f6]' : isConsulting ? 'bg-[#10b981] animate-pulse' : 'bg-[#f59e0b]'
+                              isWaiting ? 'bg-[#3683F8]' : isConsulting ? 'bg-[#10b981] animate-pulse' : 'bg-[#f59e0b]'
                             }`}></span>
                             {patient.status}
                           </span>
@@ -630,7 +692,7 @@ export function ReceptionistDashboard() {
                                 setWsLogs(prev => [`Payment Success: Collected ₹500 for "${patient.name}". Activated into Doctor Queue.`, ...prev]);
                                 setQueueTab('PAID');
                               }}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all animate-bounce hover:animate-none"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shadow-xs transition-all"
                             >
                               <CreditCard size={12} /> Pay Now (₹500)
                             </button>
@@ -639,7 +701,7 @@ export function ReceptionistDashboard() {
                               type="button"
                               onClick={(e) => handleQuickPrint(e, patient)}
                               title="Print Duplicate OPD Slip"
-                              className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded transition-colors"
+                              className="p-1 hover:bg-[#EBF3FE] text-[#3683F8] rounded-lg transition-colors"
                             >
                               <Printer size={14} />
                             </button>
@@ -648,7 +710,7 @@ export function ReceptionistDashboard() {
                             type="button"
                             onClick={(e) => handleQuickCancel(e, patient)}
                             title="Cancel patient check-in"
-                            className="p-1 hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded transition-colors"
+                            className="p-1 hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-lg transition-colors"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -669,20 +731,20 @@ export function ReceptionistDashboard() {
             </table>
           </div>
 
-          {/* Unified Screenshot-Compliant Statistics Footer */}
-          <div className="flex justify-between items-center text-xs font-bold px-6 py-4 bg-slate-50 border-t border-slate-200 text-slate-600 select-none">
+          {/* Statistics Footer */}
+          <div className="flex justify-between items-center text-xs font-bold px-6 py-4 bg-[#EBF3FE]/30 border-t border-[#D8D8D8] text-[#060606] select-none">
             <div>
               <span className="text-slate-500 uppercase tracking-wider text-[10px] mr-2">Total Today</span>
-              <span className="text-slate-800 font-extrabold font-mono bg-white px-2 py-1 rounded border border-slate-200">{totalCount}</span>
+              <span className="text-[#060606] font-extrabold font-mono bg-white px-2 py-1 rounded border border-[#D8D8D8]">{totalCount}</span>
             </div>
             <div>
               <span className="text-slate-500 uppercase tracking-wider text-[10px] mr-2">Currently Waiting</span>
-              <span className="text-[#3b82f6] font-extrabold font-mono bg-[#3b82f6]/10 px-2 py-1 rounded border border-[#3b82f6]/20">{waitingCount}</span>
+              <span className="text-[#3683F8] font-extrabold font-mono bg-[#EBF3FE] px-2 py-1 rounded border border-blue-200">{waitingCount}</span>
             </div>
           </div>
 
           {/* WebSocket stream logger inside the panel */}
-          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 flex items-center justify-between">
+          <div className="border-t border-[#D8D8D8] bg-[#EBF3FE]/20 px-4 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="font-semibold truncate max-w-[280px] sm:max-w-md">
@@ -693,18 +755,18 @@ export function ReceptionistDashboard() {
             <button
               type="button"
               onClick={() => setShowLogs(!showLogs)}
-              className="text-[9px] font-black uppercase text-blue-600 hover:text-blue-700 tracking-wider transition-colors"
+              className="text-[9px] font-black uppercase text-[#3683F8] hover:text-blue-700 tracking-wider transition-colors"
             >
               {showLogs ? "Hide Console Logs" : `Show Logs (${wsLogs.length})`}
             </button>
           </div>
 
           {showLogs && (
-            <div className="bg-slate-900 text-slate-400 p-3.5 border-t border-slate-800 max-h-28 overflow-y-auto font-mono text-[9px] space-y-1 animate-in slide-in-from-bottom duration-150">
+            <div className="bg-[#060606] text-slate-300 p-3.5 border-t border-slate-800 max-h-28 overflow-y-auto font-mono text-[9px] space-y-1 animate-in slide-in-from-bottom duration-150">
               {wsLogs.slice(0, 10).map((log, idx) => (
                 <div key={idx} className="flex gap-2">
-                  <span className="text-slate-600">[{new Date().toLocaleTimeString()}]</span>
-                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span className="text-slate-500">[{new Date().toLocaleTimeString()}]</span>
+                  <span className="text-emerald-400 font-bold">✓</span>
                   <span className="truncate">{log}</span>
                 </div>
               ))}
@@ -712,16 +774,16 @@ export function ReceptionistDashboard() {
           )}
         </div>
 
-        {/* Right Side: The Lightning-Fast Registration & Actions Panel (30% width -> span 3) */}
+        {/* Right Side: Step-by-Step Patient Search & Token Generation Form (30% width -> span 3) */}
         <div className="lg:col-span-3 flex flex-col gap-5 min-h-0">
           
-          {/* Quick Registration Form */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col relative">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-              <h2 className="text-sm font-extrabold text-slate-800 tracking-tight flex items-center gap-1.5">
-                <UserPlus size={16} className="text-blue-600" /> Walk-In Check-In
+          {/* Quick Registration & Token Booking Form */}
+          <div className="bg-white rounded-2xl p-5 border border-[#D8D8D8] shadow-xs flex flex-col relative">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#D8D8D8]">
+              <h2 className="text-sm font-extrabold text-[#060606] tracking-tight flex items-center gap-1.5">
+                <UserPlus size={16} className="text-[#3683F8]" /> Walk-In Check-In
               </h2>
-              <div className="flex items-center gap-1 text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 font-mono">
+              <div className="flex items-center gap-1 text-[9px] font-bold bg-[#EBF3FE] text-[#3683F8] px-2 py-0.5 rounded-lg border border-blue-200 font-mono">
                 <Keyboard size={10} /> F9 Ready
               </div>
             </div>
@@ -730,19 +792,25 @@ export function ReceptionistDashboard() {
               <div>
                 <Input 
                   ref={phoneInputRef}
-                  label="Step 1: Phone Number" 
-                  placeholder="10-digit mobile" 
+                  label="Step 2: Search Patient (Phone)" 
+                  placeholder="Enter 10-digit mobile..." 
                   required
                   value={phone}
                   onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   maxLength={10}
                   pattern="[0-9]{10}"
-                  className="font-mono text-xs"
+                  className="font-mono text-xs border-[#D8D8D8]"
                 />
-                {existingPatientFound && (
-                  <p className="text-[10px] text-emerald-600 font-bold mt-1 flex items-center gap-1 animate-in fade-in">
-                    <CheckCircle2 size={12} /> Auto-filled returning patient!
-                  </p>
+                {phone.length === 10 && (
+                  existingPatientFound ? (
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1 animate-in fade-in bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
+                      <CheckCircle2 size={12} /> Patient Found! Loaded Profile.
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-amber-700 font-bold mt-1.5 flex items-center gap-1 animate-in fade-in bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+                      <UserPlus size={12} /> Patient Not Found! Please Register Below.
+                    </p>
+                  )
                 )}
               </div>
 
@@ -755,7 +823,7 @@ export function ReceptionistDashboard() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     readOnly={existingPatientFound}
-                    className="text-xs"
+                    className="text-xs border-[#D8D8D8]"
                   />
                 </div>
                 <div className="col-span-2">
@@ -767,7 +835,7 @@ export function ReceptionistDashboard() {
                     value={age}
                     onChange={e => setAge(e.target.value)}
                     readOnly={existingPatientFound}
-                    className="text-xs font-mono"
+                    className="text-xs font-mono border-[#D8D8D8]"
                   />
                 </div>
               </div>
@@ -775,7 +843,7 @@ export function ReceptionistDashboard() {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gender</label>
                 <select 
-                  className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1 text-xs font-semibold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
                   value={gender}
                   onChange={e => setGender(e.target.value)}
                   disabled={existingPatientFound}
@@ -787,9 +855,9 @@ export function ReceptionistDashboard() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Step 2: Assign Doctor</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Step 5: Book Doctor Appointment</label>
                 <select 
-                  className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1.5 text-xs font-bold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
                   value={doctorId}
                   onChange={e => setDoctorId(e.target.value)}
                   required
@@ -803,22 +871,22 @@ export function ReceptionistDashboard() {
 
               {/* Patient Vitals & History Action Button */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clinical Vitals & History</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clinical Vitals &amp; History</label>
                 <button
                   type="button"
                   onClick={() => setIsVitalsModalOpen(true)}
                   className={`w-full py-2 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all duration-200 ${
                     vitals.length > 0
-                      ? 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700'
-                      : 'border-blue-200 bg-blue-50/30 hover:bg-blue-50/60 text-blue-700'
+                      ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                      : 'border-blue-200 bg-[#EBF3FE] hover:bg-blue-100 text-[#3683F8]'
                   }`}
                 >
                   <span className="flex items-center gap-1.5">
-                    <Activity size={14} className={vitals.length > 0 ? "animate-pulse text-emerald-600" : "text-blue-600"} />
+                    <Activity size={14} className={vitals.length > 0 ? "animate-pulse text-emerald-600" : "text-[#3683F8]"} />
                     {vitals.length > 0 ? 'Vitals & History Saved' : 'Add Vitals & Medical History'}
                   </span>
                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                    vitals.length > 0 ? 'bg-emerald-100/60 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                    vitals.length > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-[#3683F8]'
                   }`}>
                     {vitals.length > 0 ? `${vitals.length} Recorded` : 'Pending'}
                   </span>
@@ -826,14 +894,14 @@ export function ReceptionistDashboard() {
                 
                 {/* Visual mini-pill grid showing recorded vitals */}
                 {vitals.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1.5 p-2 bg-emerald-50/30 border border-emerald-100/40 rounded-lg animate-in fade-in duration-200 max-h-16 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1 mt-1.5 p-2 bg-emerald-50/30 border border-emerald-100/40 rounded-lg max-h-16 overflow-y-auto">
                     {vitals.map(v => (
                       <span key={v.name} className="text-[8px] font-bold px-1.5 py-0.5 bg-white border border-emerald-100 text-emerald-700 rounded-md">
                         {v.name.replace('Pressure', 'BP').replace('Temperature', 'Temp')}: {v.value}
                       </span>
                     ))}
                     {pastDiagnoses && (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 bg-white border border-slate-200 text-slate-500 rounded-md truncate max-w-[150px]" title={pastDiagnoses}>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 bg-white border border-[#D8D8D8] text-slate-500 rounded-md truncate max-w-[150px]" title={pastDiagnoses}>
                         Dx: {pastDiagnoses}
                       </span>
                     )}
@@ -849,50 +917,50 @@ export function ReceptionistDashboard() {
                   required
                   value={charges}
                   onChange={e => setCharges(e.target.value)}
-                  className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent font-mono"
+                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1.5 text-xs font-extrabold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] font-mono"
                 />
               </div>
 
-              <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3.5">
+              <div className="flex items-center justify-between p-2.5 bg-[#EBF3FE]/30 border border-[#D8D8D8] rounded-xl px-3.5">
                 <div className="flex flex-col">
-                  <span className="text-[11px] font-extrabold text-slate-700">Pay Now</span>
+                  <span className="text-[11px] font-extrabold text-[#060606]">Pay Now</span>
                   <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Immediate collection clearance</span>
                 </div>
                 <input 
                   type="checkbox" 
                   checked={payNow}
                   onChange={e => setPayNow(e.target.checked)}
-                  className="h-4.5 w-4.5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer transition-all"
+                  className="h-4.5 w-4.5 text-[#3683F8] focus:ring-[#3683F8] border-[#D8D8D8] rounded cursor-pointer transition-all"
                 />
               </div>
 
               <Button 
                 id="register-submit-btn"
                 type="submit" 
-                className="w-full text-xs h-10 font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all mt-2"
+                className="w-full text-xs h-10 font-bold bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all mt-2"
               >
-                <Printer size={16} /> Register & Print Slip (F9)
+                <Printer size={16} /> Step 6: Generate Token (F9)
               </Button>
             </form>
           </div>
 
           {/* Quick Actions for Selected Patient */}
-          <div className="flex-1 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col min-h-0 overflow-y-auto">
+          <div className="flex-1 bg-white rounded-2xl p-5 border border-[#D8D8D8] shadow-xs flex flex-col min-h-0 overflow-y-auto">
             {selectedPatient ? (
               <div className="space-y-4 animate-in slide-in-from-right-4 duration-200">
-                <div className="pb-3.5 border-b border-slate-100">
-                  <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[9px] font-bold font-mono uppercase">
-                    Selected Patient Log
+                <div className="pb-3.5 border-b border-[#D8D8D8]">
+                  <span className="px-2.5 py-0.5 bg-[#EBF3FE] text-[#3683F8] border border-blue-200 rounded-md text-[9px] font-bold font-mono uppercase">
+                    Step 4: Selected Patient Profile
                   </span>
-                  <h3 className="text-base font-extrabold text-slate-800 tracking-tight mt-1">{selectedPatient.name}</h3>
+                  <h3 className="text-base font-extrabold text-[#060606] tracking-tight mt-1">{selectedPatient.name}</h3>
                   <p className="text-[10px] text-slate-500 font-semibold font-mono mt-0.5">{selectedPatient.id} • {selectedPatient.phone}</p>
                 </div>
 
-                <div className="flex border-b border-slate-100 text-xs font-bold text-slate-400">
+                <div className="flex border-b border-[#D8D8D8] text-xs font-bold text-slate-400">
                   <button 
                     onClick={() => setActiveTab('details')}
                     className={`flex-1 pb-2 border-b-2 text-center transition-colors ${
-                      activeTab === 'details' ? 'border-blue-600 text-blue-600' : 'border-transparent hover:text-slate-600'
+                      activeTab === 'details' ? 'border-[#3683F8] text-[#3683F8]' : 'border-transparent hover:text-slate-600'
                     }`}
                   >
                     Details
@@ -900,7 +968,7 @@ export function ReceptionistDashboard() {
                   <button 
                     onClick={() => setActiveTab('billing')}
                     className={`flex-1 pb-2 border-b-2 text-center transition-colors ${
-                      activeTab === 'billing' ? 'border-blue-600 text-blue-600' : 'border-transparent hover:text-slate-600'
+                      activeTab === 'billing' ? 'border-[#3683F8] text-[#3683F8]' : 'border-transparent hover:text-slate-600'
                     }`}
                   >
                     Fee Receipt
@@ -909,27 +977,27 @@ export function ReceptionistDashboard() {
 
                 {activeTab === 'details' ? (
                   <div className="space-y-3.5 text-xs">
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 space-y-2 font-medium">
+                    <div className="bg-[#EBF3FE]/30 p-3 rounded-xl border border-[#D8D8D8] space-y-2 font-medium">
                       <div className="flex justify-between">
                         <span className="text-slate-400 text-[10px]">Token No</span>
-                        <span className="text-slate-800 font-extrabold">{selectedPatient.tokenNumber}</span>
+                        <span className="text-[#060606] font-extrabold">{selectedPatient.tokenNumber}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400 text-[10px]">Assigned Doctor</span>
-                        <span className="text-slate-800 font-extrabold">{selectedPatient.doctorName}</span>
+                        <span className="text-[#060606] font-extrabold">{selectedPatient.doctorName}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400 text-[10px]">Registry Date</span>
-                        <span className="text-slate-800 font-semibold">Today (Live)</span>
+                        <span className="text-[#060606] font-semibold">Today (Live)</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400 text-[10px]">Wait Duration</span>
-                        <span className="text-slate-800 font-bold">{selectedPatient.waitTime || '0m'}</span>
+                        <span className="text-[#060606] font-bold">{selectedPatient.waitTime || '0m'}</span>
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Change Patient Status</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Step 7: Doctor Queue Status</label>
                       <div className="grid grid-cols-3 gap-1">
                         {(['Waiting', 'In Consultation', 'Completed'] as const).map(s => {
                           const isCurrent = selectedPatient.status === s;
@@ -937,15 +1005,14 @@ export function ReceptionistDashboard() {
                             <button
                               key={s}
                               onClick={() => {
-                                // Optimistic UI update instantly before backend sync
                                 setSelectedPatient(prev => prev ? { ...prev, status: s } : null);
                                 updatePatientStatus(selectedPatient.id, s);
                                 setWsLogs(prev => [`System: Manually changed "${selectedPatient.name}" status to "${s}".`, ...prev]);
                               }}
-                              className={`py-1.5 px-1 rounded-lg font-bold text-[9px] border text-center transition-all ${
+                              className={`py-1.5 px-1 rounded-xl font-bold text-[9px] border text-center transition-all ${
                                 isCurrent 
-                                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/20' 
-                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                  ? 'bg-[#3683F8] border-[#3683F8] text-white shadow-xs' 
+                                  : 'bg-white border-[#D8D8D8] text-slate-600 hover:bg-slate-50'
                               }`}
                             >
                               {s.replace('In ', '')}
@@ -975,9 +1042,9 @@ export function ReceptionistDashboard() {
                             collectPatientFee(linkedInvoice.id);
                             setWsLogs(prev => [`System: Payment collected for "${selectedPatient.name}" (₹${linkedInvoice.amount}). Invoice Paid.`, ...prev]);
                           }}
-                          className="w-full mt-2 h-9 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-lg flex items-center justify-center gap-1 transition-all"
+                          className="w-full mt-2 h-9 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-xl flex items-center justify-center gap-1 transition-all"
                         >
-                          <CreditCard size={14} /> Collect & Clearance
+                          <CreditCard size={14} /> Collect &amp; Clearance
                         </Button>
                       </div>
                     ) : (
@@ -1011,7 +1078,7 @@ export function ReceptionistDashboard() {
                         setIsPrintModalOpen(true);
                       }}
                       variant="outline" 
-                      className="w-full text-xs h-9 font-bold flex items-center justify-center gap-1 rounded-lg"
+                      className="w-full text-xs h-9 font-bold flex items-center justify-center gap-1 rounded-xl border-[#D8D8D8] text-[#3683F8]"
                     >
                       <Printer size={14} /> Print Duplicate OPD Slip
                     </Button>
@@ -1021,7 +1088,7 @@ export function ReceptionistDashboard() {
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                 <Clock size={40} className="mb-3.5 text-slate-200" />
-                <p className="text-xs font-medium text-slate-400">Select patient in waiting queue list to print copy slips or manage checkout details.</p>
+                <p className="text-xs font-medium text-slate-400">Select patient in waiting queue list to view Profile details, print copy slips, or manage checkout.</p>
               </div>
             )}
           </div>
@@ -1029,7 +1096,7 @@ export function ReceptionistDashboard() {
 
       </div>
 
-      {/* 3-Inch Thermal Print Preview Modal using CSS @media print template styles */}
+      {/* 3-Inch Thermal Print Preview Modal */}
       <Modal 
         isOpen={isPrintModalOpen} 
         onClose={() => setIsPrintModalOpen(false)} 
@@ -1037,12 +1104,12 @@ export function ReceptionistDashboard() {
         className="max-w-xs sm:max-w-sm"
       >
         {printInvoiceData && (
-          <div className="space-y-5">
-            <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 flex justify-center">
+          <div className="space-y-5 font-sans">
+            <div className="bg-[#EBF3FE]/40 p-4 rounded-2xl border border-[#D8D8D8] flex justify-center">
               {/* Receipts Template Mock */}
               <div 
                 id="thermal-slip-template" 
-                className="bg-white border shadow-sm text-slate-900 transition-all duration-250 max-h-[380px] overflow-y-auto"
+                className="bg-white border border-[#D8D8D8] shadow-xs text-[#060606] transition-all duration-250 max-h-[380px] overflow-y-auto font-mono text-[10px] rounded-xl"
                 style={{
                   width: printSettings.paperSize === 'A4' ? '260px' : '190px',
                   padding: `${printSettings.padding}px`,
@@ -1053,7 +1120,7 @@ export function ReceptionistDashboard() {
                 }}
               >
                 {printSettings.showHeader && (
-                  <div className="text-center pb-2 border-b border-dashed border-slate-350 space-y-1">
+                  <div className="text-center pb-2 border-b border-dashed border-[#D8D8D8] space-y-1">
                     <h3 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: printSettings.accentColor }}>
                       🏥 {printSettings.customHeaderText || hospitalName}
                     </h3>
@@ -1062,13 +1129,13 @@ export function ReceptionistDashboard() {
                   </div>
                 )}
 
-                <div className="text-center py-2 border rounded my-2 bg-slate-50/50 space-y-0.5" style={{ borderColor: `${printSettings.accentColor}30` }}>
+                <div className="text-center py-2 border rounded-xl my-2 bg-[#EBF3FE]/50 space-y-0.5" style={{ borderColor: `${printSettings.accentColor}30` }}>
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">OPD Queue Token</p>
                   <h2 className="text-xl font-black leading-none" style={{ color: printSettings.accentColor }}>{printInvoiceData.tokenNumber}</h2>
                   <p className="text-[8px] font-extrabold text-slate-500">{printInvoiceData.doctorName}</p>
                 </div>
 
-                <div className="space-y-1 border-b border-dashed border-slate-300 pb-2 text-[0.9em]">
+                <div className="space-y-1 border-b border-dashed border-[#D8D8D8] pb-2 text-[0.9em]">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Patient:</span>
                     <span className="font-bold">{printInvoiceData.patientName}</span>
@@ -1076,7 +1143,7 @@ export function ReceptionistDashboard() {
                   {printInvoiceData.patientNo && (
                     <div className="flex justify-between">
                       <span className="text-slate-500">Patient No:</span>
-                      <span className="font-bold text-blue-600">{printInvoiceData.patientNo}</span>
+                      <span className="font-bold text-[#3683F8]">{printInvoiceData.patientNo}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
@@ -1105,8 +1172,8 @@ export function ReceptionistDashboard() {
                 </div>
 
                 {printSettings.showFooter && (
-                  <div className="text-center pt-3 border-t border-dashed border-slate-300 space-y-1.5">
-                    <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded" style={{ backgroundColor: printSettings.accentColor }}>
+                  <div className="text-center pt-3 border-t border-dashed border-[#D8D8D8] space-y-1.5">
+                    <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded-lg" style={{ backgroundColor: printSettings.accentColor }}>
                       |||||||||||||||||||||||
                     </div>
                     <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">
@@ -1194,14 +1261,14 @@ export function ReceptionistDashboard() {
                   printIsolatedHtml("OPD Queue Slip", slipHtml);
                   setIsPrintModalOpen(false);
                 }} 
-                className="flex-1 font-bold rounded-xl"
+                className="flex-1 font-bold rounded-xl bg-[#3683F8] hover:bg-blue-600 text-white"
               >
                 <Printer size={16} className="mr-1.5" /> Execute Print
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setIsPrintModalOpen(false)}
-                className="flex-1 font-bold rounded-xl"
+                className="flex-1 font-bold rounded-xl border-[#D8D8D8]"
               >
                 Close Preview
               </Button>

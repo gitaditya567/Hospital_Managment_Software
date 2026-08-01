@@ -3,9 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
-import { Mail, Lock, LogIn, Sparkles, Eye, EyeOff, UserCheck, ShieldAlert, Timer } from 'lucide-react';
+import { 
+  Mail, 
+  Lock, 
+  LogIn, 
+  Eye, 
+  EyeOff, 
+  ShieldAlert, 
+  Timer,
+  ShieldCheck,
+  Building2,
+  UserCheck,
+  Stethoscope,
+  Pill,
+  CheckCircle2,
+  KeyRound,
+  ArrowRight,
+  Activity
+} from 'lucide-react';
 import { RecoverCredentialsModal } from '../../components/auth/RecoverCredentialsModal';
-
 
 export function Login() {
   const [selectedRole, setSelectedRole] = useState('SUPER_ADMIN');
@@ -72,6 +88,13 @@ export function Login() {
       .catch(err => console.error('Failed to query maintenance status', err));
   }, []);
 
+  const handleRoleSelect = (roleKey: string, defaultEmail: string) => {
+    setSelectedRole(roleKey);
+    setEmail(defaultEmail);
+    setPassword('admin123');
+    setError('');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -93,7 +116,6 @@ export function Login() {
     if (result.success) {
       localStorage.removeItem('medisaas_lockout_until');
       localStorage.removeItem('medisaas_failed_attempts');
-      // Fetch user role from the updated store to route correctly
       const user = useAuthStore.getState().user;
       const role = user?.role;
       if (role === 'SUPER_ADMIN') navigate('/super-admin');
@@ -110,225 +132,286 @@ export function Login() {
     }
   };
 
-
-
   const { settings } = useSuperAdminStore();
   const platformTitle = settings?.platformName || 'Smart Hospital Management Software';
 
+  const roleOptions = [
+    { key: 'SUPER_ADMIN', label: 'Super Operator', email: 'admin@hospital.com', icon: ShieldCheck },
+    { key: 'HOSPITAL_ADMIN', label: 'Hospital Admin', email: 'admin@citycare.com', icon: Building2 },
+    { key: 'RECEPTIONIST', label: 'Front Desk', email: 'receptionist@citycare.com', icon: UserCheck },
+    { key: 'DOCTOR', label: 'Doctor Node', email: 'doctor@citycare.com', icon: Stethoscope },
+    { key: 'PHARMACY', label: 'Pharmacist', email: 'pharmacy@citycare.com', icon: Pill },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-teal-50/50 via-white to-cyan-50/40 text-slate-600 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans medical-grid">
-      {/* Ambient background decoration */}
-      <div className="absolute top-1/4 left-1/3 w-80 h-80 bg-teal-300/40 rounded-full blur-[120px] opacity-20 pointer-events-none animate-float-slow"></div>
-      <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-cyan-300/40 rounded-full blur-[120px] opacity-20 pointer-events-none animate-float-slow" style={{ animationDelay: '2s' }}></div>
+    <div className="min-h-screen bg-[#EBF3FE] text-[#060606] flex items-center justify-center p-4 lg:p-8 font-sans medical-grid relative overflow-hidden">
+      {/* Background ambient lighting */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#3683F8]/10 rounded-full blur-[140px] pointer-events-none"></div>
+      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-[#3683F8]/15 rounded-full blur-[140px] pointer-events-none"></div>
 
-      {/* Sweeping ECG heartwave background */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.04] flex items-center justify-center">
-        <svg className="w-full h-48 text-teal-600" viewBox="0 0 1000 100" preserveAspectRatio="none">
-          <path 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="3" 
-            d="M0,50 L250,50 L260,35 L270,65 L280,50 L350,50 L365,15 L380,85 L395,50 L470,50 L480,35 L490,65 L500,50 L650,50 L665,20 L680,80 L695,50 L770,50 L780,35 L790,65 L800,50 L1000,50" 
-          />
-        </svg>
-      </div>
+      {/* Main Container Dual-Pane Layout */}
+      <div className="w-full max-w-6xl bg-white/90 backdrop-blur-xl border border-[#D8D8D8] rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[640px] z-10 animate-fade-in-up">
+        
+        {/* Left Column: Enterprise SaaS Showcase Panel */}
+        <div className="lg:col-span-5 bg-gradient-to-br from-[#060606] via-[#101928] to-[#0A1424] text-white p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
+          {/* Subtle grid pattern overlay */}
+          <div className="absolute inset-0 bg-[radial-gradient(#3683F8_1px,transparent_1px)] [background-size:24px_24px] opacity-15 pointer-events-none"></div>
 
-      <div className="w-full max-w-md z-10 animate-fade-in-up">
-        {/* Logo and Header */}
-        <div className="text-center mb-8 flex flex-col items-center">
-          <div className="inline-flex items-center justify-center h-16 w-16 rounded-3xl bg-gradient-to-br from-teal-400 to-cyan-500 text-white text-3xl font-extrabold mb-4 shadow-[0_4px_20px_rgba(20,184,166,0.35)] animate-heartbeat">
-            ✚
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-50 border border-teal-100/80 rounded-full mb-2.5 shadow-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse"></span>
-            <span className="text-[10px] text-teal-700 font-extrabold uppercase tracking-widest">Gateway Access</span>
-          </div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight text-center bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent px-2">
-            {platformTitle}
-          </h1>
-          <p className="text-slate-400 mt-2 text-xs font-semibold uppercase tracking-wider">
-            Enter credentials below to access the gateway node
-          </p>
-        </div>
-
-        {/* Login Card */}
-        <div className="glass-card rounded-3xl shadow-[0_12px_40px_-12px_rgba(13,148,136,0.08)] border border-teal-100/50 p-8 md:p-10 relative overflow-hidden">
-          {/* Floating stethoscope background vector inside card */}
-          <div className="absolute -right-8 -top-8 w-24 h-24 text-teal-500/10 pointer-events-none animate-float-slow">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19H3v-6h6v6zm12 0h-6v-6h6v6zM9 9H3V3h6v6zm12 0h-6V3h6v6z" />
-            </svg>
-          </div>
-
-          {isMaintenanceActive && (
-            <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200/80 text-amber-800 rounded-xl text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
-              <span className="text-amber-500 font-bold shrink-0">⚠️</span>
-              <span className="font-extrabold uppercase tracking-wide">System Maintenance Active: Super Admin Login Only</span>
-            </div>
-          )}
-
-          {/* 5-Minute Security Lockout Alert Banner */}
-          {remainingSeconds > 0 && (
-            <div className="mb-5 p-4 bg-rose-50 border-2 border-rose-300 text-rose-800 rounded-2xl text-xs leading-relaxed shadow-md animate-fade-in">
-              <div className="flex items-center justify-between font-extrabold mb-1.5">
-                <span className="flex items-center gap-1.5 text-rose-700 uppercase tracking-wider text-[11px]">
-                  <ShieldAlert size={16} className="text-rose-600 shrink-0" /> Security Lockout Active
-                </span>
-                <span className="bg-rose-600 text-white font-mono px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
-                  <Timer size={12} className="animate-spin" /> {formatTimer(remainingSeconds)}
-                </span>
+          <div className="relative z-10 space-y-6">
+            {/* Header Brand */}
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-[#3683F8] text-white flex items-center justify-center font-black text-xl shadow-[0_0_20px_rgba(54,131,248,0.5)]">
+                ✚
               </div>
-              <p className="font-semibold text-rose-700">
-                Maximum <strong>3 failed login attempts</strong> reached. For your system security, please wait <strong>5 minutes</strong> before trying again to ensure accurate data entry.
+              <div className="flex flex-col">
+                <span className="text-xs font-black uppercase tracking-widest text-[#3683F8]">Multi-Tenant SaaS</span>
+                <span className="text-base font-extrabold tracking-tight text-white">{platformTitle}</span>
+              </div>
+            </div>
+
+            {/* Platform Feature Cards */}
+            <div className="pt-6 space-y-4">
+              <h2 className="text-xl lg:text-2xl font-black text-white leading-snug">
+                Next-Gen Medical Telemetry & Clinical Governance
+              </h2>
+              <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                Empowering multi-hospital operations with instant OPD registration, real-time e-prescriptions, automated pharmacy billing, and central admin licensing.
               </p>
             </div>
-          )}
 
-          {error && remainingSeconds === 0 && (
-            <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs leading-relaxed flex items-start gap-2.5 shadow-sm animate-pulse">
-              <span className="text-rose-500 font-bold text-base shrink-0 leading-none">⚠️</span>
-              <span className="font-semibold">{error}</span>
+            {/* Live Telemetry Highlights */}
+            <div className="space-y-3 pt-2">
+              <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md flex items-center gap-3.5">
+                <div className="p-2.5 bg-[#3683F8]/20 text-[#3683F8] rounded-xl shrink-0">
+                  <Activity size={20} />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-2">
+                    Real-Time OPD Queueing <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-medium">Instant check-in & token dispatch</div>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md flex items-center gap-3.5">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Automated Pharmacy Billing</div>
+                  <div className="text-[11px] text-slate-400 font-medium">Batched stock deduction & invoice printing</div>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            {/* Account Role Dropdown */}
-            <div className="space-y-1.5 group">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-teal-600 transition-colors">
-                Select System Role <span className="text-rose-500">*</span>
+          {/* Footer Metrics */}
+          <div className="relative z-10 pt-8 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <ShieldCheck size={14} /> 256-Bit Encrypted Node
+            </span>
+            <span className="text-white bg-[#3683F8]/30 border border-[#3683F8]/50 px-2.5 py-1 rounded-full">
+              v1.0.0 Enterprise
+            </span>
+          </div>
+        </div>
+
+        {/* Right Column: Authentication Form Gateway */}
+        <div className="lg:col-span-7 p-8 lg:p-12 bg-white flex flex-col justify-between">
+          <div>
+            {/* Top Gateway Title */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#3683F8] bg-[#EBF3FE] px-3 py-1 rounded-full border border-blue-200">
+                  System Authentication
+                </span>
+                <h2 className="text-2xl font-black text-[#060606] tracking-tight mt-2">
+                  Sign In to Terminal Node
+                </h2>
+              </div>
+              <div className="hidden sm:flex items-center gap-1 text-[11px] font-bold text-[#3683F8] bg-[#EBF3FE] px-3 py-1.5 rounded-xl border border-blue-200">
+                <ShieldCheck size={14} /> Secure Session
+              </div>
+            </div>
+
+            {/* Quick Demo Role Selector Chips */}
+            <div className="mb-6 space-y-2">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Select Account Role (Click to auto-fill credentials)
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 transition-colors group-focus-within:text-teal-500">
-                  <UserCheck size={16} />
-                </div>
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  disabled={remainingSeconds > 0 || loading}
-                  required
-                  className="block w-full pl-11 pr-8 py-2.5 rounded-xl text-sm bg-slate-50/50 border border-teal-100/60 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-200 cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">-- Choose Login Role --</option>
-                  <option value="SUPER_ADMIN">Super Operator / Platform Admin</option>
-                  <option value="HOSPITAL_ADMIN">Hospital Administrator</option>
-                  <option value="RECEPTIONIST">Front Desk / Receptionist</option>
-                  <option value="DOCTOR">Doctor / Medical Practitioner</option>
-                  <option value="PHARMACY">Pharmacist / Pharmacy Manager</option>
-                </select>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {roleOptions.map((role) => {
+                  const Icon = role.icon;
+                  const isSelected = selectedRole === role.key;
+                  return (
+                    <button
+                      key={role.key}
+                      type="button"
+                      onClick={() => handleRoleSelect(role.key, role.email)}
+                      className={`flex items-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all border text-left ${
+                        isSelected
+                          ? 'bg-[#3683F8] text-white border-[#3683F8] shadow-md shadow-[#3683F8]/20 scale-[1.02]'
+                          : 'bg-[#EBF3FE]/40 text-slate-700 border-[#D8D8D8] hover:border-[#3683F8] hover:bg-[#EBF3FE]'
+                      }`}
+                    >
+                      <Icon size={16} className={isSelected ? 'text-white' : 'text-[#3683F8]'} />
+                      <span className="truncate">{role.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Email Input */}
-            <div className="space-y-1.5 group">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-teal-600 transition-colors">Email Address</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 transition-colors group-focus-within:text-teal-500">
-                  <Mail size={16} />
-                </div>
-                <input
-                  type="email"
-                  placeholder="e.g. receptionist@smarthospital.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={remainingSeconds > 0 || loading}
-                  required
-                  className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50/50 border border-teal-100/60 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+            {/* Lockout & Error Alerts */}
+            {isMaintenanceActive && (
+              <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs leading-relaxed flex items-start gap-2.5 shadow-xs">
+                <span className="text-amber-500 font-bold shrink-0">⚠️</span>
+                <span className="font-extrabold uppercase tracking-wide">System Maintenance Mode: Platform Administrator Access Only</span>
               </div>
-            </div>
+            )}
 
-            {/* Password Input */}
-            <div className="space-y-1.5 group">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-teal-600 transition-colors">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 transition-colors group-focus-within:text-teal-500">
-                  <Lock size={16} />
+            {remainingSeconds > 0 && (
+              <div className="mb-5 p-4 bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-2xl text-xs leading-relaxed shadow-md">
+                <div className="flex items-center justify-between font-extrabold mb-1.5">
+                  <span className="flex items-center gap-1.5 text-rose-700 uppercase tracking-wider text-[11px]">
+                    <ShieldAlert size={16} className="text-rose-600 shrink-0" /> Security Lockout Active
+                  </span>
+                  <span className="bg-rose-600 text-white font-mono px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
+                    <Timer size={12} className="animate-spin" /> {formatTimer(remainingSeconds)}
+                  </span>
                 </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={remainingSeconds > 0 || loading}
-                  required
-                  className="block w-full pl-11 pr-11 py-2.5 rounded-xl text-sm bg-slate-50/50 border border-teal-100/60 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <button
+                <p className="font-semibold text-rose-800">
+                  Maximum <strong>3 failed login attempts</strong> reached. Please wait <strong>5 minutes</strong> before re-attempting authentication.
+                </p>
+              </div>
+            )}
+
+            {error && remainingSeconds === 0 && (
+              <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs leading-relaxed flex items-start gap-2.5 shadow-xs animate-pulse">
+                <span className="text-rose-500 font-bold text-base shrink-0 leading-none">⚠️</span>
+                <span className="font-semibold">{error}</span>
+              </div>
+            )}
+
+            {/* Authentication Form */}
+            <form onSubmit={handleLogin} className="space-y-4">
+              {/* Email Address */}
+              <div className="space-y-1 group">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-[#3683F8] transition-colors">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-[#3683F8] transition-colors">
+                    <Mail size={16} />
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="Enter email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={remainingSeconds > 0 || loading}
+                    required
+                    className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-white border border-[#D8D8D8] text-[#060606] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] transition-all duration-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1 group">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-[#3683F8] transition-colors">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-[#3683F8] transition-colors">
+                    <Lock size={16} />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={remainingSeconds > 0 || loading}
+                    required
+                    className="block w-full pl-11 pr-11 py-2.5 rounded-xl text-sm bg-white border border-[#D8D8D8] text-[#060606] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] transition-all duration-200 font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={remainingSeconds > 0 || loading}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Hospital Access Code */}
+              <div className="space-y-1 group">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-[#3683F8] transition-colors">
+                  Hospital License Access Code
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#3683F8]">
+                    <KeyRound size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g. HMS-2026-001-R4#1%P (Optional)"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    disabled={remainingSeconds > 0 || loading}
+                    className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-white border border-[#D8D8D8] text-[#060606] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] transition-all duration-200 font-mono text-xs uppercase"
+                  />
+                </div>
+              </div>
+
+              {/* Actions & Credentials Recovery */}
+              <div className="flex items-center justify-between text-xs pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    disabled={remainingSeconds > 0 || loading}
+                    className="rounded bg-white border-[#D8D8D8] text-[#3683F8] focus:ring-[#3683F8]/20" 
+                    defaultChecked
+                  />
+                  <span className="text-slate-600 font-semibold">Keep me signed in</span>
+                </label>
+                <button 
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={remainingSeconds > 0 || loading}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none active:scale-95 disabled:opacity-50"
+                  onClick={() => setIsRecoverModalOpen(true)}
+                  className="font-bold text-[#3683F8] hover:text-blue-700 transition-colors"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  Recover Passwords
                 </button>
               </div>
-            </div>
 
-            {/* Hospital Access Code Input */}
-            <div className="space-y-1.5 group">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-teal-600 transition-colors">Hospital Access Code</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-teal-600 font-bold transition-colors group-focus-within:text-teal-500">
-                  🔑
-                </div>
-                <input
-                  type="text"
-                  placeholder="e.g. HMS-2026-001-R4#1%P (First login only)"
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  disabled={remainingSeconds > 0 || loading}
-                  className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50/50 border border-teal-100/60 placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-200 uppercase font-mono tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-              <p className="text-[9px] text-slate-400 font-medium leading-normal pt-0.5">
-                Required for first-time hospital terminal activation. Leave blank for subsequent logins.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between text-xs pt-1.5">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  disabled={remainingSeconds > 0 || loading}
-                  className="rounded-md bg-slate-50 border-slate-200 text-teal-600 focus:ring-teal-500/20 focus:ring-offset-white" 
-                  defaultChecked
-                />
-                <span className="text-slate-400 font-semibold group-hover:text-slate-600 transition-colors">Remember session</span>
-              </label>
-              <button 
-                type="button"
-                onClick={() => setIsRecoverModalOpen(true)}
-                className="font-bold text-teal-600 hover:text-teal-700 transition-colors"
+              {/* Submit Button */}
+              <Button 
+                type="submit" 
+                disabled={remainingSeconds > 0 || loading}
+                className="w-full h-12 bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-[#3683F8]/20 disabled:opacity-50 hover:-translate-y-[1px] active:translate-y-0"
               >
-                Recover Credentials
-              </button>
-            </div>
+                {remainingSeconds > 0 
+                  ? `System Lockout Active (${formatTimer(remainingSeconds)})` 
+                  : loading ? 'Verifying Credentials...' : 'Sign In to Gateway'
+                } <LogIn size={18} />
+              </Button>
+            </form>
+          </div>
 
-            <Button 
-              type="submit" 
-              disabled={remainingSeconds > 0 || loading}
-              className="w-full h-12 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-full font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-500/15 disabled:opacity-50 disabled:pointer-events-none hover:-translate-y-[1.5px] hover:scale-[1.01] active:translate-y-0 active:scale-[0.99] text-glow-teal animate-shimmer"
+          {/* Footer Activation Node & Copyright */}
+          <div className="pt-6 border-t border-[#D8D8D8] flex flex-col sm:flex-row justify-between items-center gap-3 text-xs">
+            <span className="text-slate-500 font-bold text-[11px]">
+              © Copyright @twinsCloud • Smart Hospital Management
+            </span>
+            <button 
+              type="button"
+              onClick={() => navigate('/activate')} 
+              className="text-[#3683F8] font-black hover:text-blue-700 transition-colors flex items-center gap-1 active:scale-95"
             >
-              {remainingSeconds > 0 
-                ? `System Lockout Active (${formatTimer(remainingSeconds)})` 
-                : loading ? 'Verifying Gateway Node...' : 'Sign In to System'
-              } <LogIn size={16} />
-            </Button>
-          </form>
-        </div>
-
-        {/* Footer Navigation */}
-        <div className="mt-8 text-center text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center gap-3 px-1 font-semibold">
-          <span className="px-3 py-1 bg-teal-50/90 border border-teal-200/80 text-teal-800 text-[11px] font-black rounded-full shadow-sm shadow-teal-500/10 flex items-center gap-1.5">
-            <span className="text-amber-500 font-extrabold">©</span> Copyright @twinsCloud • Smart Hospital Management Software v1.0.0
-          </span>
-          <button 
-            type="button"
-            onClick={() => navigate('/activate')} 
-            className="text-teal-600 hover:text-teal-700 font-bold transition-colors flex items-center gap-1 active:scale-95"
-          >
-            Activate Node <Sparkles size={12} className="text-teal-500 animate-pulse" />
-          </button>
+              Activate Terminal Node <ArrowRight size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -344,3 +427,4 @@ export function Login() {
     </div>
   );
 }
+

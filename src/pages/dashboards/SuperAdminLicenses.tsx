@@ -234,11 +234,11 @@ export function SuperAdminLicenses() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Key className="text-amber-500" /> License Management & Telemetry
+          <h1 className="text-2xl font-bold text-[#060606] flex items-center gap-2">
+            <Key className="text-[#3683F8]" /> License Management & Telemetry
           </h1>
           <p className="text-slate-500">Generate sequential HMS series license keys (HMS/2026/001) & export telemetry reports</p>
         </div>
@@ -246,33 +246,33 @@ export function SuperAdminLicenses() {
           <Button
             variant="outline"
             onClick={exportLicenseReport}
-            className="h-11 px-4 text-xs font-bold gap-1.5 border-slate-200 hover:border-slate-300 text-slate-700 bg-white shadow-sm flex items-center"
+            className="h-11 px-4 text-xs font-bold gap-1.5 border-[#D8D8D8] hover:border-slate-300 text-[#060606] bg-white shadow-xs flex items-center rounded-xl"
           >
             <FileSpreadsheet size={16} className="text-emerald-600" /> Export License Report
           </Button>
-          <Button onClick={() => setModalOpen(true)} className="h-11 px-5 text-sm font-extrabold gap-2 shadow-lg shadow-teal-500/15 flex items-center bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => setModalOpen(true)} className="h-11 px-5 text-sm font-extrabold gap-2 shadow-md flex items-center bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl">
             <Plus size={18} /> Generate New License
           </Button>
         </div>
       </div>
 
       {searchQuery && (
-        <div className="bg-teal-50 border border-teal-100 p-3.5 rounded-xl text-xs text-teal-800 flex items-center justify-between">
+        <div className="bg-[#EBF3FE] border border-[#D8D8D8] p-3.5 rounded-xl text-xs text-[#3683F8] flex items-center justify-between">
           <span>Filtering codes by global topbar query: <strong>"{searchQuery}"</strong></span>
           <span className="font-semibold">{filteredLicenses.length} matches found</span>
         </div>
       )}
 
       {/* Licenses Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#D8D8D8] shadow-xs overflow-hidden">
         <DataTable columns={columns} data={filteredLicenses} className="border-0 shadow-none rounded-none" />
       </div>
 
       {/* Security note */}
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-150 flex gap-3 text-xs text-slate-500 items-start">
-        <AlertTriangle size={18} className="text-slate-400 shrink-0 mt-0.5" />
+      <div className="p-4 bg-[#EBF3FE]/50 rounded-xl border border-[#D8D8D8] flex gap-3 text-xs text-slate-500 items-start">
+        <AlertTriangle size={18} className="text-[#3683F8] shrink-0 mt-0.5" />
         <div>
-          <h4 className="font-semibold text-slate-700 mb-0.5">Offline Sequential Series Logic (HMS/2026/001)</h4>
+          <h4 className="font-semibold text-[#060606] mb-0.5">Offline Sequential Series Logic (HMS/2026/001)</h4>
           <p className="leading-relaxed">
             Generated license strings act as sequential cryptographic passes (HMS/2026/001, HMS/2026/002...). When a hospital admin signs up, they submit their assigned code. The signup handler verifies the code is Unused in the LicenseCodes database, pairs it with the Tenant Hospital ID, marks it Used, and computes the Subscription Expiry date automatically based on validity.
           </p>
@@ -289,14 +289,14 @@ export function SuperAdminLicenses() {
               <select
                 value={selectedPlanId}
                 onChange={(e) => handlePlanSelectChange(e.target.value)}
-                className="flex-1 h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none font-medium"
+                className="flex-1 h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none font-medium"
               >
                 {plans.map(p => (
                   <option key={p.id} value={p.id}>
                     {p.name} — (₹{p.price.toLocaleString('en-IN')})
                   </option>
                 ))}
-                <option value="ADD_NEW_PLAN" className="text-teal-700 font-bold bg-teal-50">
+                <option value="ADD_NEW_PLAN" className="text-[#3683F8] font-bold bg-[#EBF3FE]">
                   + Add New Subscription Tier...
                 </option>
               </select>
@@ -304,7 +304,7 @@ export function SuperAdminLicenses() {
                 <button
                   type="button"
                   onClick={handleDeleteSelectedPlan}
-                  className="h-10 w-10 flex items-center justify-center border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors shrink-0"
+                  className="h-10 w-10 flex items-center justify-center border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors shrink-0"
                   title="Remove / Delete Selected Plan Tier (❌)"
                 >
                   <X size={18} />
@@ -319,7 +319,7 @@ export function SuperAdminLicenses() {
             <select
               value={isCustomValidity ? 'CUSTOM' : validityMonths}
               onChange={(e) => handleValiditySelectChange(e.target.value)}
-              className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none font-medium"
+              className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none font-medium"
             >
               <option value={1}>1 Month (Trial)</option>
               <option value={3}>3 Months (Quarterly)</option>
@@ -327,7 +327,7 @@ export function SuperAdminLicenses() {
               <option value={12}>12 Months (1 Year Standard)</option>
               <option value={24}>24 Months (2 Year Bundle)</option>
               <option value={36}>36 Months (3 Year Corporate)</option>
-              <option value="CUSTOM" className="text-teal-700 font-bold bg-teal-50">
+              <option value="CUSTOM" className="text-[#3683F8] font-bold bg-[#EBF3FE]">
                 + Add Custom Duration (Enter Months)...
               </option>
             </select>
@@ -335,8 +335,8 @@ export function SuperAdminLicenses() {
 
           {/* Inline Custom Months Entry Input if selected */}
           {isCustomValidity && (
-            <div className="p-3 bg-teal-50/70 border border-teal-200/80 rounded-xl space-y-1.5 animate-in fade-in">
-              <label className="text-xs font-bold text-teal-800 uppercase tracking-wider">Enter Custom Validity Duration (Months)</label>
+            <div className="p-3 bg-[#EBF3FE]/60 border border-[#D8D8D8] rounded-xl space-y-1.5 animate-in fade-in">
+              <label className="text-xs font-bold text-[#3683F8] uppercase tracking-wider">Enter Custom Validity Duration (Months)</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -344,28 +344,28 @@ export function SuperAdminLicenses() {
                   max="120"
                   value={customMonthsInput}
                   onChange={(e) => setCustomMonthsInput(Math.max(1, Number(e.target.value)))}
-                  className="w-full h-10 px-3 border border-teal-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold"
+                  className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none font-bold"
                   placeholder="e.g. 18"
                 />
-                <span className="text-xs font-bold text-teal-700 shrink-0">Months</span>
+                <span className="text-xs font-bold text-[#3683F8] shrink-0">Months</span>
               </div>
             </div>
           )}
 
           {!newCodeGenerated ? (
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={handleClose}>
+              <Button type="button" variant="outline" onClick={handleClose} className="border-[#D8D8D8]">
                 Cancel
               </Button>
-              <Button type="submit" className="bg-teal-600 hover:bg-teal-700">
+              <Button type="submit" className="bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl">
                 Generate HMS License (Sequential)
               </Button>
             </div>
           ) : (
-            <div className="mt-4 p-5 bg-teal-50/60 border border-teal-200 rounded-xl text-center space-y-3.5 animate-in zoom-in-95">
+            <div className="mt-4 p-5 bg-[#EBF3FE]/60 border border-[#D8D8D8] rounded-xl text-center space-y-3.5 animate-in zoom-in-95">
               <div>
-                <p className="text-xs text-teal-800 font-bold uppercase tracking-wider mb-1">Generated License Sequential Code</p>
-                <div className="text-xl font-mono font-black tracking-widest text-teal-900 bg-white p-3 border border-teal-200 rounded-xl select-all shadow-sm">
+                <p className="text-xs text-[#3683F8] font-bold uppercase tracking-wider mb-1">Generated License Sequential Code</p>
+                <div className="text-xl font-mono font-black tracking-widest text-[#060606] bg-white p-3 border border-[#D8D8D8] rounded-xl select-all shadow-xs">
                   {newCodeGenerated}
                 </div>
               </div>
@@ -375,14 +375,14 @@ export function SuperAdminLicenses() {
                   type="button"
                   variant="outline"
                   onClick={() => copyCode(newCodeGenerated)}
-                  className="flex-1 text-xs border-teal-200 text-teal-700 hover:bg-white"
+                  className="flex-1 text-xs border-[#D8D8D8] text-[#3683F8] hover:bg-white"
                 >
                   Copy String
                 </Button>
                 <Button
                   type="button"
                   onClick={handleClose}
-                  className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="flex-1 text-xs bg-[#3683F8] hover:bg-blue-600 text-white"
                 >
                   Done
                 </Button>

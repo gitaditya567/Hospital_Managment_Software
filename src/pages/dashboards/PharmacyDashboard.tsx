@@ -301,20 +301,19 @@ export function PharmacyDashboard() {
 };
 
 return (
-  <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-200 font-sans">
+  <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-200 font-sans pb-16">
 
     {/* Header */}
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-teal-500 via-teal-600 to-cyan-500 p-6 rounded-2xl border border-teal-500/20 text-white shadow-lg shadow-teal-500/5 relative overflow-hidden">
-      <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="z-10">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#3683F8] p-6 rounded-2xl border border-blue-400/30 text-white shadow-lg relative overflow-hidden">
+      <div className="z-10 space-y-1">
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-teal-100 animate-ping"></span>
-          <span className="text-[10px] font-extrabold text-teal-100 uppercase tracking-widest">Pharmacy POS Terminal</span>
+          <span className="h-2 w-2 rounded-full bg-white animate-ping"></span>
+          <span className="text-[10px] font-extrabold text-blue-100 uppercase tracking-widest">Pharmacy POS Terminal</span>
         </div>
-        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-glow-teal flex items-center gap-2 text-white mt-1">
-          <ShoppingCart className="text-teal-100 animate-pulse" /> Point of Sale (POS)
+        <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-2 text-white">
+          <ShoppingCart className="text-blue-100" /> Point of Sale (POS) &amp; Pharmacy Desk
         </h1>
-        <p className="text-teal-50 text-xs mt-1">Process digital prescriptions instantly and maintain ACID database compliance</p>
+        <p className="text-blue-50 text-xs">Process digital prescriptions instantly and maintain inventory compliance</p>
       </div>
     </div>
 
@@ -329,15 +328,15 @@ return (
     />
 
     {/* Hero Search Bar */}
-    <div className="glass-card rounded-2xl border border-teal-100/50 p-6 shadow-[0_8px_30px_rgba(13,148,136,0.02)] max-w-3xl mx-auto bg-white/40">
+    <div className="bg-white rounded-2xl border border-[#D8D8D8] p-6 shadow-xs max-w-3xl mx-auto">
       <form onSubmit={handleSearch} className="relative">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-6 w-6 text-teal-500 animate-pulse" />
+          <Search className="h-6 w-6 text-[#3683F8]" />
         </div>
         <input
           ref={searchInputRef}
           type="text"
-          className="block w-full pl-12 pr-28 py-3.5 text-lg font-bold font-mono uppercase bg-white border border-teal-100/60 rounded-xl focus:ring-4 focus:ring-teal-500/15 focus:border-teal-500 focus:bg-white transition-all shadow-sm placeholder-slate-400 text-slate-800"
+          className="block w-full pl-12 pr-28 py-3.5 text-base font-bold font-mono uppercase bg-white border border-[#D8D8D8] rounded-xl focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] transition-all shadow-xs placeholder-slate-400 text-[#060606]"
           placeholder="ENTER RX-CODE, PHONE OR UNIQUE PATIENT NO (e.g. PAT-1001)..."
           value={searchCode}
           onChange={(e) => {
