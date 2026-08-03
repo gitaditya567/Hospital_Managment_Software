@@ -1,0 +1,62 @@
+name: 🚀 Auto Deploy to Server
+
+on:
+  push:
+    branches:
+      - main   # Sirf main branch pe push hone par trigger hoga
+
+jobs:
+  deploy:
+    name: Deploy to aaPanel VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Repo checkout (GitHub runner pe)
+      - name: ✅ Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: SSH karke server pe deploy karo
+      - name: 🔐 Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          # Timeout settings
+          timeout: 60s
+          command_timeout: 20m
+          script: |
+            set -e  # Koi bhi error pe script band ho jaye
+
+            echo "📁 Project directory mein ja raha hu..."
+            cd /www/wwwroot/dpssitapur.in
+
+            echo "🔄 Latest code pull kar raha hu..."
+            git pull origin main
+
+            # ─── BACKEND SETUP ────────────────────────────────────────────
+            echo "📦 Backend dependencies install kar raha hu..."
+            cd server
+            npm install --omit=dev
+            cd ..
+
+            # ─── FRONTEND BUILD ───────────────────────────────────────────
+            echo "🏗️  Frontend build kar raha hu..."
+            cd client
+            npm install
+            npm run build
+            cd ..
+
+            # ─── PM2 RESTART ──────────────────────────────────────────────
+            echo "♻️  Backend server restart kar raha hu..."
+            if pm2 list | grep -q "hospital-backend"; then
+              pm2 restart hospital-backend
+            else
+              echo "⚠️  PM2 process nahi mila, fresh start kar raha hu..."
+              cd server
+              pm2 start supervisor.js --name "hospital-backend" --interpreter node
+              pm2 save
+            fi
+
+            echo "✅ Deploy complete! Server live hai."
