@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSuperAdminStore, type Invoice } from '../../store/useSuperAdminStore';
 import { StatCard } from '../../components/ui/StatCard';
 import { DataTable } from '../../components/ui/DataTable';
-import { CircleDollarSign, TrendingUp, CreditCard } from 'lucide-react';
+import { IndianRupee, TrendingUp, CreditCard } from 'lucide-react';
 
 export function SuperAdminFinancials() {
   const { invoices, plans, tenants } = useSuperAdminStore();
@@ -104,7 +104,7 @@ export function SuperAdminFinancials() {
         <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="z-10">
           <h1 className="text-2xl font-black tracking-tight flex items-center gap-2 text-white">
-            <CircleDollarSign className="text-blue-100 animate-pulse" /> Financials & Payments
+            <IndianRupee className="text-blue-100 animate-pulse" /> Financials & Payments
           </h1>
           <p className="text-blue-50 text-xs mt-1">Inspect platform billing logs, transaction tables and automated gateways integration</p>
         </div>
@@ -123,7 +123,7 @@ export function SuperAdminFinancials() {
         <StatCard
           title="Monthly Recurring Revenue (MRR)"
           value={`₹${Math.round(liveMRR).toLocaleString('en-IN')}`}
-          icon={<CircleDollarSign size={22} className="text-[#3683F8]" />}
+          icon={<IndianRupee size={22} className="text-[#3683F8]" />}
           trend="Dynamic tenant count scale"
           trendUp={true}
           className="border-[#D8D8D8] hover:shadow-md hover:border-[#3683F8] transition-all duration-200 bg-white"

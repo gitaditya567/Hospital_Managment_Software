@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
-import { Settings, Shield, Mail, FileSpreadsheet, Server, DollarSign, ToggleLeft, ToggleRight, Check } from 'lucide-react';
+import { Settings, Shield, Mail, FileSpreadsheet, Server, IndianRupee, ToggleLeft, ToggleRight, Check } from 'lucide-react';
 
 export function SuperAdminSettings() {
   const { settings, updateSettings, fetchSuperAdminData, addActivity, exportBackup, sendDiagnostics } = useSuperAdminStore();
@@ -138,7 +138,7 @@ export function SuperAdminSettings() {
         {/* Integration Options */}
         <div className="bg-white p-6 rounded-2xl border border-[#D8D8D8] shadow-xs space-y-4">
           <h2 className="text-lg font-semibold text-[#060606] flex items-center gap-2 border-b border-[#D8D8D8] pb-3">
-            <DollarSign size={18} className="text-emerald-500" /> Payment & Billing Configurator
+            <IndianRupee size={18} className="text-emerald-500" /> Payment & Billing Configurator
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

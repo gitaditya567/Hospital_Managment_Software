@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   LineChart,
   Calendar,
+  Wallet,
   PanelLeftClose
 } from 'lucide-react';
 
@@ -44,6 +45,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       case 'HOSPITAL_ADMIN':
         return [
           { to: '/hospital-admin', icon: LayoutDashboard, label: 'Dashboard' },
+          { to: '/hospital-admin/accounts', icon: Wallet, label: 'Accounts & Master Ledger' },
           { to: '/hospital-admin/staff', icon: Users, label: 'Staff Management' },
           // { to: '/hospital-admin/departments', icon: Building2, label: 'Departments & Rooms' },
           { to: '/hospital-admin/billing', icon: CreditCard, label: 'Hospital Billing' },

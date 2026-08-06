@@ -67,21 +67,6 @@ export function printIsolatedHtml(title: string, htmlContent: string) {
     .items-center { align-items: center; }
     .gap-2 { gap: 8px; }
     
-    .barcode-container {
-      height: 24px;
-      width: 100%;
-      background-color: #000000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffffff;
-      font-size: 7px;
-      letter-spacing: 5px;
-      font-weight: bold;
-      margin: 8px 0;
-      border-radius: 4px;
-    }
-    
     .dashed-divider {
       border-top: 1px dashed #cbd5e1;
       margin: 8px 0;

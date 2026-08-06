@@ -300,10 +300,10 @@ export function HospitalAdminDashboard() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[380px] overflow-y-auto relative">
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#EBF3FE]/50 border-b border-[#D8D8D8] text-slate-600 text-xs font-bold uppercase tracking-wider">
+            <thead className="sticky top-0 z-10 bg-[#EBF3FE] shadow-xs">
+              <tr className="border-b border-[#D8D8D8] text-slate-600 text-xs font-bold uppercase tracking-wider">
                 <th className="px-6 py-4">Patient Details</th>
                 <th className="px-6 py-4">Contact</th>
                 <th className="px-6 py-4">Assigned Doctor</th>

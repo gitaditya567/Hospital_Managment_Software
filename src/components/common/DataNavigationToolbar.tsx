@@ -318,7 +318,7 @@ export function applyDataFilters<T extends Record<string, any>>(items: T[], filt
 
     // 4. Date Range Filter
     if (filters.datePreset !== 'ALL') {
-      const rawDate = item.createdAt || item.date || item.timestamp;
+      const rawDate = item.appointmentDate || item.date || item.createdAt || item.timestamp;
       const itemDateStr = getLocalDateStr(rawDate) || todayStr;
 
       if (filters.datePreset === 'TODAY' && itemDateStr !== todayStr) return false;

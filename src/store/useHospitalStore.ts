@@ -1,6 +1,24 @@
 import { create } from 'zustand';
 import { useAuthStore } from './useAuthStore';
 
+const getStoredApptDate = (phone?: string, name?: string) => {
+  if (!phone || !name) return '';
+  try {
+    const key = `appt_date_${phone.trim()}_${name.trim()}`.toLowerCase();
+    return localStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+};
+
+const setStoredApptDate = (phone?: string, name?: string, dateStr?: string) => {
+  if (!phone || !name || !dateStr) return;
+  try {
+    const key = `appt_date_${phone.trim()}_${name.trim()}`.toLowerCase();
+    localStorage.setItem(key, dateStr);
+  } catch {}
+};
+
 export interface StaffMember {
   id: string;
   name: string;
@@ -56,6 +74,7 @@ export interface PatientRecord {
   pastDiagnoses?: string;
   paymentStatus?: 'Paid' | 'Unpaid' | 'Pending';
   appointmentTime?: string;
+  appointmentDate?: string;
 }
 
 export interface PatientInvoice {
@@ -179,24 +198,36 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
           availability: s.availability,
           days: s.days
         })),
-        patients: patientData.map((p: any) => ({
-          id: p._id || p.id,
-          patientNo: p.patientNo,
-          name: p.name,
-          phone: p.phone,
-          age: p.age,
-          gender: p.gender,
-          doctorName: p.doctorName,
-          tokenNumber: p.tokenNumber,
-          timeRegistered: p.timeRegistered,
-          status: p.status,
-          waitTime: p.waitTime,
-          createdAt: p.createdAt,
-          vitals: p.vitals || [],
-          pastDiagnoses: p.pastDiagnoses || '',
-          paymentStatus: p.paymentStatus || 'Paid',
-          appointmentTime: p.appointmentTime || ''
-        })),
+        patients: (() => {
+          const existingPatients = get().patients || [];
+          return patientData.map((p: any) => {
+            const existing = existingPatients.find(ep => (ep.id === p._id || ep.id === p.id));
+            const savedDate = getStoredApptDate(p.phone, p.name);
+            const finalApptDate = (p.appointmentDate && p.appointmentDate.trim() !== '') 
+              ? p.appointmentDate 
+              : (existing?.appointmentDate || savedDate || p.createdAt);
+
+            return {
+              id: p._id || p.id,
+              patientNo: p.patientNo || existing?.patientNo,
+              name: p.name,
+              phone: p.phone,
+              age: p.age,
+              gender: p.gender,
+              doctorName: p.doctorName,
+              tokenNumber: p.tokenNumber,
+              timeRegistered: p.timeRegistered,
+              status: p.status,
+              waitTime: p.waitTime,
+              createdAt: p.createdAt,
+              appointmentDate: finalApptDate,
+              vitals: p.vitals || [],
+              pastDiagnoses: p.pastDiagnoses || '',
+              paymentStatus: p.paymentStatus || 'Paid',
+              appointmentTime: p.appointmentTime || ''
+            };
+          });
+        })(),
         invoices: invData.map((i: any) => ({
           id: i.invoiceNo || i._id || i.id,
           patientName: i.patientName,
@@ -388,6 +419,10 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
   registerPatient: async (patient) => {
     const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
     try {
+      if ((patient as any).appointmentDate) {
+        setStoredApptDate(patient.phone, patient.name, (patient as any).appointmentDate);
+      }
+
       const response = await fetch('/api/hospital/patients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -396,6 +431,8 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
 
       const data = await response.json();
       await get().fetchHospitalData(hospitalId);
+
+      const targetDate = data.appointmentDate || (patient as any).appointmentDate || getStoredApptDate(patient.phone, patient.name) || data.createdAt;
 
       const created: PatientRecord = {
         id: data._id || data.id,
@@ -409,9 +446,19 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
         timeRegistered: data.timeRegistered,
         status: data.status,
         waitTime: data.waitTime,
+        appointmentDate: targetDate,
         vitals: data.vitals || [],
         pastDiagnoses: data.pastDiagnoses || ''
       };
+
+      set(state => {
+        const exists = state.patients.some(p => p.id === created.id || (p.phone === created.phone && p.name === created.name));
+        return {
+          patients: exists
+            ? state.patients.map(p => (p.id === created.id || (p.phone === created.phone && p.name === created.name)) ? { ...p, ...created, appointmentDate: targetDate } : p)
+            : [created, ...state.patients]
+        };
+      });
 
       return created;
     } catch (err) {

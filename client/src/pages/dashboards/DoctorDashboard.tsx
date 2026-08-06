@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '../../components/ui/Button';
-import { Mic, CheckCircle, Clock, Users, UserCheck, Eye, EyeOff, ShieldAlert, FileText, Phone, User, Activity, Search, Keyboard, Trash2, Edit, X, Plus, Maximize2, Minimize2, Printer } from 'lucide-react';
+import { Mic, CheckCircle, Clock, Users, UserCheck, Eye, EyeOff, ShieldAlert, FileText, Phone, User, Activity, Search, Keyboard, Trash2, Edit, X, Plus, Maximize2, Minimize2, Printer, BarChart3, Calendar, CalendarDays } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -11,7 +11,11 @@ import type { FilterState } from '../../components/common/DataNavigationToolbar'
 
 export function DoctorDashboard() {
   const { user } = useAuthStore();
-  const { patients, updatePatientStatus, fetchHospitalData } = useHospitalStore();
+  const { patients, invoices, updatePatientStatus, fetchHospitalData } = useHospitalStore();
+
+  const [activeTab, setActiveTab] = useState<'CONSULTATION' | 'OVERVIEW'>('CONSULTATION');
+  const [overviewSelectedDate, setOverviewSelectedDate] = useState(new Date().toDateString());
+  const [overviewSearchQuery, setOverviewSearchQuery] = useState('');
 
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
 
@@ -382,15 +386,69 @@ export function DoctorDashboard() {
 
     buildHistory();
   }, [selectedPatient?.id, user?.hospitalId]);
+  const matchDoctorName = (pDoctor?: string, uName?: string) => {
+    if (!uName || !pDoctor) return true;
+    const uClean = uName.toLowerCase().replace(/dr\.?/g, '').trim();
+    const pClean = pDoctor.toLowerCase().replace(/dr\.?/g, '').trim();
+    
+    if (uClean === 'doctor' || uClean === 'practitioner' || uClean === 'general opd' || !uClean) {
+      return true;
+    }
+    
+    const uFirstName = uClean.split(' ')[0];
+    const pFirstName = pClean.split(' ')[0];
+
+    return pClean.includes(uClean) || 
+           uClean.includes(pClean) || 
+           pClean.includes(uFirstName) || 
+           uClean.includes(pFirstName);
+  };
+
+  const todayStr = new Date().toDateString();
+
+  const parseToDateString = (dateVal: any) => {
+    if (!dateVal) return todayStr;
+    if (typeof dateVal === 'string') {
+      const clean = dateVal.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+        const [y, m, d] = clean.split('-').map(Number);
+        return new Date(y, m - 1, d).toDateString();
+      }
+      if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(clean)) {
+        const [d, m, y] = clean.split(/[-/]/).map(Number);
+        return new Date(y, m - 1, d).toDateString();
+      }
+    }
+    const dObj = new Date(dateVal);
+    return !isNaN(dObj.getTime()) ? dObj.toDateString() : todayStr;
+  };
+
+  const getStoredApptDate = (phone?: string, name?: string) => {
+    if (!phone || !name) return '';
+    try {
+      const key = `appt_date_${phone.trim()}_${name.trim()}`.toLowerCase();
+      return localStorage.getItem(key) || '';
+    } catch {
+      return '';
+    }
+  };
+
+  const getPatientApptDateStr = (p: any) => {
+    if (!p) return todayStr;
+    if (p.appointmentDate && p.appointmentDate.trim() !== '') return parseToDateString(p.appointmentDate);
+    const savedDate = getStoredApptDate(p.phone, p.name);
+    if (savedDate) return parseToDateString(savedDate);
+    if (p.createdAt) return parseToDateString(p.createdAt);
+    return todayStr;
+  };
 
   // Filter patients allotted to this doctor who are either waiting or currently in consultation.
-  // Strictly sort by FIFO (First-In, First-Out): In Consultation patient first, then waiting paid patients ordered by createdAt timestamp ascending.
+  // Strictly sort by FIFO (First-In, First-Out): In Consultation patient first, then waiting patients ordered by createdAt timestamp ascending.
   const doctorQueue = patients
     .filter(p =>
-      p.doctorName && user?.name &&
-      p.doctorName.toLowerCase().trim() === user.name.toLowerCase().trim() &&
+      matchDoctorName(p.doctorName, user?.name) &&
       (p.status === 'Waiting' || p.status === 'In Consultation') &&
-      (p.paymentStatus === 'Paid' || !p.paymentStatus)
+      (getPatientApptDateStr(p) === todayStr || p.status === 'In Consultation')
     )
     .sort((a, b) => {
       if (a.status === 'In Consultation') return -1;
@@ -404,10 +462,28 @@ export function DoctorDashboard() {
   const totalWaitingCount = doctorQueue.length;
   const filteredWaitingCount = filteredDoctorQueue.length;
   const checkedTodayCount = patients.filter(p =>
-    p.doctorName && user?.name &&
-    p.doctorName.toLowerCase().trim() === user.name.toLowerCase().trim() &&
+    matchDoctorName(p.doctorName, user?.name) &&
     p.status === 'Completed'
   ).length;
+
+  // Overview Tab Calculations
+  const rawDoctorPatients = patients.filter(p => matchDoctorName(p.doctorName, user?.name));
+  const doctorPatients = rawDoctorPatients.filter((p, index, self) => 
+    index === self.findIndex(t => 
+      t.id === p.id || 
+      (t.phone === p.phone && t.name === p.name && getPatientApptDateStr(t) === getPatientApptDateStr(p) && (t.appointmentTime || '') === (p.appointmentTime || ''))
+    )
+  );
+
+  // Today's Consulted Patients ("Aaj Kin Kin Ko Dekha")
+  const consultedTodayList = doctorPatients.filter(p => 
+    p.status === 'Completed' && 
+    (p.createdAt ? new Date(p.createdAt).toDateString() === todayStr : true)
+  );
+  const consultedTodayCount = consultedTodayList.length;
+
+  // Pending Patients in Live Queue
+  const pendingWaitingCount = doctorPatients.filter(p => p.status === 'Waiting' || p.status === 'In Consultation').length;
 
   // Auto-select and real-time live sync for selected patient details (vitals, pastDiagnoses, status)
   useEffect(() => {
@@ -653,21 +729,99 @@ export function DoctorDashboard() {
     printWindow.document.close();
   };
 
+  // Upcoming 15 Days Date Generator for Agenda Overview
+  const generateNext15Days = () => {
+    const dates = [];
+    const base = new Date();
+    base.setHours(0,0,0,0);
+    for (let i = 0; i < 15; i++) {
+      const d = new Date(base.getTime() + i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toDateString();
+      const isToday = i === 0;
+      const count = doctorPatients.filter(p => {
+        return getPatientApptDateStr(p) === dateStr;
+      }).length;
+      dates.push({ dateStr, count, isToday, rawDate: d });
+    }
+    return dates;
+  };
+
+  const upcomingDatesList = generateNext15Days();
+
+  // Patients for selected date in Overview tab
+  const patientsForOverviewSelectedDate = doctorPatients.filter(p => {
+    const pDateStr = getPatientApptDateStr(p);
+    const matchesDate = pDateStr === overviewSelectedDate;
+    const matchesSearch = !overviewSearchQuery || 
+      p.name.toLowerCase().includes(overviewSearchQuery.toLowerCase()) ||
+      (p.patientNo && p.patientNo.toLowerCase().includes(overviewSearchQuery.toLowerCase())) ||
+      (p.phone && p.phone.includes(overviewSearchQuery));
+    return matchesDate && matchesSearch;
+  });
+
+  const overviewDateCount = doctorPatients.filter(p => {
+    return getPatientApptDateStr(p) === overviewSelectedDate;
+  }).length;
+
   return (
     <div className="space-y-4 font-sans">
-      {/* Interactive Data Navigation & Filter Toolbar */}
-      <DataNavigationToolbar
-        filters={filters}
-        onFilterChange={setFilters}
-        totalRecordsCount={totalWaitingCount}
-        filteredCount={filteredWaitingCount}
-        title="Doctor Consultation Control & Data Filters"
-        subtitle="Filter waiting queue and historical visit records by Date Range, Patient Type, and Status"
-      />
+      {/* Top Navigation Tabs */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between bg-white p-2 rounded-2xl border border-teal-100/60 shadow-xs gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('CONSULTATION')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2",
+              activeTab === 'CONSULTATION'
+                ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                : "text-slate-600 hover:bg-teal-50 hover:text-teal-700"
+            )}
+          >
+            <Activity size={15} /> Live Consultation Workstation
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('OVERVIEW')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative",
+              activeTab === 'OVERVIEW'
+                ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                : "text-slate-600 hover:bg-teal-50 hover:text-teal-700"
+            )}
+          >
+            <BarChart3 size={15} /> Patient Analytics &amp; Schedule Overview
+            {consultedTodayCount > 0 && (
+              <span className="ml-1 bg-amber-400 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                {consultedTodayCount} Consulted Today
+              </span>
+            )}
+          </button>
+        </div>
 
-      <div className="flex h-[calc(100vh-14rem)] gap-6">
-        {/* Left Column: Waiting Room */}
-        <div className="w-1/3 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden">
+        <div className="flex items-center gap-3 px-3">
+          <span className="text-xs font-extrabold text-slate-800">Dr. {user?.name || 'Practitioner'}</span>
+          <span className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full font-bold">
+            {(user as any)?.department || 'General OPD'}
+          </span>
+        </div>
+      </div>
+
+      {activeTab === 'CONSULTATION' ? (
+        <div className="space-y-4">
+          {/* Interactive Data Navigation & Filter Toolbar */}
+          <DataNavigationToolbar
+            filters={filters}
+            onFilterChange={setFilters}
+            totalRecordsCount={totalWaitingCount}
+            filteredCount={filteredWaitingCount}
+            title="Doctor Consultation Control & Data Filters"
+            subtitle="Filter waiting queue and historical visit records by Date Range, Patient Type, and Status"
+          />
+
+          <div className="flex h-[calc(100vh-14rem)] gap-6">
+            {/* Left Column: Waiting Room */}
+            <div className="w-1/3 glass-card rounded-2xl shadow-[0_8px_30px_rgba(13,148,136,0.03)] border border-teal-100/50 flex flex-col overflow-hidden">
           {/* Header with DND Toggle */}
           <div className="p-4 border-b border-teal-50 bg-teal-50/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -774,19 +928,24 @@ export function DoctorDashboard() {
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-slate-400">
+                    <span className="text-[9px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded font-bold font-mono whitespace-nowrap">
+                      {patient.patientNo || 'PAT-1001'}
+                    </span>
                     <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
                       Token: {patient.tokenNumber}
                     </span>
                     <div className="flex items-center gap-1">
                       <Clock size={10} className="text-slate-400 flex-shrink-0" />
-                      <span>{patient.timeRegistered || 'Just now'}</span>
+                      <span>{patient.appointmentTime || patient.timeRegistered || 'Just now'}</span>
                     </div>
-                    {patient.gender && (
-                      <span className="text-[9px] uppercase font-semibold tracking-wider text-slate-300">•</span>
-                    )}
-                    {patient.gender && (
-                      <span>{patient.gender} • {patient.age} yrs</span>
-                    )}
+                    <span className={cn(
+                      "text-[9px] px-1.5 py-0.5 rounded-md font-extrabold border ml-auto",
+                      patient.paymentStatus === 'Paid'
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-rose-50 text-rose-700 border-rose-200"
+                    )}>
+                      {patient.paymentStatus === 'Paid' ? 'Paid ✓' : 'Fee Pending ⏳'}
+                    </span>
                   </div>
                 </div>
               ))
@@ -1436,6 +1595,262 @@ export function DoctorDashboard() {
           </div>
         )}
       </div>
+    </div>
+  </div>
+  ) : (
+        /* OVERVIEW TAB CONTENT */
+        <div className="space-y-6 animate-in fade-in duration-200 pb-16">
+          {/* Header & Search */}
+          <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 p-6 rounded-2xl shadow-lg border border-teal-400/30 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <span className="text-[10px] uppercase font-black tracking-widest text-teal-200">Doctor Patient Registry &amp; Analytics</span>
+              <h2 className="text-xl font-black text-white flex items-center gap-2 mt-0.5">
+                <Users size={22} className="text-teal-200" /> Patient Overview &amp; Appointment Schedule
+              </h2>
+              <p className="text-xs text-teal-100 mt-0.5">
+                Complete log of patients consulted today, date-wise appointment schedule, and pending queue
+              </p>
+            </div>
+
+            {/* Quick Search */}
+            <div className="relative w-full md:w-72">
+              <Search size={14} className="absolute left-3 top-3 text-teal-300" />
+              <input
+                type="text"
+                placeholder="Search patient name, PAT-No, phone..."
+                value={overviewSearchQuery}
+                onChange={e => setOverviewSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-xs text-white placeholder-teal-100 focus:outline-none focus:ring-2 focus:ring-white/40"
+              />
+            </div>
+          </div>
+
+          {/* Top KPI Cards (Consulted Today, Pending Queue, Future Booked) */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-teal-100 shadow-xs flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Consulted Today</p>
+                <h3 className="text-2xl font-black text-emerald-700 mt-0.5">{consultedTodayCount} Patients</h3>
+                <p className="text-[10px] text-emerald-600 font-bold">Consultation completed ✓</p>
+              </div>
+              <div className="h-11 w-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-200">
+                <UserCheck size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-teal-100 shadow-xs flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Live Queue</p>
+                <h3 className="text-2xl font-black text-amber-600 mt-0.5">{pendingWaitingCount} Patients</h3>
+                <p className="text-[10px] text-amber-600 font-bold">Waiting in OPD room</p>
+              </div>
+              <div className="h-11 w-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold border border-amber-200">
+                <Clock size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-teal-100 shadow-xs flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Booked on Date</p>
+                <h3 className="text-2xl font-black text-[#3683F8] mt-0.5">{overviewDateCount} Patients</h3>
+                <p className="text-[10px] text-blue-600 font-bold truncate max-w-[150px]">{overviewSelectedDate}</p>
+              </div>
+              <div className="h-11 w-11 rounded-2xl bg-[#EBF3FE] text-[#3683F8] flex items-center justify-center font-bold border border-blue-200">
+                <CalendarDays size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-teal-100 shadow-xs flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Patient Records</p>
+                <h3 className="text-2xl font-black text-slate-800 mt-0.5">{doctorPatients.length} Patients</h3>
+                <p className="text-[10px] text-slate-500 font-bold">Lifetime directory</p>
+              </div>
+              <div className="h-11 w-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold border border-slate-200">
+                <Users size={22} />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 1: Today's Consulted Patient Directory */}
+          <div className="bg-white rounded-2xl border border-teal-100 shadow-xs p-5 space-y-4">
+            <div className="flex justify-between items-center border-b border-teal-100 pb-3">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                  <UserCheck size={18} className="text-emerald-600" />
+                  Today's Consulted Patient Directory ({new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })})
+                </h3>
+                <p className="text-[11px] text-slate-400 font-medium">Complete record of patients consulted by you today</p>
+              </div>
+              <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-black">
+                {consultedTodayCount} Consulted Today
+              </span>
+            </div>
+
+            {consultedTodayList.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {consultedTodayList.map(pat => (
+                  <div key={pat.id} className="p-3.5 bg-emerald-50/20 border border-emerald-100 rounded-xl space-y-2 hover:border-emerald-300 transition-all">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                          {pat.name}
+                          <span className="text-[9px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                            {pat.patientNo || 'PAT-1001'}
+                          </span>
+                        </h4>
+                        <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                          {pat.age} Yrs / {pat.gender || 'Male'} • Phone: <span className="font-mono">{pat.phone}</span>
+                        </p>
+                      </div>
+                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
+                        <CheckCircle size={10} /> Consulted
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-emerald-100/60 font-semibold">
+                      <span className="flex items-center gap-1">
+                        <Clock size={11} className="text-slate-400" />
+                        Time: {pat.timeRegistered || 'Today'}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSelectedPatient(pat);
+                          setActiveTab('CONSULTATION');
+                        }}
+                        className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-bold text-[10px] flex items-center gap-1 transition-all"
+                      >
+                        <FileText size={10} /> View Prescription / EMR
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-slate-400 text-xs font-semibold space-y-1">
+                <UserCheck size={28} className="mx-auto text-slate-300 opacity-60" />
+                <p>No patients consulted yet today.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: 15-Day Appointment Agenda Schedule */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Date Picker Agenda Card */}
+            <div className="bg-white rounded-2xl p-5 border border-teal-100 shadow-xs space-y-3">
+              <div className="border-b border-teal-100 pb-2">
+                <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                  <CalendarDays size={16} className="text-teal-600" /> 15-Day Appointment Agenda Schedule
+                </h3>
+                <p className="text-[10px] text-slate-400 font-semibold">Click any date to view scheduled appointments</p>
+              </div>
+
+              {/* Upcoming 15 Days List */}
+              <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
+                {upcomingDatesList.map(({ dateStr, count, isToday }) => {
+                  const isSelected = overviewSelectedDate === dateStr;
+                  return (
+                    <button
+                      key={dateStr}
+                      onClick={() => setOverviewSelectedDate(dateStr)}
+                      className={cn(
+                        "w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all text-xs font-bold",
+                        isSelected
+                          ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                          : isToday
+                          ? "bg-teal-50 text-teal-800 border-teal-200 hover:bg-teal-100/50"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Calendar size={13} className={isSelected ? "text-white" : "text-teal-600"} />
+                        {dateStr} {isToday && "(Today)"}
+                      </span>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-[10px] font-black",
+                        isSelected
+                          ? "bg-white text-teal-800"
+                          : count > 0
+                          ? "bg-teal-100 text-teal-800 border border-teal-200"
+                          : "bg-slate-100 text-slate-500"
+                      )}>
+                        {count} Patients
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right Detailed Schedule List for Selected Date */}
+            <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-teal-100 shadow-xs space-y-4">
+              <div className="flex justify-between items-center border-b border-teal-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-800">
+                    Appointments Scheduled for {overviewSelectedDate}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">List of patients assigned for this date</p>
+                </div>
+                <span className="px-3 py-1 bg-teal-50 text-teal-700 border border-teal-200 rounded-full text-xs font-extrabold">
+                  {patientsForOverviewSelectedDate.length} Patients Scheduled
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-100 overflow-hidden">
+                {patientsForOverviewSelectedDate.map(pat => {
+                  const pInv = invoices.find(i => i.patientName === pat.name || i.patientPhone === pat.phone);
+                  const isPaid = pat.paymentStatus === 'Paid' || pInv?.status === 'Paid';
+
+                  return (
+                    <div key={pat.id} className="py-3 flex items-center justify-between hover:bg-teal-50/20 px-2 rounded-xl transition-all">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-xs text-slate-800">{pat.name}</span>
+                          <span className="text-[9px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                            {pat.patientNo || 'PAT-1001'}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">({pat.age} Yrs / {pat.gender || 'Male'})</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-[10px] text-slate-500 font-semibold">
+                          <span className="flex items-center gap-1"><Clock size={11} className="text-teal-600" /> Slot: {pat.appointmentTime || 'OPD Walk-In'}</span>
+                          <span className="text-slate-400 font-mono">Phone: {pat.phone}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {/* Status Badge */}
+                        <span className={cn(
+                          "px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border",
+                          pat.status === 'Completed' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                          pat.status === 'In Consultation' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                          "bg-teal-50 text-teal-700 border-teal-200"
+                        )}>
+                          {pat.status}
+                        </span>
+
+                        {/* Payment Status Badge */}
+                        <span className={cn(
+                          "px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border",
+                          isPaid ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
+                        )}>
+                          {isPaid ? 'Paid ✓' : 'Fee Pending ⏳'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {patientsForOverviewSelectedDate.length === 0 && (
+                  <div className="py-12 text-center text-slate-400 text-xs font-semibold space-y-1">
+                    <CalendarDays size={28} className="mx-auto text-slate-300 opacity-60" />
+                    <p>No appointments scheduled for {overviewSelectedDate}.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Patient Medical History & Timeline Modal */}
       {selectedPatient && (
         <Modal
@@ -1601,7 +2016,6 @@ export function DoctorDashboard() {
           </div>
         </Modal>
       )}
-      </div>
     </div>
   );
 }

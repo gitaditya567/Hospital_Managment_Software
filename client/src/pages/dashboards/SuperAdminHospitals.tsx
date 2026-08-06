@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { PasswordStrengthMeter } from '../../components/ui/PasswordStrengthMeter';
-import { Building2, Eye, Mail, MapPin, HardDrive, Users, Edit, Trash2, Calendar, Award } from 'lucide-react';
+import { Building2, Eye, Mail, MapPin, HardDrive, Users, Edit, Trash2, Calendar, Award, Plus, Key, X } from 'lucide-react';
 
 export function SuperAdminHospitals() {
   const {
@@ -15,7 +15,8 @@ export function SuperAdminHospitals() {
     onboardHospital,
     updateTenant,
     deleteTenant,
-    toggleTenantStatus
+    toggleTenantStatus,
+    generateLicense
   } = useSuperAdminStore();
 
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
@@ -32,6 +33,15 @@ export function SuperAdminHospitals() {
   const [address, setAddress] = useState('');
   const [licenseCodeUsed, setLicenseCodeUsed] = useState('');
   const [onboardStep, setOnboardStep] = useState(1);
+
+  // Inline license creation state (inside onboard modal)
+  const [showInlineLicenseCreate, setShowInlineLicenseCreate] = useState(false);
+  const [inlinePlanId, setInlinePlanId] = useState('');
+  const [inlineValidityMonths, setInlineValidityMonths] = useState(12);
+  const [inlineIsCustomValidity, setInlineIsCustomValidity] = useState(false);
+  const [inlineCustomMonths, setInlineCustomMonths] = useState(18);
+  const [inlineGenerating, setInlineGenerating] = useState(false);
+  const [inlineGeneratedCode, setInlineGeneratedCode] = useState('');
 
   // Form State for editing
   const [editHospitalName, setEditHospitalName] = useState('');
@@ -419,7 +429,7 @@ export function SuperAdminHospitals() {
       </Modal>
 
       {/* Modal - Onboard New Hospital */}
-      <Modal isOpen={isOnboardModalOpen} onClose={() => { setIsOnboardModalOpen(false); setOnboardStep(1); }} title="Onboard New Hospital / Clinic">
+      <Modal isOpen={isOnboardModalOpen} onClose={() => { setIsOnboardModalOpen(false); setOnboardStep(1); setShowInlineLicenseCreate(false); setInlineGeneratedCode(''); }} title="Onboard New Hospital / Clinic">
         {/* Step Indicator Header */}
         <div className="flex items-center justify-between mb-6 border-b border-[#D8D8D8] pb-4">
           <div className="flex items-center gap-2">
@@ -452,15 +462,32 @@ export function SuperAdminHospitals() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin Login Email / Username</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Admin Login Email
+                    <span className="ml-1 text-rose-500">* (must contain @)</span>
+                  </label>
                   <input
                     type="email"
                     required
                     placeholder="admin@hospital.com"
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-[#EBF3FE]/30 text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
+                    className={`w-full h-10 px-3 border rounded-xl text-sm bg-[#EBF3FE]/30 text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all ${
+                      adminEmail && !adminEmail.includes('@')
+                        ? 'border-rose-400 bg-rose-50/40'
+                        : 'border-[#D8D8D8]'
+                    }`}
                   />
+                  {adminEmail && !adminEmail.includes('@') && (
+                    <p className="text-[10px] text-rose-500 font-semibold flex items-center gap-1">
+                      ⚠ Email must contain @ symbol (e.g. admin@hospital.com)
+                    </p>
+                  )}
+                  {adminEmail && adminEmail.includes('@') && (
+                    <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                      ✓ Valid email format
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -518,6 +545,10 @@ export function SuperAdminHospitals() {
                       alert('Please complete all hospital details in Step 1 first!');
                       return;
                     }
+                    if (!adminEmail.includes('@')) {
+                      alert('Admin Login Email must be a valid email address containing @ (e.g. admin@hospital.com). Plain usernames are not allowed here.');
+                      return;
+                    }
                     setOnboardStep(2);
                   }}
                   className="h-11 px-6 font-extrabold text-sm gap-2 flex items-center bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl shadow-md"
@@ -554,29 +585,191 @@ export function SuperAdminHospitals() {
                 <PasswordStrengthMeter password={adminPassword} onPasswordChange={setAdminPassword} />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex justify-between">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex justify-between items-center">
                   <span>Allocate Unused License Code</span>
                   <span className="text-[10px] text-[#3683F8] font-bold lowercase">
                     ({unusedLicenses.length} available)
                   </span>
                 </label>
-                <select
-                  required
-                  value={licenseCodeUsed}
-                  onChange={(e) => setLicenseCodeUsed(e.target.value)}
-                  className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
-                >
-                  <option value="">-- Choose License Code --</option>
-                  {unusedLicenses.map(lic => {
-                    const plan = plans.find(p => p.id === lic.planId);
-                    return (
-                      <option key={lic.code} value={lic.code}>
-                        {lic.code} - {plan?.name || 'Plan'} ({lic.validityMonths}m Validity)
-                      </option>
-                    );
-                  })}
-                </select>
+
+                {unusedLicenses.length === 0 && !showInlineLicenseCreate ? (
+                  // No licenses available - show prompt
+                  <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-amber-300 bg-amber-50 rounded-xl">
+                    <div className="flex items-center gap-2 text-amber-700">
+                      <Key size={16} />
+                      <span className="text-xs font-bold">No unused licenses available</span>
+                    </div>
+                    <p className="text-[11px] text-amber-600 text-center">
+                      You need to create a license first before onboarding a hospital.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInlineLicenseCreate(true);
+                        setInlinePlanId(plans[0]?.id || '');
+                        setInlineGeneratedCode('');
+                        setInlineIsCustomValidity(false);
+                        setInlineValidityMonths(12);
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#3683F8] text-white text-xs font-extrabold rounded-xl shadow hover:bg-blue-600 transition-colors"
+                    >
+                      <Plus size={14} /> Create License Now
+                    </button>
+                  </div>
+                ) : unusedLicenses.length > 0 ? (
+                  // Licenses exist - show dropdown + optional create link
+                  <div className="space-y-2">
+                    <select
+                      required
+                      value={licenseCodeUsed}
+                      onChange={(e) => setLicenseCodeUsed(e.target.value)}
+                      className="w-full h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none transition-all"
+                    >
+                      <option value="">-- Choose License Code --</option>
+                      {unusedLicenses.map(lic => {
+                        const plan = plans.find(p => p.id === lic.planId);
+                        return (
+                          <option key={lic.code} value={lic.code}>
+                            {lic.code} - {plan?.name || 'Plan'} ({lic.validityMonths}m Validity)
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {!showInlineLicenseCreate && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowInlineLicenseCreate(true);
+                          setInlinePlanId(plans[0]?.id || '');
+                          setInlineGeneratedCode('');
+                          setInlineIsCustomValidity(false);
+                          setInlineValidityMonths(12);
+                        }}
+                        className="flex items-center gap-1 text-[11px] text-[#3683F8] font-bold hover:underline mt-0.5"
+                      >
+                        <Plus size={12} /> Create a new license instead
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* Inline License Creator Panel */}
+                {showInlineLicenseCreate && (
+                  <div className="border border-[#3683F8]/30 bg-[#EBF3FE]/40 rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#3683F8] flex items-center gap-1.5">
+                        <Key size={13} /> Create New License
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setShowInlineLicenseCreate(false); setInlineGeneratedCode(''); }}
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+
+                    {!inlineGeneratedCode ? (
+                      <>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Subscription Tier</label>
+                          <select
+                            value={inlinePlanId}
+                            onChange={(e) => setInlinePlanId(e.target.value)}
+                            className="w-full h-9 px-3 border border-[#D8D8D8] rounded-xl text-xs bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none"
+                          >
+                            {plans.map(p => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Validity Duration</label>
+                          <select
+                            value={inlineIsCustomValidity ? 'CUSTOM' : inlineValidityMonths}
+                            onChange={(e) => {
+                              if (e.target.value === 'CUSTOM') {
+                                setInlineIsCustomValidity(true);
+                              } else {
+                                setInlineIsCustomValidity(false);
+                                setInlineValidityMonths(Number(e.target.value));
+                              }
+                            }}
+                            className="w-full h-9 px-3 border border-[#D8D8D8] rounded-xl text-xs bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none"
+                          >
+                            <option value={1}>1 Month (Trial)</option>
+                            <option value={3}>3 Months (Quarterly)</option>
+                            <option value={6}>6 Months (Semi-annual)</option>
+                            <option value={12}>12 Months (1 Year Standard)</option>
+                            <option value={24}>24 Months (2 Year Bundle)</option>
+                            <option value={36}>36 Months (3 Year Corporate)</option>
+                            <option value="CUSTOM" className="text-[#3683F8] font-bold bg-[#EBF3FE]">+ Custom Duration...</option>
+                          </select>
+                        </div>
+
+                        {inlineIsCustomValidity && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max="120"
+                              value={inlineCustomMonths}
+                              onChange={(e) => setInlineCustomMonths(Math.max(1, Number(e.target.value)))}
+                              className="flex-1 h-9 px-3 border border-[#D8D8D8] rounded-xl text-xs bg-white text-[#060606] focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] focus:outline-none"
+                              placeholder="e.g. 18"
+                            />
+                            <span className="text-xs font-bold text-[#3683F8] shrink-0">Months</span>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={inlineGenerating || !inlinePlanId}
+                          onClick={async () => {
+                            setInlineGenerating(true);
+                            try {
+                              const months = inlineIsCustomValidity ? inlineCustomMonths : inlineValidityMonths;
+                              const code = await generateLicense(inlinePlanId, months);
+                              setInlineGeneratedCode(code);
+                              setLicenseCodeUsed(code);
+                            } finally {
+                              setInlineGenerating(false);
+                            }
+                          }}
+                          className="w-full h-9 bg-[#3683F8] hover:bg-blue-600 text-white text-xs font-extrabold rounded-xl shadow flex items-center justify-center gap-1.5 transition-colors disabled:opacity-60"
+                        >
+                          {inlineGenerating ? 'Generating...' : <><Plus size={13} /> Generate License</>}
+                        </button>
+                      </>
+                    ) : (
+                      // Success state - show generated code
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-[#3683F8] font-bold uppercase tracking-wider text-center">License Generated & Auto-Selected ✓</p>
+                        <div className="text-sm font-mono font-black tracking-widest text-[#060606] bg-white p-2.5 border border-emerald-300 rounded-xl text-center select-all">
+                          {inlineGeneratedCode}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(inlineGeneratedCode)}
+                            className="flex-1 h-8 text-[11px] font-bold border border-[#D8D8D8] rounded-xl hover:bg-white transition-colors text-slate-600"
+                          >
+                            Copy Code
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowInlineLicenseCreate(false); }}
+                            className="flex-1 h-8 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors"
+                          >
+                            Use This License ✓
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between gap-3 pt-3">

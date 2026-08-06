@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   KeyRound,
   ArrowRight,
-  Activity
+  Activity,
+  User
 } from 'lucide-react';
 import { RecoverCredentialsModal } from '../../components/auth/RecoverCredentialsModal';
 
@@ -33,6 +34,10 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [isMaintenanceActive, setIsMaintenanceActive] = useState(false);
   const [isRecoverModalOpen, setIsRecoverModalOpen] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Common hospital email domains for auto-suggest
+  const EMAIL_DOMAINS = ['hospital.com', 'citycare.com', 'clinic.com', 'healthcare.com', 'medcare.in'];
 
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(() => {
     const saved = localStorage.getItem('medisaas_lockout_until');
@@ -95,6 +100,14 @@ export function Login() {
     setError('');
   };
 
+  // Whether the current input looks like an email or a plain username
+  const isEmailFormat = email.includes('@');
+
+  // Suggestions: only show when typing without @
+  const suggestions = !isEmailFormat && email.trim().length > 0
+    ? EMAIL_DOMAINS.map(domain => `${email.trim()}@${domain}`)
+    : [];
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -108,9 +121,14 @@ export function Login() {
       return;
     }
 
+    if (!email.trim()) {
+      setError('Please enter your email address or username.');
+      return;
+    }
+
     setLoading(true);
     
-    const result = await login(email, password, accessCode, selectedRole);
+    const result = await login(email.trim(), password, accessCode, selectedRole);
     setLoading(false);
     
     if (result.success) {
@@ -295,25 +313,66 @@ export function Login() {
 
             {/* Authentication Form */}
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email Address */}
+              {/* Email Address / Username */}
               <div className="space-y-1 group">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-[#3683F8] transition-colors">
-                  Email Address
+                  Email Address / Username
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-[#3683F8] transition-colors">
-                    <Mail size={16} />
+                    {isEmailFormat ? <Mail size={16} /> : <User size={16} />}
                   </div>
                   <input
-                    type="email"
-                    placeholder="Enter email address"
+                    type="text"
+                    placeholder="admin@hospital.com  or  admindemo"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setShowSuggestions(!e.target.value.includes('@') && e.target.value.trim().length > 0);
+                    }}
+                    onFocus={() => {
+                      if (!email.includes('@') && email.trim().length > 0) setShowSuggestions(true);
+                    }}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                     disabled={remainingSeconds > 0 || loading}
                     required
+                    autoComplete="username"
                     className="block w-full pl-11 pr-3.5 py-2.5 rounded-xl text-sm bg-white border border-[#D8D8D8] text-[#060606] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] transition-all duration-200 font-medium"
                   />
+
+                  {/* Auto-suggest Dropdown */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#3683F8]/30 rounded-xl shadow-lg z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="px-3 py-1.5 bg-[#EBF3FE]/60 border-b border-[#D8D8D8]">
+                        <span className="text-[10px] font-bold text-[#3683F8] uppercase tracking-wider">@ सुझाव — एक चुनें:</span>
+                      </div>
+                      {suggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onMouseDown={() => {
+                            setEmail(suggestion);
+                            setShowSuggestions(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-[#EBF3FE] hover:text-[#3683F8] transition-colors flex items-center gap-2 group/item"
+                        >
+                          <Mail size={12} className="text-slate-400 group-hover/item:text-[#3683F8] shrink-0" />
+                          <span className="font-mono">
+                            <span className="text-slate-400">{email.trim()}</span>
+                            <span className="text-[#3683F8] font-bold">@{suggestion.split('@')[1]}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+                <p className="text-[10px] pl-1">
+                  {isEmailFormat
+                    ? <span className="text-emerald-600 font-semibold">✉ Email format detected — ready to sign in</span>
+                    : email.trim()
+                      ? <span className="text-amber-600 font-semibold">👤 Username detected — select a @ suggestion above or type full email</span>
+                      : <span className="text-slate-400">Enter your email address or plain username (e.g. admindemo)</span>}
+                </p>
               </div>
 
               {/* Password */}

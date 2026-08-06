@@ -1031,16 +1031,15 @@ export function HospitalAdminAnalytics() {
                   </div>
                 </div>
 
-                {/* Barcode representation */}
-                <div className="text-center pt-2.5 border-t border-dashed border-[#D8D8D8] space-y-1.5">
-                  <div className="h-6 w-full bg-[#060606] mx-auto flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold">
-                    |||||||||||||||||||||||
-                  </div>
-                  <p className="text-[7px] text-slate-400 uppercase tracking-wider">
+                {/* Footer */}
+                <div className="text-center pt-2.5 border-t border-dashed border-[#D8D8D8] space-y-1">
+                  <p className="text-[7.5px] text-slate-400 uppercase tracking-wider">E &amp; O.E</p>
+                  <p className="text-[7.5px] text-slate-600 font-semibold uppercase">
                     {selectedTransaction.status === 'Paid'
                       ? 'Thank you for cooperation'
                       : 'Please settle outstanding payment'}
                   </p>
+                  <p className="text-[9px] font-extrabold text-slate-800 tracking-tight pt-0.5">Thank You</p>
                 </div>
 
               </div>

@@ -8,6 +8,7 @@ import { FileText, Printer, ClipboardList } from 'lucide-react';
 import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
+import { buildPharmacyBillSlipHtml } from '../../utils/thermalSlipTemplates';
 
 export function PharmacyOrders() {
   const { bills } = usePharmacyStore();
@@ -163,13 +164,12 @@ export function PharmacyOrders() {
               </div>
 
               {printSettings.showFooter && (
-                <div className="text-center pt-3 border-t border-dashed border-slate-300 mt-2 space-y-1.5">
-                  <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded" style={{ backgroundColor: printSettings.accentColor }}>
-                    ||||| {selectedBill.id} |||||
-                  </div>
-                  <p className="text-[7px] text-slate-400 leading-normal uppercase">
-                    {printSettings.customFooterText || 'Smart Hospital Management Software • Copyright © twinsCloud'}
+                <div className="text-center pt-2.5 border-t border-dashed border-slate-300 mt-2 space-y-1">
+                  <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">E &amp; O.E</p>
+                  <p className="text-[7.5px] text-slate-600 font-semibold leading-normal">
+                    {printSettings.customFooterText || 'Keep medicines out of reach of children.'}
                   </p>
+                  <p className="text-[9px] font-extrabold text-slate-800 tracking-tight pt-0.5">Thank You</p>
                 </div>
               )}
             </div>
@@ -179,80 +179,26 @@ export function PharmacyOrders() {
               <Button
                 className="flex gap-2"
                 onClick={() => {
-                  const headerTitle = printSettings.showHeader
-                    ? `<div class="text-center pb-2 dashed-divider">
-                         ${printSettings.logoUrl ? `< div style = "text-align: center; margin-bottom: 6px;" > <img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
-            <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || 'Smart Hospital Pharmacy'}</h3>
-            <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Pharmacy Checkout Invoice</p>
-            <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">DUPLICATE RECEIPT</p>
-          </div>`
-          : '';
-
-          const footerContent = printSettings.showFooter
-          ? `<div class="text-center pt-3 dashed-divider">
-            <div class="barcode-container brand-accent-bg">||||| ${selectedBill.id} |||||</div>
-            <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase;">
-              ${printSettings.customFooterText || 'Smart Hospital Management Software • Copyright © twinsCloud'}
-            </p>
-          </div>`
-          : '';
-
-                  const itemsHtml = selectedBill.items.map((item: any) => `
-          <tr style="border-bottom: 1px solid #e2e8f0; font-size: 0.9em;">
-            <td style="padding: 4px 0; text-align: left; font-weight: bold;">${item.name}</td>
-            <td style="padding: 4px 0; text-align: center;">${item.qty}</td>
-            <td style="padding: 4px 0; text-align: right; font-weight: bold;">₹${(item.qty * item.price).toFixed(2)}</td>
-          </tr>
-          `).join('');
-
-          const slipHtml = `
-          <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
-            ${headerTitle}
-
-            <div style="font-size: 0.85em; margin-bottom: 6px;">
-              <div>BILL ID: <strong>${selectedBill.id}</strong></div>
-              <div>RX CODE: <strong>${selectedBill.rxCode}</strong></div>
-              <div>PATIENT: <strong>${selectedBill.patientName}</strong></div>
-              <div>PHONE: <strong>${selectedBill.patientPhone}</strong></div>
-              <div>DOCTOR: <strong>Dr. ${selectedBill.doctorName}</strong></div>
-              <div>DATE/TIME: <strong>${selectedBill.date}</strong></div>
-            </div>
-
-            <div class="dashed-divider"></div>
-
-            <table>
-              <thead>
-                <tr>
-                  <th style="text-align: left;">Item</th>
-                  <th style="text-align: center; width: 40px;">Qty</th>
-                  <th style="text-align: right; width: 80px;">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsHtml}
-              </tbody>
-            </table>
-
-            <div class="dashed-divider"></div>
-
-            <div style="font-size: 0.9em; font-weight: bold;">
-              <div class="flex justify-between" style="font-size: 1.1em; font-weight: 900; margin-top: 4px;">
-                <span>GRAND TOTAL:</span>
-                <span class="brand-accent-text">₹${selectedBill.total.toFixed(2)}</span>
-              </div>
-              <div class="flex justify-between" style="font-size: 0.85em; color: #475569; margin-top: 4px;">
-                <span>PAYMENT MODE:</span>
-                <span>${selectedBill.paymentMode}</span>
-              </div>
-            </div>
-
-            ${footerContent}
-          </div>
-          `;
+                  const slipHtml = buildPharmacyBillSlipHtml({
+                    billId:       selectedBill.id,
+                    rxCode:       selectedBill.rxCode,
+                    patientName:  selectedBill.patientName,
+                    patientPhone: selectedBill.patientPhone,
+                    doctorName:   selectedBill.doctorName,
+                    date:         selectedBill.date,
+                    items:        selectedBill.items.map((item: any) => ({
+                                    name:  item.name,
+                                    qty:   item.qty,
+                                    price: item.price,
+                                  })),
+                    total:        selectedBill.total,
+                    paymentMode:  selectedBill.paymentMode,
+                  });
 
           printIsolatedHtml("Pharmacy Bill Receipt", slipHtml);
           setIsModalOpen(false);
                 }}
+
               >
           <Printer size={16} /> Execute Print
         </Button>

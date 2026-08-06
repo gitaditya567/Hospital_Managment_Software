@@ -3,7 +3,7 @@ import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { Building2, Key, CircleDollarSign, ShieldAlert, Activity, ChevronRight } from 'lucide-react';
+import { Building2, Key, IndianRupee, ShieldAlert, Activity, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function SuperAdminDashboard() {
@@ -164,7 +164,7 @@ export function SuperAdminDashboard() {
         <StatCard
           title="Monthly Recurring Revenue (MRR)"
           value={`₹${Math.round(liveMRR).toLocaleString('en-IN')}`}
-          icon={<CircleDollarSign size={22} className="text-[#3683F8]" />}
+          icon={<IndianRupee size={22} className="text-[#3683F8]" />}
           trend="Live database telemetry"
           trendUp={true}
           className="border-[#D8D8D8] hover:shadow-md hover:border-[#3683F8] transition-all duration-200 bg-white"
@@ -309,7 +309,7 @@ export function SuperAdminDashboard() {
                   act.type === 'hospital' ? 'bg-blue-50 text-[#3683F8] border border-blue-200' : 'bg-slate-100 text-slate-600'
                 }`}>
                   {act.type === 'license' ? <Key size={16} /> :
-                    act.type === 'payment' ? <CircleDollarSign size={16} /> :
+                    act.type === 'payment' ? <IndianRupee size={16} /> :
                       act.type === 'hospital' ? <Building2 size={16} /> : <Activity size={16} />}
                 </div>
                 <div>

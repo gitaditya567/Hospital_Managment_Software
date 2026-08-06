@@ -20,6 +20,7 @@ import { HospitalAdminDepartments } from './pages/dashboards/HospitalAdminDepart
 import { HospitalAdminAppointments } from './pages/dashboards/HospitalAdminAppointments';
 import { HospitalAdminAnalytics } from './pages/dashboards/HospitalAdminAnalytics';
 import { HospitalAdminBilling } from './pages/dashboards/HospitalAdminBilling';
+import { HospitalAdminAccounts } from './pages/dashboards/HospitalAdminAccounts';
 import { HospitalAdminSettings } from './pages/dashboards/HospitalAdminSettings';
 
 import { ReceptionistDashboard } from './pages/dashboards/ReceptionistDashboard';
@@ -78,6 +79,7 @@ function App() {
           <Route path="appointments" element={<HospitalAdminAppointments />} />
           <Route path="analytics" element={<HospitalAdminAnalytics />} />
           <Route path="billing" element={<HospitalAdminBilling />} />
+          <Route path="accounts" element={<HospitalAdminAccounts />} />
           <Route path="settings" element={<HospitalAdminSettings />} />
         </Route>
 

@@ -329,9 +329,9 @@ superadminRouter.post('/licenses', async (req, res) => {
   }
 });
 
-superadminRouter.put('/licenses/*/revoke', async (req, res) => {
-  const rawCode = req.params[0];
-  const code = decodeURIComponent(rawCode);
+superadminRouter.put('/licenses/revoke', async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ message: 'License code is required.' });
   try {
     const license = await LicenseCode.findOne({ code });
     if (!license) return res.status(404).json({ message: 'License code not found.' });
@@ -361,9 +361,9 @@ superadminRouter.put('/licenses/*/revoke', async (req, res) => {
   }
 });
 
-superadminRouter.delete('/licenses/*', async (req, res) => {
-  const rawCode = req.params[0];
-  const code = decodeURIComponent(rawCode);
+superadminRouter.delete('/licenses', async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ message: 'License code is required.' });
   try {
     await LicenseCode.findOneAndDelete({ code });
 

@@ -339,7 +339,7 @@ hospitalRouter.get('/patients', async (req, res) => {
 });
 
 hospitalRouter.post('/patients', async (req, res) => {
-  const { name, phone, age, gender, doctorName, hospitalId, vitals, pastDiagnoses, paymentStatus, payNow, appointmentTime } = req.body;
+  const { name, phone, age, gender, doctorName, hospitalId, vitals, pastDiagnoses, paymentStatus, payNow, appointmentTime, appointmentDate } = req.body;
   try {
     // Generate token number: count patients under this doctor today
     const doctorPatientsCount = await Patient.countDocuments({ hospitalId, doctorName });
@@ -405,6 +405,7 @@ hospitalRouter.post('/patients', async (req, res) => {
       pastDiagnoses: pastDiagnoses || '',
       paymentStatus: pStatus,
       appointmentTime: appointmentTime || '',
+      appointmentDate: appointmentDate || '',
       hospitalId
     });
 

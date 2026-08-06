@@ -28,6 +28,7 @@ const patientSchema = new mongoose.Schema({
     default: 'Paid' 
   },
   appointmentTime: { type: String, default: '' },
+  appointmentDate: { type: String, default: '' },
   hospitalId: { type: String, required: true }
 }, { timestamps: true });
 

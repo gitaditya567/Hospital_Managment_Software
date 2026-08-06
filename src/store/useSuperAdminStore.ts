@@ -198,7 +198,11 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
 
   revokeLicense: async (code) => {
     try {
-      await fetch(`/api/superadmin/licenses/${code}/revoke`, { method: 'PUT' });
+      await fetch('/api/superadmin/licenses/revoke', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
       await get().fetchSuperAdminData();
     } catch (err) {
       console.error('Failed to revoke license', err);
@@ -207,7 +211,11 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
 
   deleteLicense: async (code) => {
     try {
-      await fetch(`/api/superadmin/licenses/${code}`, { method: 'DELETE' });
+      await fetch('/api/superadmin/licenses', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
       await get().fetchSuperAdminData();
     } catch (err) {
       console.error('Failed to delete license', err);

@@ -20,8 +20,16 @@ export function ReceptionistPatients() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
 
+  const formatToLocalYYYYMMDD = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Quick check-in states
   const [checkInDoctorId, setCheckInDoctorId] = useState('');
+  const [checkInDateInput, setCheckInDateInput] = useState(formatToLocalYYYYMMDD(new Date()));
   const [checkInFeeType, setCheckInFeeType] = useState('OPD Consultation Fee');
   const [payNow, setPayNow] = useState(true);
   const [checkInSuccessData, setCheckInSuccessData] = useState<any>(null);
@@ -237,6 +245,10 @@ export function ReceptionistPatients() {
     const selectedDoc = activeDoctors.find(d => d.id === checkInDoctorId);
     const doctorName = selectedDoc ? selectedDoc.name : 'General Physician';
 
+    const [y, m, d] = checkInDateInput.split('-').map(Number);
+    const chosenDateObj = new Date(y, m - 1, d);
+    const apptDateFormatted = chosenDateObj.toDateString();
+
     // Register
     const newPatient = await registerPatient({
       name: selectedPatient.name,
@@ -246,6 +258,8 @@ export function ReceptionistPatients() {
       doctorName,
       vitals,
       pastDiagnoses,
+      appointmentDate: apptDateFormatted,
+      appointmentTime: 'OPD Walk-In',
       payNow
     });
 
@@ -656,6 +670,19 @@ export function ReceptionistPatients() {
                     <option>OPD Consultation Fee</option>
                     <option>Emergency Consultation Fee</option>
                   </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Appointment Date</label>
+                  <input
+                    type="date"
+                    value={checkInDateInput}
+                    min={formatToLocalYYYYMMDD(new Date())}
+                    max={formatToLocalYYYYMMDD(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))}
+                    onChange={e => setCheckInDateInput(e.target.value)}
+                    className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                    required
+                  />
                 </div>
 
                 {/* Patient Vitals & History Action Button */}

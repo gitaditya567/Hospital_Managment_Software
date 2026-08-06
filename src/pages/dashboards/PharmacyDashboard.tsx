@@ -3,9 +3,10 @@ import { usePharmacyStore } from '../../store/usePharmacyStore';
 import { Button } from '../../components/ui/Button';
 import { Search, Printer, Pill, X, AlertTriangle, AlertOctagon, Terminal, ShoppingCart } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
-import { getPrintSettings, getHospitalDisplayName, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
+import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
+import { buildPharmacyBillSlipHtml } from '../../utils/thermalSlipTemplates';
 import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
 import type { FilterState } from '../../components/common/DataNavigationToolbar';
 
@@ -225,80 +226,27 @@ export function PharmacyDashboard() {
   const triggerPrintReceipt = () => {
     if (!dispensedBill) return;
 
-    const headerTitle = printSettings.showHeader
-      ? `<div class="text-center pb-2 dashed-divider">
-           ${printSettings.logoUrl ? `< div style = "text-align: center; margin-bottom: 6px;" > <img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div> ` : ''}
-           <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${getHospitalDisplayName()} Pharmacy</h3>
-           <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Pharmacy Checkout Invoice</p>
-           <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${dispensedBill.date}</p>
-         </div>`
-      : '';
+    const slipHtml = buildPharmacyBillSlipHtml({
+      billId:       dispensedBill.id,
+      rxCode:       dispensedBill.rxCode,
+      patientName:  dispensedBill.patientName,
+      patientPhone: dispensedBill.patientPhone,
+      patientNo:    dispensedBill.patientNo,
+      doctorName:   dispensedBill.doctorName,
+      date:         dispensedBill.date,
+      items:        dispensedBill.items.map((i: any) => ({
+                      name:  i.name,
+                      qty:   i.qty,
+                      price: i.price,
+                    })),
+      total:        dispensedBill.total,
+      paymentMode:  dispensedBill.paymentMode,
+    });
 
-  const footerContent = printSettings.showFooter
-    ? `<div class="text-center pt-3 dashed-divider">
-           <div class="barcode-container brand-accent-bg">||||| ${dispensedBill.id} |||||</div>
-           <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase;">
-             ${printSettings.customFooterText || 'Thank you for visiting! Keep medicines out of reach.'}
-           </p>
-         </div>`
-    : '';
+    printIsolatedHtml("Pharmacy Bill Receipt", slipHtml);
+    setIsPrintModalOpen(false);
+  };
 
-  const itemsHtml = dispensedBill.items.map((item: any) => `
-      <tr style="border-bottom: 1px solid #e2e8f0; font-size: 0.9em;">
-        <td style="padding: 4px 0; text-align: left; font-weight: bold;">${item.name}</td>
-        <td style="padding: 4px 0; text-align: center;">${item.qty}</td>
-        <td style="padding: 4px 0; text-align: right; font-weight: bold;">₹${(item.qty * item.price).toFixed(2)}</td>
-      </tr>
-    `).join('');
-
-  const slipHtml = `
-      <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
-        ${headerTitle}
-
-        <div style="font-size: 0.85em; margin-bottom: 6px;">
-          <div>BILL ID: <strong>${dispensedBill.id}</strong></div>
-          <div>RX CODE: <strong>${dispensedBill.rxCode}</strong></div>
-          ${dispensedBill.patientNo ? `< div > PATIENT NO: <strong style = "font-family: monospace;">${ dispensedBill.patientNo }</strong></div > ` : ''}
-          <div>PATIENT: <strong>${dispensedBill.patientName}</strong></div>
-          <div>PHONE: <strong>${dispensedBill.patientPhone}</strong></div>
-          <div>DOCTOR: <strong>Dr. ${dispensedBill.doctorName}</strong></div>
-        </div>
-
-        <div class="dashed-divider"></div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align: left;">Item</th>
-              <th style="text-align: center; width: 40px;">Qty</th>
-              <th style="text-align: right; width: 80px;">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-
-        <div class="dashed-divider"></div>
-
-        <div style="font-size: 0.9em; font-weight: bold;">
-          <div class="flex justify-between" style="font-size: 1.1em; font-weight: 900; margin-top: 4px;">
-            <span>GRAND TOTAL:</span>
-            <span class="brand-accent-text">₹${dispensedBill.total.toFixed(2)}</span>
-          </div>
-          <div class="flex justify-between" style="font-size: 0.85em; color: #475569; margin-top: 4px;">
-            <span>PAYMENT MODE:</span>
-            <span>${dispensedBill.paymentMode}</span>
-          </div>
-        </div>
-
-        ${footerContent}
-      </div>
-    `;
-
-  printIsolatedHtml("Pharmacy Bill Receipt", slipHtml);
-  setIsPrintModalOpen(false);
-};
 
 return (
   <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-200 font-sans pb-16">
@@ -643,13 +591,12 @@ return (
             </div>
 
             {printSettings.showFooter && (
-              <div className="text-center pt-3 border-t border-dashed border-slate-300 mt-2 space-y-1.5">
-                <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded" style={{ backgroundColor: printSettings.accentColor }}>
-                  ||||| {dispensedBill.id} |||||
-                </div>
-                <p className="text-[7px] text-slate-400 leading-normal uppercase">
-                  {printSettings.customFooterText || 'Thank you for visiting! Keep medicines out of reach of children.'}
+              <div className="text-center pt-2.5 border-t border-dashed border-slate-300 mt-2 space-y-1">
+                <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">E &amp; O.E</p>
+                <p className="text-[7.5px] text-slate-600 font-semibold leading-normal">
+                  {printSettings.customFooterText || 'Keep medicines out of reach of children.'}
                 </p>
+                <p className="text-[9px] font-extrabold text-slate-800 tracking-tight pt-0.5">Thank You</p>
               </div>
             )}
           </div>

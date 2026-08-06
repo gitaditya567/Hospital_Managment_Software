@@ -5,11 +5,12 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import {
   Receipt, Printer, Search, CreditCard, CheckCircle2,
-  DollarSign, Clock, TrendingUp
+  IndianRupee, Clock, TrendingUp
 } from 'lucide-react';
 import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
+import { buildOpdBillingSlipHtml } from '../../utils/thermalSlipTemplates';
 
 export function ReceptionistInvoices() {
   const { invoices, collectPatientFee, hospitalName } = useHospitalStore();
@@ -85,7 +86,7 @@ export function ReceptionistInvoices() {
             <p className="text-[10px] text-slate-400 font-semibold">Total revenue generated</p>
           </div>
           <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
-            <DollarSign size={22} />
+            <IndianRupee size={22} />
           </div>
         </div>
 
@@ -255,23 +256,28 @@ export function ReceptionistInvoices() {
             <div className="bg-[#EBF3FE]/40 p-4 rounded-2xl border border-[#D8D8D8] flex justify-center">
               <div
                 id="thermal-slip-template"
-                className="bg-white border border-[#D8D8D8] shadow-xs text-[#060606] transition-all duration-250 max-h-[380px] overflow-y-auto font-mono text-[10px] rounded-xl"
+                className="bg-white border border-[#D8D8D8] shadow-xs text-[#060606] transition-all duration-250 font-mono text-[10px] rounded-xl w-full max-w-[220px]"
                 style={{
-                  width: printSettings.paperSize === 'A4' ? '260px' : '190px',
                   padding: `${printSettings.padding}px`,
-                  margin: `${printSettings.margin}px`,
                   fontSize: `${printSettings.fontSize}px`,
-                  fontFamily: printSettings.paperSize === 'A4' ? 'sans-serif' : 'monospace',
+                  fontFamily: 'monospace',
                   borderTop: `4px solid ${printSettings.accentColor}`
                 }}
               >
                 {printSettings.showHeader && (
                   <div className="text-center pb-2 border-b border-dashed border-[#D8D8D8] space-y-1">
+                    {printSettings.logoUrl && (
+                      <div className="flex justify-center mb-1">
+                        <img src={printSettings.logoUrl} alt="Logo" className="max-h-8 object-contain" />
+                      </div>
+                    )}
                     <h3 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: printSettings.accentColor }}>
-                      🏥 {printSettings.customHeaderText || hospitalName}
+                      {printSettings.customHeaderText || hospitalName}
                     </h3>
-                    <p className="text-[8px] text-slate-500">Live Clinical Registry Slip</p>
-                    <p className="text-[7px] text-slate-400">Date: {printInvoiceData.date}</p>
+                    <div className="flex justify-between text-[7px] text-slate-500 pt-1 border-t border-dashed border-slate-200">
+                      <span>Bill No: <strong>{printInvoiceData.id}</strong></span>
+                      <span>Date: <strong>{printInvoiceData.date}</strong></span>
+                    </div>
                   </div>
                 )}
 
@@ -304,19 +310,18 @@ export function ReceptionistInvoices() {
                     <span>₹{printInvoiceData.amount}</span>
                   </div>
                   <div className="flex justify-between font-black border-t pt-1.5 mt-1" style={{ borderTopColor: printSettings.accentColor }}>
-                    <span>Total Amount:</span>
+                    <span>TOTAL AMOUNT:</span>
                     <span style={{ color: printSettings.accentColor }}>₹{printInvoiceData.amount}</span>
                   </div>
                 </div>
 
                 {printSettings.showFooter && (
-                  <div className="text-center pt-3 border-t border-dashed border-[#D8D8D8] space-y-1.5">
-                    <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded-lg" style={{ backgroundColor: printSettings.accentColor }}>
-                      |||||||||||||||||||||||
-                    </div>
-                    <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">
-                      {printSettings.customFooterText || (printInvoiceData.status === 'Paid' ? 'Thank you for cooperation' : 'Please settle outstanding payment')}
+                  <div className="text-center pt-2.5 border-t border-dashed border-[#D8D8D8] mt-2 space-y-1">
+                    <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">E &amp; O.E</p>
+                    <p className="text-[7.5px] text-slate-600 font-semibold leading-normal">
+                      {printSettings.customFooterText || (printInvoiceData.status === 'Paid' ? 'Thank you for your cooperation' : 'Please settle outstanding payment')}
                     </p>
+                    <p className="text-[9px] font-extrabold text-slate-800 tracking-tight pt-0.5">Thank You</p>
                   </div>
                 )}
               </div>
@@ -325,73 +330,20 @@ export function ReceptionistInvoices() {
             <div className="flex gap-2">
               <Button
                 onClick={() => {
-                  const headerTitle = printSettings.showHeader
-                    ? `<div class="text-center pb-2 dashed-divider">
-                         ${printSettings.logoUrl ? `<div style="text-align: center; margin-bottom: 6px;"><img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
-                         <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || hospitalName}</h3>
-                         <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Clinical Registry Slip</p>
-                         <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${printInvoiceData.date}</p>
-                       </div>`
-                    : '';
-
-                  const footerContent = printSettings.showFooter
-                    ? `<div class="text-center pt-3 dashed-divider">
-                         <div class="barcode-container brand-accent-bg">|||||||||||||||||||||||</div>
-                         <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase; leading-height: 1.3;">
-                           ${printSettings.customFooterText || (printInvoiceData.status === 'Paid' ? 'Thank you for cooperation' : 'Please settle outstanding payment')}
-                         </p>
-                       </div>`
-                    : '';
-
-                  const slipHtml = `
-                    <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
-                      ${headerTitle}
-
-                      <div class="text-center py-3 my-2" style="border: 1px solid ${printSettings.accentColor}30; border-radius: 8px; background-color: #f8fafc;">
-                        <p style="margin: 0; font-size: 0.75em; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Transaction Status</p>
-                        <h2 style="margin: 4px 0; font-size: 1.4em; font-weight: 900; line-height: 1; color: ${printInvoiceData.status === 'Paid' ? '#10b981' : '#f43f5e'};">
-                          ${printInvoiceData.status === 'Paid' ? 'PAID & CLEARED' : 'PENDING DUE'}
-                        </h2>
-                        <p style="margin: 0; font-size: 0.8em; font-weight: bold; color: #334155;">${printInvoiceData.doctorName}</p>
-                      </div>
-
-                      <div class="dashed-divider"></div>
-
-                      <div style="font-size: 0.9em; space-y: 4px;">
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">Patient:</span>
-                          <span class="font-bold">${printInvoiceData.patientName}</span>
-                        </div>
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">Invoice Ref:</span>
-                          <span class="font-bold">${printInvoiceData.id}</span>
-                        </div>
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">Contact:</span>
-                          <span class="font-bold">${printInvoiceData.patientPhone}</span>
-                        </div>
-                      </div>
-
-                      <div class="dashed-divider"></div>
-
-                      <div style="font-size: 0.9em;">
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span>${printInvoiceData.feeType}:</span>
-                          <span class="font-bold">₹${printInvoiceData.amount}</span>
-                        </div>
-                        <div class="flex justify-between font-black solid-divider pt-2" style="font-size: 1.1em;">
-                          <span>Total Amount:</span>
-                          <span class="brand-accent-text">₹${printInvoiceData.amount}</span>
-                        </div>
-                      </div>
-
-                      ${footerContent}
-                    </div>
-                  `;
-
+                  const slipHtml = buildOpdBillingSlipHtml({
+                    patientName:  printInvoiceData.patientName,
+                    patientPhone: printInvoiceData.patientPhone,
+                    invoiceId:    printInvoiceData.id,
+                    doctorName:   printInvoiceData.doctorName,
+                    feeType:      printInvoiceData.feeType,
+                    amount:       printInvoiceData.amount,
+                    date:         printInvoiceData.date,
+                    status:       printInvoiceData.status as 'Paid' | 'Pending',
+                  });
                   printIsolatedHtml("OPD Billing Receipt", slipHtml);
                   setIsPrintModalOpen(false);
-                }} 
+                }}
+
                 className="flex-1 font-bold rounded-xl bg-[#3683F8] hover:bg-blue-600 text-white"
               >
                 <Printer size={16} className="mr-1.5" /> Execute Print

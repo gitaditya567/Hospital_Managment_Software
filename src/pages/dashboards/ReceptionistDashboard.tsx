@@ -13,6 +13,7 @@ import {
 import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
+import { buildOpdQueueSlipHtml } from '../../utils/thermalSlipTemplates';
 
 export function ReceptionistDashboard() {
   const { 
@@ -36,12 +37,20 @@ export function ReceptionistDashboard() {
   // Active doctors scheduled for today
   const activeDoctors = staff.filter(s => s.role === 'Doctor' && s.status === 'Active');
 
+  const formatToLocalYYYYMMDD = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Form State
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('Male');
   const [doctorId, setDoctorId] = useState('');
+  const [appointmentDateInput, setAppointmentDateInput] = useState(formatToLocalYYYYMMDD(new Date()));
   const [charges, setCharges] = useState('500');
   const [payNow, setPayNow] = useState(true);
 
@@ -168,8 +177,12 @@ export function ReceptionistDashboard() {
     const selectedDoc = activeDoctors.find(d => d.id === doctorId);
     const doctorName = selectedDoc ? selectedDoc.name : 'General Physician';
 
+    const [y, m, d] = appointmentDateInput.split('-').map(Number);
+    const chosenDateObj = new Date(y, m - 1, d);
+    const apptDateFormatted = chosenDateObj.toDateString();
+
     // 1. Optimistic UI Updates - instantly trigger registered states before server callbacks
-    setWsLogs(prev => [`Optimistic UI: Registering patient "${name}"...`, ...prev]);
+    setWsLogs(prev => [`Optimistic UI: Registering patient "${name}" for ${apptDateFormatted}...`, ...prev]);
 
     const patientData = {
       name,
@@ -178,7 +191,10 @@ export function ReceptionistDashboard() {
       gender,
       doctorName,
       vitals,
-      pastDiagnoses
+      pastDiagnoses,
+      appointmentDate: apptDateFormatted,
+      appointmentTime: 'OPD Walk-In',
+      payNow
     };
 
     // Store Registration
@@ -582,18 +598,25 @@ export function ReceptionistDashboard() {
               </button>
             </div>
 
-            <p className="text-[10px] text-slate-500 font-semibold italic">
-              {queueTab === 'PAID' 
-                ? '✓ Showing patients ready for Doctor consultation' 
-                : '⚠️ Payment required before Doctor queue activation'}
-            </p>
+            <div className={`px-3 py-1.5 rounded-full border text-[11px] font-extrabold flex items-center gap-2 shadow-xs transition-all ${
+              queueTab === 'PAID'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-rose-50 border-rose-200 text-rose-700'
+            }`}>
+              <span className={`h-2 w-2 rounded-full ${queueTab === 'PAID' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              <span>
+                {queueTab === 'PAID' 
+                  ? 'Verified Paid Queue • Patients Ready for Doctor Consultation' 
+                  : 'Fee Pending Queue • Payment Required for OPD Routing'}
+              </span>
+            </div>
           </div>
 
           {/* Today's Queue Data Table */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto max-h-[420px] relative border-t border-[#D8D8D8]">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#EBF3FE]/50 border-b border-[#D8D8D8] text-slate-600 text-[10px] font-extrabold uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 bg-[#EBF3FE] shadow-xs">
+                <tr className="border-b border-[#D8D8D8] text-slate-600 text-[10px] font-extrabold uppercase tracking-wider">
                   <th className="px-5 py-3.5">Token No</th>
                   <th className="px-5 py-3.5">Patient Name</th>
                   <th className="px-5 py-3.5">Age/Gender</th>
@@ -869,6 +892,19 @@ export function ReceptionistDashboard() {
                 </select>
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Appointment Date</label>
+                <input
+                  type="date"
+                  value={appointmentDateInput}
+                  min={formatToLocalYYYYMMDD(new Date())}
+                  max={formatToLocalYYYYMMDD(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))}
+                  onChange={e => setAppointmentDateInput(e.target.value)}
+                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1 text-xs font-bold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
+                  required
+                />
+              </div>
+
               {/* Patient Vitals & History Action Button */}
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clinical Vitals &amp; History</label>
@@ -1109,23 +1145,28 @@ export function ReceptionistDashboard() {
               {/* Receipts Template Mock */}
               <div 
                 id="thermal-slip-template" 
-                className="bg-white border border-[#D8D8D8] shadow-xs text-[#060606] transition-all duration-250 max-h-[380px] overflow-y-auto font-mono text-[10px] rounded-xl"
+                className="bg-white border border-[#D8D8D8] shadow-xs text-[#060606] transition-all duration-250 font-mono text-[10px] rounded-xl w-full max-w-[220px]"
                 style={{
-                  width: printSettings.paperSize === 'A4' ? '260px' : '190px',
                   padding: `${printSettings.padding}px`,
-                  margin: `${printSettings.margin}px`,
                   fontSize: `${printSettings.fontSize}px`,
-                  fontFamily: printSettings.paperSize === 'A4' ? 'sans-serif' : 'monospace',
+                  fontFamily: 'monospace',
                   borderTop: `4px solid ${printSettings.accentColor}`
                 }}
               >
                 {printSettings.showHeader && (
                   <div className="text-center pb-2 border-b border-dashed border-[#D8D8D8] space-y-1">
+                    {printSettings.logoUrl && (
+                      <div className="flex justify-center mb-1">
+                        <img src={printSettings.logoUrl} alt="Logo" className="max-h-8 object-contain" />
+                      </div>
+                    )}
                     <h3 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: printSettings.accentColor }}>
-                      🏥 {printSettings.customHeaderText || hospitalName}
+                      {printSettings.customHeaderText || hospitalName}
                     </h3>
-                    <p className="text-[8px] text-slate-500">Live Clinical Registry Slip</p>
-                    <p className="text-[7px] text-slate-400">Date: {printInvoiceData.date}</p>
+                    <div className="flex justify-between text-[7px] text-slate-500 pt-1 border-t border-dashed border-slate-200">
+                      <span>Bill No: <strong>{printInvoiceData.patientNo || (printInvoiceData.patientId && printInvoiceData.patientId.length !== 24 ? printInvoiceData.patientId : 'OPD-101')}</strong></span>
+                      <span>Date: <strong>{printInvoiceData.date}</strong></span>
+                    </div>
                   </div>
                 )}
 
@@ -1140,16 +1181,12 @@ export function ReceptionistDashboard() {
                     <span className="text-slate-500">Patient:</span>
                     <span className="font-bold">{printInvoiceData.patientName}</span>
                   </div>
-                  {printInvoiceData.patientNo && (
+                  {(printInvoiceData.patientNo || (printInvoiceData.patientId && printInvoiceData.patientId.length !== 24)) && (
                     <div className="flex justify-between">
                       <span className="text-slate-500">Patient No:</span>
-                      <span className="font-bold text-[#3683F8]">{printInvoiceData.patientNo}</span>
+                      <span className="font-bold text-[#3683F8]">{printInvoiceData.patientNo || printInvoiceData.patientId}</span>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">UID:</span>
-                    <span className="font-bold">{printInvoiceData.patientId}</span>
-                  </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Age/Gender:</span>
                     <span className="font-bold">{printInvoiceData.age} Yrs / {printInvoiceData.gender}</span>
@@ -1166,19 +1203,18 @@ export function ReceptionistDashboard() {
                     <span>₹{printInvoiceData.amount}</span>
                   </div>
                   <div className="flex justify-between font-black border-t pt-1.5 mt-1" style={{ borderTopColor: printSettings.accentColor }}>
-                    <span>Paid Amount:</span>
+                    <span>TOTAL AMOUNT:</span>
                     <span style={{ color: printSettings.accentColor }}>₹{printInvoiceData.amount}</span>
                   </div>
                 </div>
 
                 {printSettings.showFooter && (
-                  <div className="text-center pt-3 border-t border-dashed border-[#D8D8D8] space-y-1.5">
-                    <div className="h-5 w-full flex items-center justify-center text-[7px] text-white tracking-[6px] font-bold rounded-lg" style={{ backgroundColor: printSettings.accentColor }}>
-                      |||||||||||||||||||||||
-                    </div>
-                    <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">
+                  <div className="text-center pt-2.5 border-t border-dashed border-[#D8D8D8] mt-2 space-y-1">
+                    <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">E &amp; O.E</p>
+                    <p className="text-[7.5px] text-slate-600 font-semibold leading-normal">
                       {printSettings.customFooterText || `Please wait outside Room ${printInvoiceData.doctorName.includes('Sarah') ? '101' : '202'}`}
                     </p>
+                    <p className="text-[9px] font-extrabold text-slate-800 tracking-tight pt-0.5">Thank You</p>
                   </div>
                 )}
               </div>
@@ -1187,77 +1223,20 @@ export function ReceptionistDashboard() {
             <div className="flex gap-2">
               <Button 
                 onClick={() => {
-                  const headerTitle = printSettings.showHeader 
-                    ? `<div class="text-center pb-2 dashed-divider">
-                         ${printSettings.logoUrl ? `<div style="text-align: center; margin-bottom: 6px;"><img src="${printSettings.logoUrl}" style="max-height: 40px; max-width: 100%; object-fit: contain;" /></div>` : ''}
-                         <h3 class="font-extrabold uppercase brand-accent-text" style="margin: 0; font-size: 1.15em;">🏥 ${printSettings.customHeaderText || hospitalName}</h3>
-                         <p style="margin: 2px 0 0 0; font-size: 0.8em; color: #64748b;">Live Clinical Registry Slip</p>
-                         <p style="margin: 2px 0 0 0; font-size: 0.7em; color: #94a3b8;">Date: ${printInvoiceData.date}</p>
-                       </div>`
-                    : '';
-
-                  const footerContent = printSettings.showFooter
-                    ? `<div class="text-center pt-3 dashed-divider">
-                         <div class="barcode-container brand-accent-bg">|||||||||||||||||||||||</div>
-                         <p style="margin: 4px 0 0 0; font-size: 0.78em; color: #64748b; text-transform: uppercase; leading-height: 1.3;">
-                           ${printSettings.customFooterText || `Please wait outside Room ${printInvoiceData.doctorName.includes('Sarah') ? '101' : '202'}`}
-                         </p>
-                       </div>`
-                    : '';
-
-                  const slipHtml = `
-                    <div style="font-family: monospace; font-size: ${printSettings.fontSize}px; line-height: 1.4;">
-                      ${headerTitle}
-
-                      <div class="text-center py-3 my-2" style="border: 1px solid ${printSettings.accentColor}30; border-radius: 8px; background-color: #f8fafc;">
-                        <p style="margin: 0; font-size: 0.75em; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">OPD Queue Token</p>
-                        <h2 class="brand-accent-text" style="margin: 4px 0; font-size: 2.2em; font-weight: 900; line-height: 1;">${printInvoiceData.tokenNumber}</h2>
-                        <p style="margin: 0; font-size: 0.8em; font-weight: bold; color: #334155;">${printInvoiceData.doctorName}</p>
-                      </div>
-
-                      <div class="dashed-divider"></div>
-
-                      <div style="font-size: 0.9em; space-y: 4px;">
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">Patient:</span>
-                          <span class="font-bold">${printInvoiceData.patientName}</span>
-                        </div>
-                        ${printInvoiceData.patientNo ? `
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">Patient No:</span>
-                          <span class="font-bold brand-accent-text">${printInvoiceData.patientNo}</span>
-                        </div>` : ''}
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">UID:</span>
-                          <span class="font-bold">${printInvoiceData.patientId}</span>
-                        </div>
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">Age/Gender:</span>
-                          <span class="font-bold">${printInvoiceData.age} Yrs / ${printInvoiceData.gender}</span>
-                        </div>
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span style="color: #64748b;">Contact:</span>
-                          <span class="font-bold">${printInvoiceData.phone}</span>
-                        </div>
-                      </div>
-
-                      <div class="dashed-divider"></div>
-
-                      <div style="font-size: 0.9em;">
-                        <div class="flex justify-between" style="margin-bottom: 4px;">
-                          <span>${printInvoiceData.feeType}:</span>
-                          <span class="font-bold">₹${printInvoiceData.amount}</span>
-                        </div>
-                        <div class="flex justify-between font-black solid-divider pt-2" style="font-size: 1.1em;">
-                          <span>Paid Amount:</span>
-                          <span class="brand-accent-text">₹${printInvoiceData.amount}</span>
-                        </div>
-                      </div>
-
-                      ${footerContent}
-                    </div>
-                  `;
-
+                  const slipHtml = buildOpdQueueSlipHtml({
+                    tokenNumber: printInvoiceData.tokenNumber,
+                    patientName: printInvoiceData.patientName,
+                    patientId:   printInvoiceData.patientId,
+                    patientNo:   printInvoiceData.patientNo,
+                    age:         printInvoiceData.age,
+                    gender:      printInvoiceData.gender,
+                    phone:       printInvoiceData.phone,
+                    doctorName:  printInvoiceData.doctorName,
+                    feeType:     printInvoiceData.feeType,
+                    amount:      printInvoiceData.amount,
+                    date:        printInvoiceData.date,
+                    billNo:      printInvoiceData.patientNo || printInvoiceData.patientId,
+                  });
                   printIsolatedHtml("OPD Queue Slip", slipHtml);
                   setIsPrintModalOpen(false);
                 }} 
