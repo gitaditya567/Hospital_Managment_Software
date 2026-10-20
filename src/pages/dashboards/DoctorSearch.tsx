@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getPrintSettings, getHospitalDisplayName } from '../../utils/printSettings';
+import { doctorTitle } from '../../lib/utils';
 
 export function DoctorSearch() {
   const { patients } = useHospitalStore();
@@ -166,7 +167,7 @@ export function DoctorSearch() {
 
   // Copy prescription details in a readable format
   const handleCopyPrescription = (visit: any) => {
-    let copyText = `Clinical Prescription Record\n=========================\nPatient: ${selectedPatient.name} (${selectedPatient.gender}, ${selectedPatient.age} Yrs)\nPhone: ${selectedPatient.phone}\nDoctor: Dr. ${visit.doctor}\nDate: ${visit.date}\nRx Code: ${visit.rxCode || 'N/A'}\n\nMedicines Prescribed:\n`;
+    let copyText = `Clinical Prescription Record\n=========================\nPatient: ${selectedPatient.name} (${selectedPatient.gender}, ${selectedPatient.age} Yrs)\nPhone: ${selectedPatient.phone}\nDoctor: ${doctorTitle(visit.doctor)}\nDate: ${visit.date}\nRx Code: ${visit.rxCode || 'N/A'}\n\nMedicines Prescribed:\n`;
 
     if (Array.isArray(visit.medicines)) {
       visit.medicines.forEach((med: any, idx: number) => {
@@ -263,7 +264,7 @@ export function DoctorSearch() {
             </div>
             <div class="meta-item" style="text-align: right;">
               <p><strong>Prescription Date:</strong> ${visit.date}</p>
-              <p><strong>Consulting Doctor:</strong> Dr. ${visit.doctor}</p>
+              <p><strong>Consulting Doctor:</strong> ${doctorTitle(visit.doctor)}</p>
               <p><strong>Rx Code Reference:</strong> <span style="font-family: monospace; font-weight: 800; color: ${settings.accentColor};">${visit.rxCode || 'N/A'}</span></p>
             </div>
           </div>
@@ -286,7 +287,7 @@ export function DoctorSearch() {
           <div class="signature">
             <div>
               <div class="signature-box">Authorized Medical Practitioner</div>
-              <p style="margin: 4px 0 0 0; font-size: 12px; text-align: center; color: #475569; font-weight: 700;">Dr. ${visit.doctor}</p>
+              <p style="margin: 4px 0 0 0; font-size: 12px; text-align: center; color: #475569; font-weight: 700;">${doctorTitle(visit.doctor)}</p>
             </div>
           </div>
 
@@ -528,7 +529,7 @@ export function DoctorSearch() {
                             <div className="space-y-2 text-xs text-left">
                               <div className="flex justify-between items-center">
                                 <span className="font-extrabold text-slate-800 text-sm">
-                                  {isPharmacy ? "Pharmacy POS Checkout" : `Dr. ${visit.doctor}`}
+                                  {isPharmacy ? "Pharmacy POS Checkout" : `${doctorTitle(visit.doctor)}`}
                                 </span>
                                 <span className="text-[9px] text-slate-400 font-bold font-mono">{visit.date}</span>
                               </div>

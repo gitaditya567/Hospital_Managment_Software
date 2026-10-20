@@ -8,6 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { getPrintSettings, getHospitalDisplayName } from '../../utils/printSettings';
 import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
 import type { FilterState } from '../../components/common/DataNavigationToolbar';
+import { doctorTitle } from '../../lib/utils';
 
 export function DoctorDashboard() {
   const { user } = useAuthStore();
@@ -691,7 +692,7 @@ export function DoctorDashboard() {
             </div>
             <div class="meta-item" style="text-align: right;">
               <p><strong>Prescription Date:</strong> ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-              <p><strong>Consulting Doctor:</strong> Dr. ${user?.name || 'Practitioner'}</p>
+              <p><strong>Consulting Doctor:</strong> ${doctorTitle(user?.name, 'Practitioner')}</p>
               <p><strong>Rx Code Reference:</strong> <span style="font-family: monospace; font-weight: 800; color: ${settings.accentColor};">${rxRef}</span></p>
             </div>
           </div>
@@ -712,7 +713,7 @@ export function DoctorDashboard() {
           <div class="signature">
             <div>
               <div class="signature-box">Authorized Medical Practitioner</div>
-              <p style="margin: 4px 0 0 0; font-size: 12px; text-align: center; color: #475569; font-weight: 700;">Dr. ${user?.name || 'Doctor'}</p>
+              <p style="margin: 4px 0 0 0; font-size: 12px; text-align: center; color: #475569; font-weight: 700;">${doctorTitle(user?.name, 'Doctor')}</p>
             </div>
           </div>
           ${footerBlock}
@@ -800,7 +801,7 @@ export function DoctorDashboard() {
         </div>
 
         <div className="flex items-center gap-3 px-3">
-          <span className="text-xs font-extrabold text-slate-800">Dr. {user?.name || 'Practitioner'}</span>
+          <span className="text-xs font-extrabold text-slate-800">{doctorTitle(user?.name, 'Practitioner')}</span>
           <span className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full font-bold">
             {(user as any)?.department || 'General OPD'}
           </span>
@@ -1973,7 +1974,7 @@ export function DoctorDashboard() {
                       </head>
                       <body>
                         <h1>${hospitalTitle} - Longitudinal Patient EMR Summary</h1>
-                        <p style="font-size: 12px; color: #64748b; margin-top: 2px;">Printed by Dr. ${user?.name || 'Doctor'}</p>
+                        <p style="font-size: 12px; color: #64748b; margin-top: 2px;">Printed by ${doctorTitle(user?.name, 'Doctor')}</p>
                         <div class="box">
                           <div><b>Patient Name:</b> ${selectedPatient.name}</div>
                           <div><b>Patient UID:</b> ${selectedPatient.patientNo || selectedPatient.id}</div>

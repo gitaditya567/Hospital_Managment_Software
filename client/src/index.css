@@ -203,3 +203,83 @@
 }
 
 
+
+/* ───────── Landing page motion ───────── */
+@layer components {
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+  .reveal[data-reveal='left'] { transform: translateX(-36px); }
+  .reveal[data-reveal='right'] { transform: translateX(36px); }
+  .reveal[data-reveal='zoom'] { transform: scale(0.94); }
+  .reveal.is-visible { opacity: 1; transform: none; }
+
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee 38s linear infinite;
+  }
+  .marquee-mask:hover .marquee-track { animation-play-state: paused; }
+
+  .btn-shine { position: relative; overflow: hidden; isolation: isolate; }
+  .btn-shine::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.9s ease;
+    z-index: -1;
+  }
+  .btn-shine:hover::after { transform: translateX(120%); }
+
+  .blob-drift { animation: blobDrift 18s ease-in-out infinite alternate; }
+  .blob-drift-slow { animation: blobDrift 26s ease-in-out infinite alternate-reverse; }
+
+  .toast-in { animation: toastIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+  .tour-progress { animation: tourProgress var(--tour-duration, 6s) linear forwards; }
+
+  .gradient-text {
+    background: linear-gradient(90deg, #3683F8, #06b6d4, #3683F8);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 5s linear infinite;
+  }
+
+  .faq-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .faq-panel[data-open='true'] { grid-template-rows: 1fr; }
+  .faq-panel > div { overflow: hidden; }
+
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes blobDrift {
+    0% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-60px, 40px) scale(1.12); }
+    100% { transform: translate(40px, -30px) scale(0.95); }
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(16px) scale(0.96); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes tourProgress { from { width: 0%; } to { width: 100%; } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .marquee-track, .blob-drift, .blob-drift-slow, .gradient-text, .toast-in,
+  .animate-float, .animate-float-slow, .animate-heartbeat { animation: none !important; }
+  .tour-progress { animation: none; width: 100%; }
+  html { scroll-behavior: auto !important; }
+}
+
+html { scroll-behavior: smooth; }

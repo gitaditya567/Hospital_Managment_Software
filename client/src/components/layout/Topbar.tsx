@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { useNavigate } from 'react-router-dom';
+import { doctorTitle } from '../../lib/utils';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -196,21 +197,21 @@ export function Topbar({ onMenuClick, isSidebarOpen = true }: TopbarProps) {
         )}
 
         {user?.role === 'RECEPTIONIST' && doctors.length > 0 && (
-          <div className="hidden xl:flex items-center space-x-2 border-l border-[#D8D8D8] pl-3 text-[10px] font-bold text-slate-600 shrink-0">
+          <div className="hidden xl:flex items-center space-x-2 border-l border-[#D8D8D8] pl-3 text-[10px] font-bold text-slate-600 min-w-0 overflow-hidden">
             <span className="text-[9px] uppercase tracking-wider text-slate-500 font-extrabold">OPD Shift:</span>
             {doctors.map(doc => {
               const isActive = doc.status === 'Active';
               return (
                 <span
                   key={doc.id}
-                  className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${
+                  className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] font-bold whitespace-nowrap shrink-0 ${
                     isActive 
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
                       : 'bg-rose-50 border-rose-200 text-rose-700'
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                  Dr. {doc.name} ({isActive ? 'Active' : doc.status})
+                  {doctorTitle(doc.name)} ({isActive ? 'Active' : doc.status})
                 </span>
               );
             })}

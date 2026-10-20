@@ -9,6 +9,7 @@ import { printIsolatedHtml } from '../../utils/printHelper';
 import { buildPharmacyBillSlipHtml } from '../../utils/thermalSlipTemplates';
 import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
 import type { FilterState } from '../../components/common/DataNavigationToolbar';
+import { doctorTitle } from '../../lib/utils';
 
 export function PharmacyDashboard() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
@@ -347,7 +348,7 @@ return (
               </div>
               <div>
                 <label className="text-[9px] uppercase text-slate-400 font-extrabold tracking-wider">Prescribing Physician</label>
-                <p className="text-slate-800 mt-0.5">Dr. {activePrescription.doctorName}</p>
+                <p className="text-slate-800 mt-0.5">{doctorTitle(activePrescription.doctorName)}</p>
               </div>
               <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] font-bold text-slate-500">
                 <span>Prescription Date</span>

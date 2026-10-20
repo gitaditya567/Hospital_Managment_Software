@@ -31,6 +31,7 @@
  */
 
 import { getPrintSettings, getHospitalDisplayName } from './printSettings';
+import { doctorTitle } from '../lib/utils';
 
 // ─────────────────────────────────────────────
 // Types
@@ -319,7 +320,7 @@ export function buildOpdQueueSlipHtml(data: {
     ...(displayPatientNo ? [{ label: 'Patient No', value: displayPatientNo, bold: true }] : []),
     { label: 'Age/Gender', value: `${data.age} Yrs / ${data.gender}` },
     { label: 'Contact',    value: data.phone },
-    { label: 'Doctor',     value: `Dr. ${data.doctorName}` },
+    { label: 'Doctor',     value: `${doctorTitle(data.doctorName)}` },
   ];
   return buildThermalSlipHtml({
     slipTypeLabel: 'OPD Registration Slip',
@@ -353,7 +354,7 @@ export function buildOpdBillingSlipHtml(data: {
     { label: 'Patient',    value: data.patientName, bold: true },
     { label: 'Invoice Ref',value: data.invoiceId },
     { label: 'Contact',    value: data.patientPhone },
-    { label: 'Doctor',     value: `Dr. ${data.doctorName}` },
+    { label: 'Doctor',     value: `${doctorTitle(data.doctorName)}` },
   ];
   return buildThermalSlipHtml({
     slipTypeLabel:       'OPD Billing Receipt',
@@ -392,7 +393,7 @@ export function buildPharmacyBillSlipHtml(data: {
     ...(data.patientNo ? [{ label: 'Patient No', value: data.patientNo }] : []),
     { label: 'Patient',  value: data.patientName, bold: true },
     { label: 'Phone',    value: data.patientPhone },
-    { label: 'Doctor',   value: `Dr. ${data.doctorName}` },
+    { label: 'Doctor',   value: `${doctorTitle(data.doctorName)}` },
   ];
   return buildThermalSlipHtml({
     slipTypeLabel:       'Pharmacy Bill Receipt',
