@@ -5,6 +5,7 @@ import { initSecurityProtections } from './utils/securityProtection';
 import { Login } from './pages/auth/Login';
 import { Home } from './pages/public/Home';
 import { Register } from './pages/public/Register';
+import { LegalPage } from './pages/public/LegalPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { RoleRoute } from './components/layout/RoleRoute';
 
@@ -53,6 +54,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/signup" element={<Navigate to="/register" replace />} />
+        <Route path="/terms" element={<LegalPage slug="terms" />} />
+        <Route path="/privacy" element={<LegalPage slug="privacy" />} />
+        <Route path="/refund-policy" element={<LegalPage slug="refund-policy" />} />
+        <Route path="/legal" element={<Navigate to="/terms" replace />} />
         <Route path="/activate" element={<Navigate to="/register?mode=license" replace />} />
         <Route path="/setup" element={<Navigate to="/register?mode=license" replace />} />
 

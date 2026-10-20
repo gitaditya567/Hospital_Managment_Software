@@ -92,7 +92,7 @@ const addDays = (days) => {
 // Without a license code the hospital starts a free trial; with an unused license code it is activated on that paid plan.
 publicRouter.post('/register', async (req, res) => {
   const {
-    hospitalName, adminName, email, password, phone, address, city, planId, licenseCode
+    hospitalName, adminName, email, password, phone, address, city, planId, licenseCode, acceptTerms, termsVersion
   } = req.body || {};
 
   try {
@@ -111,6 +111,7 @@ publicRouter.post('/register', async (req, res) => {
     if (!password || String(password).length < 8) errors.push('Password must be at least 8 characters.');
     if (!phone || String(phone).replace(/\D/g, '').length < 10) errors.push('A valid 10-digit phone number is required.');
     if (!address || String(address).trim().length < 5) errors.push('Hospital address is required.');
+    if (acceptTerms !== true) errors.push('You must accept the Terms of Service and Privacy Policy.');
     if (errors.length) {
       return res.status(400).json({ message: errors[0], errors });
     }
@@ -170,6 +171,9 @@ publicRouter.post('/register', async (req, res) => {
       planId: plan.id,
       status: 'Active',
       isTrial,
+      termsAcceptedAt: new Date(),
+      termsVersion: String(termsVersion || '1.0').slice(0, 20),
+      termsAcceptedIp: req.ip || '',
       signupSource: usingLicense ? 'license-activation' : 'self-signup'
     });
     await tenant.save();

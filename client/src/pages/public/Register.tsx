@@ -7,6 +7,7 @@ import {
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { PasswordStrengthMeter } from '../../components/ui/PasswordStrengthMeter';
+import { LEGAL } from './legalContent';
 
 interface PublicPlan {
   id: string;
@@ -97,7 +98,7 @@ export function Register() {
     if (password !== confirmPassword) return setError('Password and confirm password do not match.');
     if (phone.replace(/\D/g, '').length < 10) return setError('Please enter a valid 10-digit mobile number.');
     if (mode === 'license' && !licenseCode.trim()) return setError('Please enter the license key shared by our team.');
-    if (!agree) return setError('Please accept the terms to continue.');
+    if (!agree) return setError('Please accept the Terms of Service and Privacy Policy to continue.');
 
     setSubmitting(true);
     try {
@@ -113,7 +114,9 @@ export function Register() {
           address: address.trim(),
           city: city.trim(),
           planId: mode === 'trial' ? planId : undefined,
-          licenseCode: mode === 'license' ? licenseCode.trim() : undefined
+          licenseCode: mode === 'license' ? licenseCode.trim() : undefined,
+          acceptTerms: agree,
+          termsVersion: LEGAL.version
         })
       });
       const isJson = (res.headers.get('content-type') || '').includes('application/json');
@@ -352,7 +355,12 @@ export function Register() {
 
               <label className="flex items-start gap-2.5 text-sm text-slate-600 cursor-pointer">
                 <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} className="mt-0.5 rounded border-[#D8D8D8] text-[#3683F8] focus:ring-[#3683F8]/20" />
-                <span>I confirm I am authorised to register this hospital and agree to keep patient data confidential.</span>
+                <span>
+                  I am authorised to register this hospital and I agree to the{' '}
+                  <Link to="/terms" target="_blank" className="font-bold text-[#3683F8] hover:underline">Terms of Service</Link>,{' '}
+                  <Link to="/privacy" target="_blank" className="font-bold text-[#3683F8] hover:underline">Privacy Policy</Link> and{' '}
+                  <Link to="/refund-policy" target="_blank" className="font-bold text-[#3683F8] hover:underline">Refund Policy</Link>, including the hospital's duty to inform patients and obtain their consent.
+                </span>
               </label>
 
               <button

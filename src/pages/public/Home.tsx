@@ -124,7 +124,8 @@ const SECURITY = [
 const FAQS = [
   { q: 'Do I need to install anything?', a: 'No. The software runs in any modern browser on desktop, laptop or tablet. Your data is stored securely in the cloud, so every counter in your hospital sees the same live information.' },
   { q: 'How does the free trial work?', a: 'Register your hospital and you are signed in immediately on a free trial with all features of the plan you choose. No card is required. Before the trial ends you can activate a paid plan with a license key.' },
-  { q: 'What happens when my subscription ends?', a: 'Your data is never deleted. Staff logins pause, while the hospital admin can still sign in, view records and renew the plan with a new license key — everything resumes instantly.' },
+  { q: 'What happens when my subscription ends?', a: 'Staff logins pause, while the hospital admin can still sign in, view records and renew with a new license key — everything resumes instantly. Your data is kept for at least 90 days after expiry and is never deleted without e-mail notice, so you always have time to renew or export it.' },
+  { q: 'Can I get a refund?', a: 'Yes — you get a full refund if you ask within 7 days of payment and have not activated the license key. Plans never renew automatically. See our Refund & Cancellation Policy for details.' },
   { q: 'How many staff accounts can I create?', a: 'It depends on your plan. Each plan has a limit for doctors, receptionists and pharmacists; the Enterprise plan is unlimited. You can upgrade at any time.' },
   { q: 'Can patients be shared between two hospitals?', a: 'No. Each hospital is a separate, isolated account. Patient numbers, invoices and stock are private to your hospital.' },
   { q: 'Does it work with thermal printers?', a: 'Yes. Token slips, OPD receipts, prescriptions and pharmacy bills are formatted for 80 mm thermal printers, and also print cleanly on A4.' },
@@ -803,6 +804,9 @@ export function Home() {
             <a href="#pricing" className="hover:text-[#3683F8] transition-colors">Pricing</a>
             <Link to="/login" className="hover:text-[#3683F8] transition-colors">Sign in</Link>
             <Link to="/register?mode=license" className="hover:text-[#3683F8] transition-colors">Activate license</Link>
+            <Link to="/terms" className="hover:text-[#3683F8] transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-[#3683F8] transition-colors">Privacy</Link>
+            <Link to="/refund-policy" className="hover:text-[#3683F8] transition-colors">Refunds</Link>
             {settings?.supportEmail && (
               <a href={`mailto:${settings.supportEmail}`} className="hover:text-[#3683F8] inline-flex items-center gap-1.5 transition-colors"><Mail size={14} /> {settings.supportEmail}</a>
             )}

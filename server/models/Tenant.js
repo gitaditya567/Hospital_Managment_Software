@@ -14,6 +14,9 @@ const tenantSchema = new mongoose.Schema({
   adminPhone: { type: String, default: '' },
   hospitalLogo: { type: String, default: '' },
   isTrial: { type: Boolean, default: false },
+  termsAcceptedAt: { type: Date, default: null },
+  termsVersion: { type: String, default: '' },
+  termsAcceptedIp: { type: String, default: '' },
   signupSource: { type: String, enum: ['operator', 'self-signup', 'license-activation'], default: 'operator' },
   status: { 
     type: String, 

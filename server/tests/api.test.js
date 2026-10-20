@@ -107,13 +107,18 @@ test('registration validates input', async () => {
   const bad = await api('POST', '/api/public/register', { body: { hospitalName: 'X', email: 'nope', password: '1' } });
   assert.equal(bad.status, 400);
   assert.ok(bad.data.errors.length >= 3);
+  const noTerms = await api('POST', '/api/public/register', {
+    body: { hospitalName: 'No Terms Hospital', adminName: 'Admin', email: 'noterms@x.test', password: 'Password#1', phone: '9876543210', address: '1 Main Road' }
+  });
+  assert.equal(noTerms.status, 400);
+  assert.match(noTerms.data.message, /Terms of Service/);
 });
 
 test('hospital self-registration starts a free trial and logs the admin in', async () => {
   const r = await api('POST', '/api/public/register', {
     body: {
       hospitalName: 'Alpha Care Hospital', adminName: 'Dr. Alpha', email: 'Admin@Alpha.test',
-      password: 'AlphaPass#1', phone: '9876543210', address: '12 MG Road', city: 'Lucknow', planId: 'plan-basic'
+      password: 'AlphaPass#1', phone: '9876543210', address: '12 MG Road', city: 'Lucknow', planId: 'plan-basic', acceptTerms: true, termsVersion: '1.0'
     }
   });
   assert.equal(r.status, 201, JSON.stringify(r.data));
@@ -122,6 +127,9 @@ test('hospital self-registration starts a free trial and logs the admin in', asy
   assert.equal(r.data.subscription.isTrial, true);
   assert.ok(r.data.subscription.daysLeft >= 13 && r.data.subscription.daysLeft <= 15);
   assert.match(r.data.hospital.accessCode, /^TRIAL-/);
+  const stored = await models.Tenant.findById(r.data.user.hospitalId);
+  assert.ok(stored.termsAcceptedAt, 'terms acceptance timestamp stored');
+  assert.equal(stored.termsVersion, '1.0');
   ctx.alphaAdmin = r.data.token;
   ctx.alphaId = r.data.user.hospitalId;
 
@@ -130,7 +138,7 @@ test('hospital self-registration starts a free trial and logs the admin in', asy
   assert.equal(me.data.user.hospitalId, ctx.alphaId);
 
   const dup = await api('POST', '/api/public/register', {
-    body: { hospitalName: 'Alpha Again', adminName: 'Someone', email: 'admin@alpha.test', password: 'AlphaPass#1', phone: '9876543210', address: '12 MG Road' }
+    body: { hospitalName: 'Alpha Again', adminName: 'Someone', email: 'admin@alpha.test', password: 'AlphaPass#1', phone: '9876543210', address: '12 MG Road', acceptTerms: true }
   });
   assert.equal(dup.status, 409);
 
@@ -292,7 +300,7 @@ test('pharmacy flow: inventory, prescription, transactional checkout', async () 
 
 test('tenant isolation: one hospital cannot see or change another', async () => {
   const r = await api('POST', '/api/public/register', {
-    body: { hospitalName: 'Beta Clinic', adminName: 'Beta Admin', email: 'admin@beta.test', password: 'BetaPass#1', phone: '9123456780', address: '5 Civil Lines' }
+    body: { hospitalName: 'Beta Clinic', adminName: 'Beta Admin', email: 'admin@beta.test', password: 'BetaPass#1', phone: '9123456780', address: '5 Civil Lines', acceptTerms: true }
   });
   assert.equal(r.status, 201);
   ctx.betaAdmin = r.data.token;
@@ -389,7 +397,7 @@ test('super admin: tenants, licenses, renewal and suspension', async () => {
 test('registration with a paid license code activates that plan', async () => {
   const lic = await api('POST', '/api/superadmin/licenses', { token: ctx.root, body: { planId: 'plan-pro', validityMonths: 6 } });
   const r = await api('POST', '/api/public/register', {
-    body: { hospitalName: 'Gamma Hospital', adminName: 'Gamma Admin', email: 'admin@gamma.test', password: 'GammaPass#1', phone: '9000012345', address: '1 Hazratganj', licenseCode: lic.data.code }
+    body: { hospitalName: 'Gamma Hospital', adminName: 'Gamma Admin', email: 'admin@gamma.test', password: 'GammaPass#1', phone: '9000012345', address: '1 Hazratganj', licenseCode: lic.data.code, acceptTerms: true }
   });
   assert.equal(r.status, 201, JSON.stringify(r.data));
   assert.equal(r.data.subscription.isTrial, false);
