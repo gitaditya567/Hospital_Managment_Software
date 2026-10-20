@@ -116,9 +116,14 @@ export function Register() {
           licenseCode: mode === 'license' ? licenseCode.trim() : undefined
         })
       });
-      const data = await res.json().catch(() => ({}));
+      const isJson = (res.headers.get('content-type') || '').includes('application/json');
+      const data = isJson ? await res.json().catch(() => ({})) : {};
       if (!res.ok) {
-        setError(data.message || 'Registration failed. Please try again.');
+        if (!isJson || res.status === 404) {
+          setError(`Registration service is unavailable (HTTP ${res.status}). The server may be restarting or outdated — please try again in a minute.`);
+        } else {
+          setError(data.message || 'Registration failed. Please try again.');
+        }
         return;
       }
 
