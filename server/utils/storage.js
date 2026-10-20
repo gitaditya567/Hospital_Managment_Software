@@ -8,10 +8,11 @@ import { PharmacyBill } from '../models/PharmacyBill.js';
 import { Department } from '../models/Department.js';
 import { DoctorSchedule } from '../models/DoctorSchedule.js';
 import { User } from '../models/User.js';
+import { Appointment } from '../models/Appointment.js';
 import { Tenant } from '../models/Tenant.js';
 
 // Every collection that stores rows owned by a hospital tenant (via hospitalId)
-export const TENANT_SCOPED_MODELS = [Staff, Patient, Invoice, Medicine, Prescription, PharmacyBill, Department, DoctorSchedule, User];
+export const TENANT_SCOPED_MODELS = [Staff, Patient, Invoice, Medicine, Prescription, PharmacyBill, Department, DoctorSchedule, User, Appointment];
 
 // Calculate the actual database storage occupied by a hospital tenant in MB
 export const getHospitalStorageUsed = async (hospitalId) => {

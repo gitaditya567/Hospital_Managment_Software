@@ -10,7 +10,8 @@ import { usePharmacyStore } from '../../store/usePharmacyStore';
 import { ShieldAlert, LogOut, Gift, AlertTriangle } from 'lucide-react';
 
 export function DashboardLayout() {
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  // Sidebar starts open on desktop and closed on phones/tablets so it doesn't cover the page
+  const [isSidebarOpen, setSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 1024);
   const { user, logout } = useAuthStore();
   const fetchSuperAdminData = useSuperAdminStore((state) => state.fetchSuperAdminData);
   const fetchHospitalData = useHospitalStore((state) => state.fetchHospitalData);

@@ -55,7 +55,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         return [
           { to: '/receptionist', icon: LayoutDashboard, label: 'OPD Queue & Check-In' },
           { to: '/receptionist/patients', icon: Users, label: 'Patient Directory' },
-          { to: '/receptionist/appointments', icon: Calendar, label: 'Doctor Schedules' },
+          { to: '/receptionist/appointments', icon: Calendar, label: 'Appointments' },
           { to: '/receptionist/invoices', icon: CreditCard, label: 'OPD Fee Collection' },
         ];
       case 'DOCTOR':

@@ -1,12 +1,13 @@
 import express from 'express';
 import crypto from 'crypto';
 import { requireRole } from '../middleware/auth.js';
-import { getHospitalStorageUsed, isObjectId } from '../utils/storage.js';
+import { getHospitalStorageUsed, isObjectId, escapeRegex } from '../utils/storage.js';
 import { Staff } from '../models/Staff.js';
 import { Department } from '../models/Department.js';
 import { DoctorSchedule } from '../models/DoctorSchedule.js';
 import { Patient } from '../models/Patient.js';
 import { Invoice } from '../models/Invoice.js';
+import { Appointment } from '../models/Appointment.js';
 import { Tenant } from '../models/Tenant.js';
 import { LicenseCode } from '../models/LicenseCode.js';
 import { User } from '../models/User.js';
@@ -372,87 +373,112 @@ hospitalRouter.get('/patients', async (req, res) => {
   }
 });
 
-hospitalRouter.post('/patients', async (req, res) => {
-  const { name, phone, age, gender, doctorName, hospitalId, vitals, pastDiagnoses, paymentStatus, payNow, appointmentTime, appointmentDate } = req.body;
-  try {
-    if (!name || !phone || age === undefined || age === '' || !doctorName) {
-      return res.status(400).json({ message: 'Patient name, phone, age and doctor are required.' });
+// Helper function to generate sequential Invoice ID (INV-1001, INV-1002...)
+const generateSequentialInvoiceNo = async (hospitalId) => {
+  const count = await Invoice.countDocuments({ hospitalId });
+  let nextSeq = 1001 + count;
+
+  // Double-check highest existing invoice number to prevent duplicate collision
+  const lastInvoice = await Invoice.findOne({ hospitalId, invoiceNo: { $regex: /^INV-/ } }).sort({ createdAt: -1 });
+  if (lastInvoice && lastInvoice.invoiceNo) {
+    const parsedNum = parseInt(lastInvoice.invoiceNo.replace('INV-', ''));
+    if (!isNaN(parsedNum) && parsedNum >= nextSeq) {
+      nextSeq = parsedNum + 1;
     }
+  }
+  return `INV-${nextSeq}`;
+};
 
-    // Generate token number: count patients under this doctor today (tokens restart every day)
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const doctorPatientsCount = await Patient.countDocuments({ hospitalId, doctorName, createdAt: { $gte: startOfDay } });
-    const tokenNumber = `OPD-${101 + doctorPatientsCount}`;
+const invoiceDateString = () => new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+const PAYMENT_MODES = ['Cash', 'UPI', 'Card'];
+const cleanPaymentMode = (mode) => (PAYMENT_MODES.includes(mode) ? mode : '');
 
-    // Lookup existing patient to reuse patientNo, or generate a new unique one
-    let patientNo;
-    if (phone) {
-      const existingPatient = await Patient.findOne({ hospitalId, phone, patientNo: { $exists: true, $ne: null } });
-      if (existingPatient && existingPatient.patientNo) {
-        patientNo = existingPatient.patientNo;
-      }
-    }
-    
-    if (!patientNo) {
-      // Find highest existing PAT-XXXX sequence number for this hospital
-      const lastPatientWithNo = await Patient.findOne({ 
-        hospitalId, 
-        patientNo: { $regex: /^PAT-\d+$/ } 
-      }).sort({ createdAt: -1 });
+// Same phone + same name (case-insensitive) is the same person; family members sharing a phone get their own number
+const findPatientNo = async (hospitalId, phone, name) => {
+  const existing = await Patient.findOne({
+    hospitalId,
+    phone,
+    name: { $regex: new RegExp(`^\\s*${escapeRegex(String(name).trim())}\\s*$`, 'i') },
+    patientNo: { $exists: true, $ne: null }
+  }).sort({ createdAt: -1 });
+  if (existing && existing.patientNo) return existing.patientNo;
 
-      let nextSeq = 1001;
-      if (lastPatientWithNo && lastPatientWithNo.patientNo) {
-        const numMatch = lastPatientWithNo.patientNo.match(/\d+/);
-        if (numMatch) {
-          const parsedNum = parseInt(numMatch[0], 10);
-          if (!isNaN(parsedNum)) {
-            nextSeq = parsedNum + 1;
-          }
-        }
-      } else {
-        const totalCount = await Patient.countDocuments({ hospitalId });
-        nextSeq = 1001 + totalCount;
-      }
+  const numbered = await Patient.find({ hospitalId, patientNo: { $regex: /^PAT-\d+$/ } }).select('patientNo').lean();
+  const highest = numbered.reduce((max, p) => Math.max(max, parseInt(p.patientNo.slice(4), 10) || 0), 1000);
+  return `PAT-${highest + 1}`;
+};
 
-      let isUnique = false;
-      while (!isUnique) {
-        const candidate = `PAT-${nextSeq}`;
-        const duplicate = await Patient.findOne({ hospitalId, patientNo: candidate });
-        if (!duplicate) {
-          patientNo = candidate;
-          isUnique = true;
-        } else {
-          nextSeq += 1;
-        }
-      }
-    }
+const nextTokenNumber = async (hospitalId, doctorName) => {
+  // Tokens restart every day for each doctor
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const todayCount = await Patient.countDocuments({ hospitalId, doctorName, createdAt: { $gte: startOfDay } });
+  return `OPD-${101 + todayCount}`;
+};
 
-    let pStatus = paymentStatus || (payNow === false ? 'Unpaid' : 'Paid');
+// Creates today's OPD visit and (optionally) its fee invoice in one step
+const createOpdVisit = async (hospitalId, data) => {
+  const { name, phone, age, gender, doctorName, vitals, pastDiagnoses, appointmentTime, appointmentDate, fee } = data;
+  if (!name || !phone || age === undefined || age === '' || !doctorName) {
+    const err = new Error('Patient name, phone, age and doctor are required.');
+    err.status = 400;
+    throw err;
+  }
 
-    const newPatient = new Patient({
-      name,
-      patientNo,
-      phone,
-      age: Number(age),
-      gender: gender || 'Male',
+  const payNow = data.payNow !== false;
+  const amount = fee && Number(fee.amount) >= 0 ? Number(fee.amount) : null;
+  const patient = new Patient({
+    name: String(name).trim(),
+    patientNo: await findPatientNo(hospitalId, phone, name),
+    phone: String(phone).trim(),
+    age: Number(age),
+    gender: gender || 'Male',
+    doctorName,
+    tokenNumber: await nextTokenNumber(hospitalId, doctorName),
+    timeRegistered: appointmentTime ? `Appt ${appointmentTime}` : 'Walk-in',
+    status: 'Waiting',
+    waitTime: '0m',
+    vitals: vitals || [],
+    pastDiagnoses: pastDiagnoses || '',
+    // Free visits (amount 0) are treated as paid so they go straight to the doctor
+    paymentStatus: data.paymentStatus || (payNow || amount === 0 ? 'Paid' : 'Unpaid'),
+    appointmentTime: appointmentTime || '',
+    appointmentDate: appointmentDate || new Date().toDateString(),
+    hospitalId
+  });
+  await patient.save();
+
+  let invoice = null;
+  if (amount !== null) {
+    invoice = new Invoice({
+      invoiceNo: await generateSequentialInvoiceNo(hospitalId),
+      patientName: patient.name,
+      patientPhone: patient.phone,
+      patientId: patient._id.toString(),
+      amount,
       doctorName,
-      tokenNumber,
-      timeRegistered: appointmentTime ? `Appt ${appointmentTime}` : 'Just now',
-      status: 'Waiting',
-      waitTime: '0m',
-      vitals: vitals || [],
-      pastDiagnoses: pastDiagnoses || '',
-      paymentStatus: pStatus,
-      appointmentTime: appointmentTime || '',
-      appointmentDate: appointmentDate || '',
+      feeType: fee.feeType || 'OPD Consultation Fee',
+      paymentMode: patient.paymentStatus === 'Paid' ? cleanPaymentMode(fee.paymentMode) : '',
+      date: invoiceDateString(),
+      status: patient.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
       hospitalId
     });
+    await invoice.save();
+  }
 
-    await newPatient.save();
-    res.status(201).json(newPatient);
+  const result = patient.toObject();
+  if (invoice) {
+    result.invoice = { ...invoice.toObject(), id: invoice.invoiceNo };
+  }
+  return result;
+};
+
+hospitalRouter.post('/patients', async (req, res) => {
+  try {
+    const visit = await createOpdVisit(req.hospitalId, req.body);
+    res.status(201).json(visit);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(error.status || 400).json({ message: error.message });
   }
 });
 
@@ -471,10 +497,15 @@ hospitalRouter.put('/patients/:id', async (req, res) => {
   }
 });
 
+// Cancelling a check-in also removes its unpaid invoice; collected fees stay in the ledger
 hospitalRouter.delete('/patients/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await Patient.findOneAndDelete(scoped(req, id));
+    const patient = await Patient.findOneAndDelete(scoped(req, id));
+    if (patient) {
+      await Invoice.deleteMany({ hospitalId: req.hospitalId, patientId: patient._id.toString(), status: 'Pending' });
+      await Appointment.updateMany({ hospitalId: req.hospitalId, patientId: patient._id.toString() }, { status: 'Booked', patientId: null });
+    }
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -486,28 +517,12 @@ hospitalRouter.delete('/patients/:id', async (req, res) => {
 // 5. BILLING & INVOICES OPERATIONS
 // ----------------------------------------------------
 
-// Helper function to generate sequential Invoice ID (INV-1001, INV-1002...)
-const generateSequentialInvoiceNo = async (hospitalId) => {
-  const count = await Invoice.countDocuments({ hospitalId });
-  let nextSeq = 1001 + count;
-  
-  // Double-check highest existing invoice number to prevent duplicate collision
-  const lastInvoice = await Invoice.findOne({ hospitalId, invoiceNo: { $regex: /^INV-/ } }).sort({ createdAt: -1 });
-  if (lastInvoice && lastInvoice.invoiceNo) {
-    const parsedNum = parseInt(lastInvoice.invoiceNo.replace('INV-', ''));
-    if (!isNaN(parsedNum) && parsedNum >= nextSeq) {
-      nextSeq = parsedNum + 1;
-    }
-  }
-  return `INV-${nextSeq}`;
-};
-
 hospitalRouter.get('/invoices', async (req, res) => {
   const { hospitalId } = req.query;
   try {
     const query = hospitalId ? { hospitalId } : {};
     let list = await Invoice.find(query).sort({ createdAt: -1 }).lean();
-    
+
     // Auto-fix legacy invoices without invoiceNo
     let counter = 1001;
     const processed = list.map((inv) => {
@@ -526,24 +541,26 @@ hospitalRouter.get('/invoices', async (req, res) => {
 });
 
 hospitalRouter.post('/invoices', async (req, res) => {
-  const { patientName, patientPhone, amount, doctorName, feeType, hospitalId, status } = req.body;
+  const { patientName, patientPhone, patientId, amount, doctorName, feeType, hospitalId, status, paymentMode } = req.body;
   try {
-    const dateString = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     const invoiceNo = await generateSequentialInvoiceNo(hospitalId);
-    
+    const finalStatus = status === 'Paid' ? 'Paid' : 'Pending';
+
     const newInvoice = new Invoice({
       invoiceNo,
       patientName,
       patientPhone,
+      patientId: patientId || null,
       amount: Number(amount),
       doctorName,
       feeType,
-      date: dateString,
-      status: status || 'Pending',
+      paymentMode: finalStatus === 'Paid' ? cleanPaymentMode(paymentMode) : '',
+      date: invoiceDateString(),
+      status: finalStatus,
       hospitalId
     });
     await newInvoice.save();
-    
+
     const responseObj = newInvoice.toObject();
     responseObj.id = invoiceNo;
     res.status(201).json(responseObj);
@@ -558,15 +575,15 @@ hospitalRouter.put('/invoices/:id/collect', async (req, res) => {
     // Support matching by _id OR invoiceNo
     const updated = await Invoice.findOneAndUpdate(
       { $or: [{ _id: isObjectId(id) ? id : null }, { invoiceNo: id }], hospitalId: req.hospitalId },
-      { status: 'Paid' },
+      { status: 'Paid', paymentMode: cleanPaymentMode(req.body && req.body.paymentMode) },
       { new: true }
     );
-    if (updated) {
-      await Patient.updateMany(
-        { hospitalId: updated.hospitalId, phone: updated.patientPhone, paymentStatus: { $ne: 'Paid' } },
-        { paymentStatus: 'Paid' }
-      );
-    }
+    if (!updated) return res.status(404).json({ message: 'Invoice not found.' });
+
+    const patientFilter = updated.patientId && isObjectId(updated.patientId)
+      ? { _id: updated.patientId, hospitalId: updated.hospitalId }
+      : { hospitalId: updated.hospitalId, phone: updated.patientPhone, paymentStatus: { $ne: 'Paid' } };
+    await Patient.updateMany(patientFilter, { paymentStatus: 'Paid' });
     res.json(updated);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -575,7 +592,7 @@ hospitalRouter.put('/invoices/:id/collect', async (req, res) => {
 
 hospitalRouter.put('/patients/:id/collect-fee', async (req, res) => {
   const { id } = req.params;
-  const { amount, feeType } = req.body;
+  const { amount, feeType, paymentMode } = req.body;
   try {
     const patient = await Patient.findOne(scoped(req, id));
     if (!patient) return res.status(404).json({ message: 'Patient profile not found.' });
@@ -583,40 +600,156 @@ hospitalRouter.put('/patients/:id/collect-fee', async (req, res) => {
     patient.paymentStatus = 'Paid';
     await patient.save();
 
-    // Sync or create invoice
-    const existingInvoice = await Invoice.findOne({
-      hospitalId: patient.hospitalId,
-      patientPhone: patient.phone,
-      status: 'Pending'
-    });
+    // Prefer the invoice raised for this visit; fall back to the legacy phone match
+    const pending = await Invoice.findOne({ hospitalId: patient.hospitalId, patientId: patient._id.toString(), status: 'Pending' })
+      || await Invoice.findOne({ hospitalId: patient.hospitalId, patientPhone: patient.phone, patientId: null, status: 'Pending' });
 
-    if (existingInvoice) {
-      existingInvoice.status = 'Paid';
-      await existingInvoice.save();
+    let invoice;
+    if (pending) {
+      pending.status = 'Paid';
+      pending.paymentMode = cleanPaymentMode(paymentMode);
+      await pending.save();
+      invoice = pending;
     } else {
-      const dateString = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-      const invoiceNo = await generateSequentialInvoiceNo(patient.hospitalId);
-      
-      const newInvoice = new Invoice({
-        invoiceNo,
+      invoice = new Invoice({
+        invoiceNo: await generateSequentialInvoiceNo(patient.hospitalId),
         patientName: patient.name,
         patientPhone: patient.phone,
-        amount: Number(amount) || 500,
+        patientId: patient._id.toString(),
+        amount: Number(amount) >= 0 && amount !== undefined ? Number(amount) : (req.tenant?.opdFee || 500),
         doctorName: patient.doctorName,
         feeType: feeType || 'OPD Consultation Fee',
-        date: dateString,
+        paymentMode: cleanPaymentMode(paymentMode),
+        date: invoiceDateString(),
         status: 'Paid',
         hospitalId: patient.hospitalId
       });
-      await newInvoice.save();
+      await invoice.save();
     }
 
-    res.json({ message: 'Consultation fee collected. Patient activated into Doctor Queue.', patient });
+    res.json({ message: 'Consultation fee collected. Patient activated into Doctor Queue.', patient, invoice: { ...invoice.toObject(), id: invoice.invoiceNo } });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
 
+
+// ----------------------------------------------------
+// 5b. APPOINTMENTS (future bookings → OPD queue at check-in)
+// ----------------------------------------------------
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const todayYMD = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+hospitalRouter.get('/appointments', async (req, res) => {
+  const { from, to } = req.query;
+  try {
+    const filter = { hospitalId: req.hospitalId };
+    if (from || to) {
+      filter.date = {};
+      if (from && YMD.test(from)) filter.date.$gte = from;
+      if (to && YMD.test(to)) filter.date.$lte = to;
+    }
+    const list = await Appointment.find(filter).sort({ date: 1, createdAt: 1 }).lean();
+    res.json(list.map(a => ({ ...a, id: a._id.toString() })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+hospitalRouter.post('/appointments', async (req, res) => {
+  const { patientName, phone, age, gender, doctorId, doctorName, date, time, notes } = req.body;
+  try {
+    if (!patientName || !phone || age === undefined || age === '' || !doctorName || !date || !time) {
+      return res.status(400).json({ message: 'Patient name, phone, age, doctor, date and time are required.' });
+    }
+    if (!YMD.test(date) || date < todayYMD()) {
+      return res.status(400).json({ message: 'Appointments can only be booked for today or a future date.' });
+    }
+    const clash = await Appointment.exists({ hospitalId: req.hospitalId, doctorName, date, time, status: 'Booked' });
+    if (clash) {
+      return res.status(409).json({ message: `${doctorName} already has an appointment at ${time} on this date. Please pick another slot.` });
+    }
+    const appt = await Appointment.create({
+      patientName, phone: String(phone).trim(), age: Number(age), gender: gender || 'Male',
+      doctorId: doctorId || '', doctorName, date, time, notes: notes || '', hospitalId: req.hospitalId
+    });
+    res.status(201).json({ ...appt.toObject(), id: appt._id.toString() });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Reschedule or change status (Cancelled / No Show / back to Booked)
+hospitalRouter.put('/appointments/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status, date, time, doctorId, doctorName, notes } = req.body;
+  try {
+    const appt = await Appointment.findOne(scoped(req, id));
+    if (!appt) return res.status(404).json({ message: 'Appointment not found.' });
+    if (appt.status === 'Checked In') {
+      return res.status(400).json({ message: 'This appointment is already checked in. Manage it from the OPD queue.' });
+    }
+    if (status !== undefined) {
+      if (!['Booked', 'Cancelled', 'No Show'].includes(status)) return res.status(400).json({ message: 'Invalid appointment status.' });
+      appt.status = status;
+    }
+    if (date !== undefined) {
+      if (!YMD.test(date) || date < todayYMD()) return res.status(400).json({ message: 'Please choose today or a future date.' });
+      appt.date = date;
+    }
+    if (time !== undefined) appt.time = time;
+    if (doctorName !== undefined) { appt.doctorName = doctorName; appt.doctorId = doctorId || ''; }
+    if (notes !== undefined) appt.notes = notes;
+    await appt.save();
+    res.json({ ...appt.toObject(), id: appt._id.toString() });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+hospitalRouter.delete('/appointments/:id', async (req, res) => {
+  try {
+    await Appointment.findOneAndDelete({ ...scoped(req, req.params.id), status: { $ne: 'Checked In' } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// The patient has arrived: create today's OPD visit (token + invoice) from the booking
+hospitalRouter.post('/appointments/:id/check-in', async (req, res) => {
+  const { payNow, fee, vitals, pastDiagnoses } = req.body;
+  try {
+    const appt = await Appointment.findOne(scoped(req, req.params.id));
+    if (!appt) return res.status(404).json({ message: 'Appointment not found.' });
+    if (appt.status === 'Checked In') return res.status(400).json({ message: 'This appointment is already checked in.' });
+    if (appt.status === 'Cancelled') return res.status(400).json({ message: 'This appointment was cancelled.' });
+    if (appt.date !== todayYMD()) return res.status(400).json({ message: 'Only today\'s appointments can be checked in.' });
+
+    const visit = await createOpdVisit(req.hospitalId, {
+      name: appt.patientName,
+      phone: appt.phone,
+      age: appt.age,
+      gender: appt.gender,
+      doctorName: appt.doctorName,
+      vitals,
+      pastDiagnoses,
+      appointmentTime: appt.time,
+      payNow,
+      fee
+    });
+    appt.status = 'Checked In';
+    appt.patientId = visit._id.toString();
+    await appt.save();
+    res.status(201).json({ appointment: { ...appt.toObject(), id: appt._id.toString() }, patient: visit });
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message });
+  }
+});
 
 // ----------------------------------------------------
 // 6. STANDARD FEES CONFIG OPERATIONS

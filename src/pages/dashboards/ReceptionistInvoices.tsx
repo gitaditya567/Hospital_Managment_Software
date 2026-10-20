@@ -11,6 +11,7 @@ import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSetting
 import type { PrintSettings } from '../../utils/printSettings';
 import { printIsolatedHtml } from '../../utils/printHelper';
 import { buildOpdBillingSlipHtml } from '../../utils/thermalSlipTemplates';
+import { CollectFeeModal } from './reception/receptionShared';
 
 export function ReceptionistInvoices() {
   const { invoices, collectPatientFee, hospitalName } = useHospitalStore();
@@ -57,8 +58,9 @@ export function ReceptionistInvoices() {
     setIsPrintModalOpen(true);
   };
 
+  const [collectTarget, setCollectTarget] = useState<PatientInvoice | null>(null);
   const handleCollect = (invoiceId: string) => {
-    collectPatientFee(invoiceId);
+    setCollectTarget(invoices.find(inv => inv.id === invoiceId) || null);
   };
 
   return (
@@ -201,11 +203,14 @@ export function ReceptionistInvoices() {
                       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         isPaid 
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                          : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
                       }`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                         {invoice.status}
                       </span>
+                      {isPaid && invoice.paymentMode && (
+                        <span className="block text-[10px] font-bold text-slate-500 mt-1">{invoice.paymentMode}</span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex gap-2 justify-end">
@@ -359,6 +364,18 @@ export function ReceptionistInvoices() {
           </div>
         )}
       </Modal>
+
+      <CollectFeeModal
+        open={!!collectTarget}
+        onClose={() => setCollectTarget(null)}
+        patientName={collectTarget?.patientName || ''}
+        amount={collectTarget?.amount || 0}
+        feeType={collectTarget?.feeType || ''}
+        onConfirm={async (mode) => {
+          if (collectTarget) await collectPatientFee(collectTarget.id, mode);
+          setCollectTarget(null);
+        }}
+      />
     </div>
   );
 }

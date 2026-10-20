@@ -28,6 +28,7 @@ export interface StaffMember {
   email: string;
   personalEmail?: string;
   status: 'Active' | 'Inactive' | 'On Leave';
+  consultationFee?: number;
   roleHistory?: Array<{ previousRole: string; newRole: string; updatedAt: string }>;
 }
 
@@ -86,7 +87,54 @@ export interface PatientInvoice {
   status: 'Paid' | 'Pending';
   doctorName: string;
   feeType: string;
+  patientId?: string | null;
+  paymentMode?: PaymentMode | '';
 }
+
+export type PaymentMode = 'Cash' | 'UPI' | 'Card';
+
+export interface VisitFee {
+  amount: number;
+  feeType: string;
+  paymentMode?: PaymentMode;
+}
+
+export interface Appointment {
+  id: string;
+  patientName: string;
+  phone: string;
+  age: number;
+  gender: string;
+  doctorId: string;
+  doctorName: string;
+  date: string; // YYYY-MM-DD
+  time: string;
+  notes: string;
+  status: 'Booked' | 'Checked In' | 'Cancelled' | 'No Show';
+  patientId: string | null;
+}
+
+export interface RegisteredVisit extends PatientRecord {
+  invoice?: PatientInvoice | null;
+}
+
+const readError = async (res: Response, fallback: string) => {
+  const data = await res.json().catch(() => ({}));
+  return (data && data.message) || fallback;
+};
+
+const toInvoice = (i: any): PatientInvoice => ({
+  id: i.invoiceNo || i._id || i.id,
+  patientName: i.patientName,
+  patientPhone: i.patientPhone,
+  date: i.date,
+  amount: i.amount,
+  status: i.status,
+  doctorName: i.doctorName,
+  feeType: i.feeType,
+  patientId: i.patientId || null,
+  paymentMode: i.paymentMode || ''
+});
 
 export interface SubscriptionPlan {
   id: string;
@@ -167,13 +215,18 @@ interface HospitalState {
   updateSchedule: (id: string, updates: Partial<DoctorSchedule>) => Promise<void>;
 
   updateFees: (fees: Partial<StandardFees>) => Promise<void>;
-  registerPatient: (patient: Omit<PatientRecord, 'id' | 'tokenNumber' | 'timeRegistered' | 'status'> & { payNow?: boolean }) => Promise<PatientRecord>;
+  registerPatient: (patient: Omit<PatientRecord, 'id' | 'tokenNumber' | 'timeRegistered' | 'status'> & { payNow?: boolean; fee?: VisitFee }) => Promise<RegisteredVisit>;
   updatePatientStatus: (patientId: string, status: PatientRecord['status']) => Promise<void>;
   addPatientInvoice: (invoice: Omit<PatientInvoice, 'id' | 'date'>) => Promise<void>;
-  collectPatientFee: (invoiceId: string) => Promise<void>;
-  collectPatientFeeDirectly: (patientId: string, amount?: number, feeType?: string) => Promise<void>;
+  collectPatientFee: (invoiceId: string, paymentMode?: PaymentMode) => Promise<void>;
+  collectPatientFeeDirectly: (patientId: string, amount?: number, feeType?: string, paymentMode?: PaymentMode) => Promise<PatientInvoice | null>;
   cancelPatient: (patientId: string) => Promise<void>;
   renewSubscription: (hospitalId: string, licenseCode: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  appointments: Appointment[];
+  fetchAppointments: (from?: string, to?: string) => Promise<void>;
+  bookAppointment: (appt: Omit<Appointment, 'id' | 'status' | 'patientId' | 'notes'> & { notes?: string }) => Promise<Appointment>;
+  updateAppointment: (id: string, updates: Partial<Pick<Appointment, 'status' | 'date' | 'time' | 'doctorId' | 'doctorName' | 'notes'>>) => Promise<Appointment>;
+  checkInAppointment: (id: string, opts: { payNow: boolean; fee: VisitFee; vitals?: Array<{ name: string; value: string }>; pastDiagnoses?: string }) => Promise<RegisteredVisit>;
   setHospitalName: (name: string) => void;
   setHospitalLogo: (logo: string) => void;
 }
@@ -273,6 +326,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
           email: s.email,
           personalEmail: s.personalEmail || '',
           status: s.status,
+          consultationFee: typeof s.consultationFee === 'number' ? s.consultationFee : undefined,
           roleHistory: s.roleHistory || []
         })),
         departments: deptData.map((d: any) => ({
@@ -323,16 +377,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
             };
           });
         })(),
-        invoices: invData.map((i: any) => ({
-          id: i.invoiceNo || i._id || i.id,
-          patientName: i.patientName,
-          patientPhone: i.patientPhone,
-          date: i.date,
-          amount: i.amount,
-          status: i.status,
-          doctorName: i.doctorName,
-          feeType: i.feeType
-        })),
+        invoices: invData.map(toInvoice),
         fees: feesData,
         hospitalName: profileData.hospitalName || get().hospitalName || 'Smart Hospital',
         hospitalLogo: profileData.hospitalLogo || get().hospitalLogo || localStorage.getItem('medisaas_hospital_logo') || '',
@@ -528,13 +573,16 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...patient, hospitalId })
       });
+      if (!response.ok) {
+        throw new Error(await readError(response, 'Could not register the patient. Please try again.'));
+      }
 
       const data = await response.json();
       await get().fetchHospitalData(hospitalId);
 
       const targetDate = data.appointmentDate || (patient as any).appointmentDate || getStoredApptDate(patient.phone, patient.name) || data.createdAt;
 
-      const created: PatientRecord = {
+      const created: RegisteredVisit = {
         id: data._id || data.id,
         patientNo: data.patientNo,
         name: data.name,
@@ -548,7 +596,9 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
         waitTime: data.waitTime,
         appointmentDate: targetDate,
         vitals: data.vitals || [],
-        pastDiagnoses: data.pastDiagnoses || ''
+        pastDiagnoses: data.pastDiagnoses || '',
+        paymentStatus: data.paymentStatus,
+        createdAt: data.createdAt
       };
 
       set(state => {
@@ -560,7 +610,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
         };
       });
 
-      return created;
+      return { ...created, invoice: data.invoice ? toInvoice(data.invoice) : null };
     } catch (err) {
       console.error('Failed to register patient', err);
       throw err;
@@ -595,11 +645,13 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
     }
   },
 
-  collectPatientFee: async (invoiceId) => {
+  collectPatientFee: async (invoiceId, paymentMode) => {
     const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
     try {
       await fetch(`/api/hospital/invoices/${invoiceId}/collect`, {
-        method: 'PUT'
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentMode })
       });
       await get().fetchHospitalData(hospitalId);
     } catch (err) {
@@ -607,17 +659,20 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
     }
   },
 
-  collectPatientFeeDirectly: async (patientId, amount = 500, feeType = 'OPD Consultation Fee') => {
+  collectPatientFeeDirectly: async (patientId, amount, feeType = 'OPD Consultation Fee', paymentMode) => {
     const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
     try {
-      await fetch(`/api/hospital/patients/${patientId}/collect-fee`, {
+      const res = await fetch(`/api/hospital/patients/${patientId}/collect-fee`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, feeType })
+        body: JSON.stringify({ amount, feeType, paymentMode })
       });
+      const data = await res.json().catch(() => ({}));
       await get().fetchHospitalData(hospitalId);
+      return res.ok && data.invoice ? toInvoice(data.invoice) : null;
     } catch (err) {
       console.error('Failed to collect patient fee directly', err);
+      return null;
     }
   },
 
@@ -629,6 +684,77 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
     } catch (err) {
       console.error('Failed to cancel patient appointment', err);
     }
+  },
+
+  appointments: [],
+
+  fetchAppointments: async (from, to) => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    try {
+      const res = await fetch(`/api/hospital/appointments?${params.toString()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      set({ appointments: asArray(data) });
+    } catch (err) {
+      console.error('Failed to load appointments', err);
+    }
+  },
+
+  bookAppointment: async (appt) => {
+    const res = await fetch('/api/hospital/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(appt)
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Could not book the appointment.'));
+    const created: Appointment = await res.json();
+    set(state => ({ appointments: [...state.appointments, created] }));
+    return created;
+  },
+
+  updateAppointment: async (id, updates) => {
+    const res = await fetch(`/api/hospital/appointments/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Could not update the appointment.'));
+    const updated: Appointment = await res.json();
+    set(state => ({ appointments: state.appointments.map(a => (a.id === id ? updated : a)) }));
+    return updated;
+  },
+
+  checkInAppointment: async (id, opts) => {
+    const hospitalId = useAuthStore.getState().user?.hospitalId || '';
+    const res = await fetch(`/api/hospital/appointments/${id}/check-in`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(opts)
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Could not check in this appointment.'));
+    const data = await res.json();
+    set(state => ({ appointments: state.appointments.map(a => (a.id === id ? data.appointment : a)) }));
+    await get().fetchHospitalData(hospitalId);
+    const p = data.patient;
+    return {
+      id: p._id || p.id,
+      patientNo: p.patientNo,
+      name: p.name,
+      phone: p.phone,
+      age: p.age,
+      gender: p.gender,
+      doctorName: p.doctorName,
+      tokenNumber: p.tokenNumber,
+      timeRegistered: p.timeRegistered,
+      status: p.status,
+      paymentStatus: p.paymentStatus,
+      createdAt: p.createdAt,
+      appointmentTime: p.appointmentTime,
+      appointmentDate: p.appointmentDate,
+      invoice: p.invoice ? toInvoice(p.invoice) : null
+    };
   },
 
   renewSubscription: async (hospitalId, licenseCode) => {

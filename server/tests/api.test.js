@@ -243,6 +243,92 @@ test('OPD flow: registration, daily tokens, fee collection, consultation', async
   ctx.patientOne = p1.data;
 });
 
+test('reception: one-step visit + invoice, family numbering, cancel clears dues', async () => {
+  const visit = await api('POST', '/api/hospital/patients', {
+    token: ctx.reception,
+    body: { name: 'Kiran Rao', phone: '8100000001', age: 34, gender: 'Female', doctorName: 'Dr. One', payNow: true, fee: { amount: 700, feeType: 'OPD Consultation Fee', paymentMode: 'UPI' } }
+  });
+  assert.equal(visit.status, 201, JSON.stringify(visit.data));
+  assert.equal(visit.data.paymentStatus, 'Paid');
+  assert.equal(visit.data.invoice.amount, 700);
+  assert.equal(visit.data.invoice.status, 'Paid');
+  assert.equal(visit.data.invoice.paymentMode, 'UPI');
+  assert.equal(visit.data.invoice.patientId, visit.data._id);
+
+  // Same phone, different person -> new patient number; same person again -> same number
+  const child = await api('POST', '/api/hospital/patients', {
+    token: ctx.reception,
+    body: { name: 'Aarav Rao', phone: '8100000001', age: 6, gender: 'Male', doctorName: 'Dr. One', payNow: false, fee: { amount: 500 } }
+  });
+  assert.notEqual(child.data.patientNo, visit.data.patientNo);
+  assert.equal(child.data.paymentStatus, 'Unpaid');
+  assert.equal(child.data.invoice.status, 'Pending');
+  const again = await api('POST', '/api/hospital/patients', {
+    token: ctx.reception,
+    body: { name: '  kiran rao ', phone: '8100000001', age: 34, doctorName: 'Dr. One', payNow: true, fee: { amount: 0 } }
+  });
+  assert.equal(again.data.patientNo, visit.data.patientNo);
+
+  // Free visit counts as paid
+  assert.equal(again.data.paymentStatus, 'Paid');
+
+  // Cancelling an unpaid check-in removes its pending invoice
+  const del = await api('DELETE', `/api/hospital/patients/${child.data._id}`, { token: ctx.reception });
+  assert.equal(del.status, 200);
+  const invs = await api('GET', '/api/hospital/invoices', { token: ctx.reception });
+  assert.equal(invs.data.some(i => i.patientId === child.data._id), false, 'pending invoice of cancelled visit removed');
+
+  // Collect-fee uses the visit's own invoice and records the payment mode
+  const unpaid = await api('POST', '/api/hospital/patients', {
+    token: ctx.reception,
+    body: { name: 'Meena Das', phone: '8100000002', age: 50, doctorName: 'Dr. One', payNow: false, fee: { amount: 650 } }
+  });
+  const collected = await api('PUT', `/api/hospital/patients/${unpaid.data._id}/collect-fee`, { token: ctx.reception, body: { paymentMode: 'Card' } });
+  assert.equal(collected.status, 200);
+  assert.equal(collected.data.invoice.amount, 650);
+  assert.equal(collected.data.invoice.paymentMode, 'Card');
+  assert.equal(collected.data.invoice.invoiceNo, unpaid.data.invoice.invoiceNo, 'no duplicate invoice created');
+});
+
+test('appointments: book, clash, reschedule, check-in creates the visit once', async () => {
+  const d = new Date();
+  const ymd = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  const today = ymd(d);
+  const tomorrow = ymd(new Date(d.getTime() + 86400000));
+  const yesterday = ymd(new Date(d.getTime() - 86400000));
+
+  const past = await api('POST', '/api/hospital/appointments', { token: ctx.reception, body: { patientName: 'Old', phone: '8200000000', age: 30, doctorName: 'Dr. One', date: yesterday, time: '10:00 AM' } });
+  assert.equal(past.status, 400);
+
+  const before = (await api('GET', '/api/hospital/patients', { token: ctx.reception })).data.length;
+  const future = await api('POST', '/api/hospital/appointments', { token: ctx.reception, body: { patientName: 'Future Patient', phone: '8200000001', age: 40, doctorName: 'Dr. One', date: tomorrow, time: '11:00 AM' } });
+  assert.equal(future.status, 201);
+  const after = (await api('GET', '/api/hospital/patients', { token: ctx.reception })).data.length;
+  assert.equal(after, before, 'booking does not add anyone to today\'s queue');
+
+  const clash = await api('POST', '/api/hospital/appointments', { token: ctx.reception, body: { patientName: 'Clash', phone: '8200000002', age: 22, doctorName: 'Dr. One', date: tomorrow, time: '11:00 AM' } });
+  assert.equal(clash.status, 409);
+
+  const early = await api('POST', `/api/hospital/appointments/${future.data.id}/check-in`, { token: ctx.reception, body: { payNow: true, fee: { amount: 500 } } });
+  assert.equal(early.status, 400, 'future appointment cannot be checked in today');
+
+  const moved = await api('PUT', `/api/hospital/appointments/${future.data.id}`, { token: ctx.reception, body: { date: today, time: '04:00 PM' } });
+  assert.equal(moved.data.date, today);
+
+  const checkIn = await api('POST', `/api/hospital/appointments/${future.data.id}/check-in`, { token: ctx.reception, body: { payNow: true, fee: { amount: 500, paymentMode: 'Cash' } } });
+  assert.equal(checkIn.status, 201, JSON.stringify(checkIn.data));
+  assert.match(checkIn.data.patient.tokenNumber, /^OPD-\d+$/);
+  assert.equal(checkIn.data.appointment.status, 'Checked In');
+  const twice = await api('POST', `/api/hospital/appointments/${future.data.id}/check-in`, { token: ctx.reception, body: { payNow: true, fee: { amount: 500 } } });
+  assert.equal(twice.status, 400, 'cannot check in twice');
+
+  const list = await api('GET', `/api/hospital/appointments?from=${today}&to=${tomorrow}`, { token: ctx.reception });
+  assert.equal(list.data.length, 1);
+
+  const other = await api('GET', '/api/hospital/appointments', { token: ctx.betaAdmin || ctx.alphaAdmin });
+  assert.ok(Array.isArray(other.data));
+});
+
 test('pharmacy flow: inventory, prescription, transactional checkout', async () => {
   const med = await api('POST', '/api/pharmacy/inventory', {
     token: ctx.pharmacy,

@@ -11,6 +11,14 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+  // Esc closes the dialog
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -21,9 +29,11 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
           className
         )}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100/60 bg-slate-50/20">
+        <div role="dialog" aria-modal="true" aria-label={title} className="flex items-center justify-between px-6 py-4 border-b border-slate-100/60 bg-slate-50/20">
           <h2 className="text-lg font-bold text-slate-800 tracking-tight">{title}</h2>
-          <button 
+          <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all duration-200 active:scale-95"
           >

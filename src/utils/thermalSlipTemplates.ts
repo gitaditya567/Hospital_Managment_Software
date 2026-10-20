@@ -310,6 +310,8 @@ export function buildOpdQueueSlipHtml(data: {
   date: string;
   billNo?: string;
   footerText?: string;
+  paymentStatus?: 'Paid' | 'Due';
+  paymentMode?: string;
 }): string {
   const isMongoId = Boolean(data.patientId && data.patientId.length === 24 && /^[0-9a-fA-F]{24}$/.test(data.patientId));
   const displayPatientNo = data.patientNo || (!isMongoId ? data.patientId : '');
@@ -334,6 +336,11 @@ export function buildOpdQueueSlipHtml(data: {
     taxRows:             [],
     total:               data.amount,
     footerText:          data.footerText,
+    ...(data.paymentStatus ? {
+      statusBadge: data.paymentStatus === 'Paid' ? 'PAID' : 'FEE DUE',
+      statusColor: data.paymentStatus === 'Paid' ? 'green' as const : 'red' as const
+    } : {}),
+    ...(data.paymentMode ? { paymentMode: data.paymentMode } : {}),
   });
 }
 

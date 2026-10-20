@@ -1,745 +1,464 @@
-import { useState } from 'react';
-import { useHospitalStore } from '../../store/useHospitalStore';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { VitalsModal } from '../../components/VitalsModal';
-import { printIsolatedHtml } from '../../utils/printHelper';
-import { buildOpdQueueSlipHtml } from '../../utils/thermalSlipTemplates';
-import { 
-  Calendar as CalendarIcon, Clock, Users, Plus, ChevronLeft, ChevronRight, Activity, 
-  UserPlus, Printer, CheckCircle2, CalendarDays, IndianRupee
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  CalendarClock, Plus, Phone, Clock, CheckCircle2, XCircle, UserX, RotateCcw, CalendarDays, Search, AlertTriangle, X
 } from 'lucide-react';
+import { useHospitalStore } from '../../store/useHospitalStore';
+import type { Appointment, PaymentMode } from '../../store/useHospitalStore';
+import { Modal } from '../../components/ui/Modal';
+import { doctorTitle } from '../../lib/utils';
+import {
+  PaymentModePicker, PersonPicker, ToastStack, feeOptionsFor, peopleForPhone, printOpdSlip, roomFor,
+  slotsFor, timeToMinutes, toYMD, useToasts
+} from './reception/receptionShared';
+
+const DAYS_AHEAD = 15;
+
+const statusStyle: Record<Appointment['status'], string> = {
+  'Booked': 'bg-[#EBF3FE] text-[#3683F8] border-blue-200',
+  'Checked In': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Cancelled': 'bg-slate-100 text-slate-500 border-slate-200',
+  'No Show': 'bg-amber-50 text-amber-700 border-amber-200'
+};
+
+const fromYMD = (s: string) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+interface FormState {
+  phone: string;
+  personKey: string;
+  name: string;
+  age: string;
+  gender: string;
+  doctorId: string;
+  date: string;
+  time: string;
+  notes: string;
+}
 
 export function ReceptionistAppointments() {
-  const { staff, patients, invoices, registerPatient, addPatientInvoice, collectPatientFeeDirectly } = useHospitalStore();
-  const doctors = staff.filter(s => s.role === 'Doctor' && s.status === 'Active');
+  const {
+    patients, staff, schedules, fees, appointments,
+    fetchAppointments, bookAppointment, updateAppointment, checkInAppointment
+  } = useHospitalStore();
+  const { toasts, push, dismiss } = useToasts();
 
-  const [selectedDoctor, setSelectedDoctor] = useState('All');
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const doctors = useMemo(() => staff.filter(s => s.role === 'Doctor' && s.status === 'Active'), [staff]);
+  const today = toYMD(new Date());
+  const lastDay = toYMD(new Date(Date.now() + (DAYS_AHEAD - 1) * 86400000));
 
-  // Helper for local time YYYY-MM-DD
-  const formatToLocalYYYYMMDD = (d: Date) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  const days = useMemo(() => Array.from({ length: DAYS_AHEAD }, (_, i) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + i);
+    return d;
+  }), []);
 
-  // Date Boundaries: No past dates, max 15 days in advance
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [doctorFilter, setDoctorFilter] = useState('All');
+  const [showClosed, setShowClosed] = useState(false);
+  const [search, setSearch] = useState('');
 
-  const max15Days = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
-  max15Days.setHours(23, 59, 59, 999);
+  useEffect(() => {
+    fetchAppointments(today, lastDay);
+  }, [fetchAppointments, today, lastDay]);
 
-  const todayStr = formatToLocalYYYYMMDD(today);
-  const max15DaysStr = formatToLocalYYYYMMDD(max15Days);
+  const bookedOn = (ymd: string) => appointments.filter(a => a.date === ymd && a.status === 'Booked').length;
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toDateString());
-  const [apptDateInput, setApptDateInput] = useState(todayStr);
+  const list = appointments
+    .filter(a => a.date === selectedDate)
+    .filter(a => doctorFilter === 'All' || a.doctorName === doctorFilter)
+    .filter(a => showClosed || a.status === 'Booked' || a.status === 'Checked In')
+    .filter(a => {
+      const q = search.trim().toLowerCase();
+      return !q || a.patientName.toLowerCase().includes(q) || a.phone.includes(q);
+    })
+    .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
-  // Real scheduled appointments state
-  const [appointments, setAppointments] = useState<any[]>([]);
-
-  // Form State
-  const [newAppt, setNewAppt] = useState({
-    name: '',
-    phone: '',
-    age: '',
-    gender: 'Male',
-    doctorId: doctors[0]?.id || '',
-    time: '10:00 AM'
+  // ───────── Book / reschedule form ─────────
+  const emptyForm = (): FormState => ({
+    phone: '', personKey: 'new', name: '', age: '', gender: 'Male',
+    doctorId: doctors[0]?.id || '', date: selectedDate, time: '', notes: ''
   });
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Appointment | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  // Auto-fill existing patient state
-  const [existingPatientFound, setExistingPatientFound] = useState<any | null>(null);
+  const knownPeople = useMemo(() => peopleForPhone(patients, form.phone), [patients, form.phone]);
+  const formDoctor = doctors.find(d => d.id === form.doctorId);
+  const formSchedule = schedules.find(s => s.doctorId === form.doctorId || s.doctorName === formDoctor?.name);
+  const { slots, worksThatDay, hoursLabel } = slotsFor(formSchedule, fromYMD(form.date));
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const takenSlots = new Set(
+    appointments
+      .filter(a => a.date === form.date && a.doctorName === formDoctor?.name && a.status === 'Booked' && a.id !== editing?.id)
+      .map(a => a.time)
+  );
 
-  // Patient vitals and diagnoses states for scheduler
-  const [vitals, setVitals] = useState<Array<{ name: string; value: string }>>([]);
-  const [pastDiagnoses, setPastDiagnoses] = useState('');
-  const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
+  const set = (patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch }));
 
-  // Phone input auto-lookup handler
-  const handlePhoneChange = (phoneInput: string) => {
-    const cleanPhone = phoneInput.replace(/\D/g, '').slice(0, 10);
-    setNewAppt(prev => ({ ...prev, phone: cleanPhone }));
-
-    if (cleanPhone.length === 10) {
-      const match = patients.find(p => p.phone === cleanPhone);
-      if (match) {
-        setExistingPatientFound(match);
-        setNewAppt(prev => ({
-          ...prev,
-          name: match.name,
-          age: match.age ? String(match.age) : prev.age,
-          gender: match.gender || 'Male'
-        }));
-        if (match.vitals && match.vitals.length > 0) {
-          setVitals(match.vitals);
-        }
-        if (match.pastDiagnoses) {
-          setPastDiagnoses(match.pastDiagnoses);
-        }
-      } else {
-        setExistingPatientFound(null);
-      }
-    } else {
-      setExistingPatientFound(null);
-    }
+  const openBook = () => {
+    setEditing(null);
+    setForm(emptyForm());
+    setFormError('');
+    setFormOpen(true);
   };
 
-  const handleCreateAppointment = async (e: React.FormEvent) => {
+  const openReschedule = (a: Appointment) => {
+    setEditing(a);
+    setForm({
+      phone: a.phone, personKey: 'new', name: a.patientName, age: String(a.age), gender: a.gender,
+      doctorId: doctors.find(d => d.name === a.doctorName)?.id || doctors[0]?.id || '',
+      date: a.date < today ? today : a.date, time: a.time, notes: a.notes || ''
+    });
+    setFormError('');
+    setFormOpen(true);
+  };
+
+  // Phone lookup pre-fills the most recent patient on this number
+  useEffect(() => {
+    if (editing || form.phone.length !== 10) return;
+    const person = knownPeople[0];
+    if (person) set({ personKey: person.key, name: person.name, age: String(person.age), gender: person.gender });
+    else set({ personKey: 'new' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.phone.length === 10 ? form.phone : '']);
+
+  const choosePerson = (key: string) => {
+    const person = knownPeople.find(p => p.key === key);
+    set(person
+      ? { personKey: key, name: person.name, age: String(person.age), gender: person.gender }
+      : { personKey: 'new', name: '', age: '', gender: 'Male' });
+  };
+
+  const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    const doc = doctors.find(d => d.id === newAppt.doctorId);
-    if (!doc) return;
-
-    // Local Date parsing
-    const [y, m, d] = apptDateInput.split('-').map(Number);
-    const chosenDateObj = new Date(y, m - 1, d);
-    if (chosenDateObj < today || chosenDateObj > max15Days) {
-      alert("Appointments can only be scheduled for Today or up to 15 days in advance.");
-      return;
+    setFormError('');
+    if (!editing) {
+      if (form.phone.length !== 10) return setFormError('Enter a 10-digit mobile number.');
+      if (!form.name.trim()) return setFormError('Enter the patient name.');
+      if (!form.age || Number(form.age) < 0 || Number(form.age) > 120) return setFormError('Enter a valid age (0–120).');
     }
+    if (!formDoctor) return setFormError('Choose a doctor.');
+    if (!form.time) return setFormError('Choose a time slot.');
 
-    const apptDateFormatted = chosenDateObj.toDateString();
-
-    // Register patient or update EMR
-    const registered = await registerPatient({
-      name: newAppt.name,
-      phone: newAppt.phone,
-      age: parseInt(newAppt.age) || 30,
-      gender: newAppt.gender,
-      doctorName: doc.name,
-      vitals,
-      pastDiagnoses,
-      appointmentTime: newAppt.time,
-      appointmentDate: apptDateFormatted,
-      payNow: false
-    } as any);
-
-    addPatientInvoice({
-      patientName: newAppt.name,
-      patientPhone: newAppt.phone,
-      amount: 500,
-      status: 'Pending',
-      doctorName: doc.name,
-      feeType: 'OPD Consultation Fee'
-    });
-
-    // Store in appointments list and sync to global Zustand store for Doctor Console visibility
-    const newEntry = {
-      id: registered.id || `APPT-${Date.now()}`,
-      patientNo: registered.patientNo || 'PAT-1001',
-      patientName: newAppt.name,
-      phone: newAppt.phone,
-      age: parseInt(newAppt.age) || 30,
-      gender: newAppt.gender,
-      doctorId: doc.id,
-      doctorName: doc.name,
-      date: apptDateFormatted,
-      time: newAppt.time,
-      status: 'Confirmed (Fee Pending)',
-      type: 'Scheduled',
-      vitals,
-      pastDiagnoses
-    };
-
-    setAppointments(prev => {
-      const exists = prev.some(a => a.id === newEntry.id || (a.phone === newEntry.phone && a.patientName === newEntry.patientName && a.date === newEntry.date));
-      return exists ? prev.map(a => (a.id === newEntry.id || (a.phone === newEntry.phone && a.patientName === newEntry.patientName && a.date === newEntry.date)) ? newEntry : a) : [newEntry, ...prev];
-    });
-    setSelectedDate(apptDateFormatted);
-
-    // Reset Form
-    setNewAppt({
-      name: '',
-      phone: '',
-      age: '',
-      gender: 'Male',
-      doctorId: doctors[0]?.id || '',
-      time: '10:00 AM'
-    });
-    setExistingPatientFound(null);
-    setVitals([]);
-    setPastDiagnoses('');
-    setShowAddForm(false);
-  };
-
-  const handleApptCheckIn = async (appt: any, payNow: boolean) => {
-    const newPatient = await registerPatient({
-      name: appt.patientName,
-      phone: appt.phone,
-      age: appt.age,
-      gender: appt.gender || 'Male',
-      doctorName: appt.doctorName,
-      vitals: appt.vitals || [],
-      pastDiagnoses: appt.pastDiagnoses || '',
-      appointmentTime: appt.time,
-      appointmentDate: appt.date,
-      payNow
-    });
-
-    if (payNow) {
-      await collectPatientFeeDirectly(newPatient.id, 500, 'OPD Consultation Fee');
-    } else {
-      addPatientInvoice({
-        patientName: appt.patientName,
-        patientPhone: appt.phone,
-        amount: 500,
-        status: 'Pending',
-        doctorName: appt.doctorName,
-        feeType: 'OPD Consultation Fee'
-      });
-    }
-
-    // Forcefully preserve appointmentDate & paymentStatus in store
-    useHospitalStore.setState(state => ({
-      patients: state.patients.map(p => 
-        (p.id === newPatient.id || (p.phone === appt.phone && p.name === appt.patientName))
-          ? { ...p, appointmentDate: appt.date, paymentStatus: payNow ? 'Paid' : p.paymentStatus }
-          : p
-      )
-    }));
-
-    setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: payNow ? 'Checked-In (Paid)' : 'Checked-In (Fee Pending)' } : a));
-    alert(`Appointment for "${appt.patientName}" checked in into live OPD queue (Token: ${newPatient.tokenNumber})!`);
-  };
-
-  // Generate calendar days
-  const getDaysInMonth = () => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const date = new Date(year, month, 1);
-    const days = [];
-
-    const firstDayIndex = date.getDay();
-    for (let i = 0; i < firstDayIndex; i++) {
-      days.push(null);
-    }
-
-    while (date.getMonth() === month) {
-      days.push(new Date(date));
-      date.setDate(date.getDate() + 1);
-    }
-    return days;
-  };
-
-  const days = getDaysInMonth();
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  // Helper for timezone-safe date string parsing
-  const parseToDateString = (dateVal: any) => {
-    if (!dateVal) return new Date().toDateString();
-    if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
-      const [y, m, d] = dateVal.split('-').map(Number);
-      return new Date(y, m - 1, d).toDateString();
-    }
-    const dObj = new Date(dateVal);
-    return !isNaN(dObj.getTime()) ? dObj.toDateString() : new Date().toDateString();
-  };
-
-  // Deduplicate and combine master patient directory with scheduler appointments
-  const allAppointmentsMap = new Map();
-
-  patients.forEach(p => {
-    const pInv = invoices.find(i => i.patientName === p.name || i.patientPhone === p.phone);
-    const isPaid = p.paymentStatus === 'Paid' || pInv?.status === 'Paid';
-    const apptDateStr = parseToDateString((p as any).appointmentDate || p.createdAt);
-    const doc = doctors.find(d => d.name === p.doctorName) || doctors[0];
-    const key = `${p.phone}-${p.name}`.toLowerCase();
-    
-    allAppointmentsMap.set(key, {
-      id: p.id,
-      patientNo: p.patientNo || 'PAT-1001',
-      patientName: p.name,
-      phone: p.phone,
-      age: p.age,
-      gender: p.gender || 'Male',
-      doctorId: doc?.id || 'EMP-001',
-      doctorName: p.doctorName,
-      date: apptDateStr,
-      time: p.appointmentTime || 'OPD Walk-In',
-      status: isPaid ? 'Checked-In (Paid)' : 'Confirmed (Fee Pending)',
-      paymentStatus: isPaid ? 'Paid' : 'Pending',
-      type: p.appointmentTime ? 'Scheduled' : 'Walk-In',
-      vitals: p.vitals || [],
-      pastDiagnoses: p.pastDiagnoses || ''
-    });
-  });
-
-  appointments.forEach(a => {
-    const key = `${a.phone}-${a.patientName}`.toLowerCase();
-    if (!allAppointmentsMap.has(key)) {
-      allAppointmentsMap.set(key, a);
-    } else {
-      const existing = allAppointmentsMap.get(key);
-      if (a.status.includes('Paid')) {
-        existing.status = a.status;
-        existing.paymentStatus = 'Paid';
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateAppointment(editing.id, { date: form.date, time: form.time, doctorId: formDoctor.id, doctorName: formDoctor.name, notes: form.notes });
+        push('success', `Appointment moved to ${fromYMD(form.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, ${form.time}.`);
+      } else {
+        await bookAppointment({
+          patientName: form.name.trim(), phone: form.phone, age: Number(form.age), gender: form.gender,
+          doctorId: formDoctor.id, doctorName: formDoctor.name, date: form.date, time: form.time, notes: form.notes
+        });
+        push('success', `Booked ${form.name.trim()} with ${doctorTitle(formDoctor.name)} on ${fromYMD(form.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} at ${form.time}.`);
       }
+      setSelectedDate(form.date);
+      setFormOpen(false);
+    } catch (err: any) {
+      setFormError(err?.message || 'Could not save the appointment.');
+    } finally {
+      setSaving(false);
     }
-  });
+  };
 
-  const allAppointments = Array.from(allAppointmentsMap.values());
+  // ───────── Status changes ─────────
+  const changeStatus = async (a: Appointment, status: Appointment['status'], label: string) => {
+    if (status === 'Cancelled' && !window.confirm(`Cancel ${a.patientName}'s appointment at ${a.time}?`)) return;
+    try {
+      await updateAppointment(a.id, { status });
+      push('success', `${a.patientName}: ${label}.`);
+    } catch (err: any) {
+      push('error', err?.message || 'Could not update the appointment.');
+    }
+  };
 
-  const filteredAppointments = allAppointments.filter(appt => {
-    const matchesDoctor = selectedDoctor === 'All' || appt.doctorId === selectedDoctor;
-    const matchesDate = appt.date === selectedDate;
-    return matchesDoctor && matchesDate;
-  });
+  // ───────── Check-in ─────────
+  const [checkIn, setCheckIn] = useState<Appointment | null>(null);
+  const [payNow, setPayNow] = useState(true);
+  const [mode, setMode] = useState<PaymentMode>('Cash');
+  const [feeKey, setFeeKey] = useState('opd');
+  const [busy, setBusy] = useState(false);
+  const checkInDoctor = checkIn ? doctors.find(d => d.name === checkIn.doctorName) : undefined;
+  const checkInFees = feeOptionsFor(fees, checkInDoctor);
+  const checkInFee = checkInFees.find(f => f.key === feeKey) || checkInFees[0];
 
-  // KPI Calculations for Selected Date
-  const totalCountForDate = filteredAppointments.length;
-  const paidCountForDate = filteredAppointments.filter(a => a.status.includes('Paid') || a.paymentStatus === 'Paid').length;
-  const pendingCountForDate = totalCountForDate - paidCountForDate;
+  const openCheckIn = (a: Appointment) => {
+    setCheckIn(a);
+    setPayNow(true);
+    setMode('Cash');
+    const doc = doctors.find(d => d.name === a.doctorName);
+    setFeeKey(feeOptionsFor(fees, doc).some(f => f.key === 'doctor') ? 'doctor' : 'opd');
+  };
+
+  const confirmCheckIn = async () => {
+    if (!checkIn) return;
+    setBusy(true);
+    try {
+      const visit = await checkInAppointment(checkIn.id, {
+        payNow,
+        fee: { amount: checkInFee.amount, feeType: checkInFee.feeType, paymentMode: mode }
+      });
+      const paid = visit.paymentStatus === 'Paid';
+      printOpdSlip({
+        tokenNumber: visit.tokenNumber, patientId: visit.id, patientNo: visit.patientNo, patientName: visit.name,
+        phone: visit.phone, age: visit.age, gender: visit.gender || 'Male', doctorName: visit.doctorName,
+        room: roomFor(schedules, checkInDoctor || { name: visit.doctorName }), feeType: checkInFee.feeType,
+        amount: checkInFee.amount, paid, paymentMode: paid ? mode : undefined, invoiceNo: visit.invoice?.id
+      });
+      push('success', `${visit.name} checked in · Token ${visit.tokenNumber}${paid ? '' : ' · fee due'}`);
+      setCheckIn(null);
+    } catch (err: any) {
+      push('error', err?.message || 'Check-in failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dayAppointments = appointments.filter(a => a.date === selectedDate);
+  const summary = {
+    booked: dayAppointments.filter(a => a.status === 'Booked').length,
+    checkedIn: dayAppointments.filter(a => a.status === 'Checked In').length,
+    closed: dayAppointments.filter(a => a.status === 'Cancelled' || a.status === 'No Show').length
+  };
+  const isTodaySelected = selectedDate === today;
 
   return (
-    <div className="space-y-6 font-sans pb-16">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 text-white relative overflow-hidden">
-        <div className="space-y-1 z-10">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-white animate-ping"></span>
-            <span className="text-[10px] font-extrabold text-blue-100 uppercase tracking-widest">Appointments Manager</span>
-          </div>
-          <h1 className="text-2xl font-black text-white flex items-center gap-2 tracking-tight">
-            <CalendarIcon size={24} className="text-blue-100" /> Doctor Schedules &amp; Booking Console
-          </h1>
-          <p className="text-blue-50 text-xs font-semibold">
-            Book slots, auto-lookup registered patients, enforce 15-day limit, and track payment status
-          </p>
+    <div className="space-y-5 font-sans pb-16">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#3683F8] p-5 sm:p-6 rounded-2xl shadow-lg text-white">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2"><CalendarClock size={22} /> Appointments</h1>
+          <p className="text-blue-50 text-xs mt-1">Book visits up to {DAYS_AHEAD} days ahead. Patients join the OPD queue when you check them in on the day.</p>
         </div>
-        <Button onClick={() => {
-          if (doctors.length > 0) {
-            setNewAppt(prev => ({ ...prev, doctorId: doctors[0].id }));
-          }
-          const selObj = new Date(selectedDate);
-          if (!isNaN(selObj.getTime())) {
-            setApptDateInput(formatToLocalYYYYMMDD(selObj));
-          }
-          setShowAddForm(!showAddForm);
-        }} className="h-11 px-5 text-xs font-extrabold gap-2 bg-white text-[#3683F8] hover:bg-blue-50 rounded-xl shadow-md flex items-center border border-white/30 z-10">
-          <Plus size={16} /> Book New Appointment
-        </Button>
+        <button type="button" onClick={openBook} disabled={doctors.length === 0} className="h-11 px-5 rounded-xl bg-white text-[#3683F8] font-extrabold text-sm inline-flex items-center gap-2 hover:bg-blue-50 disabled:opacity-60">
+          <Plus size={18} /> Book appointment
+        </button>
       </div>
 
-      {/* Selected Date Summary KPIs Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bookings for Date</p>
-            <h3 className="text-xl font-black text-[#060606] mt-0.5">{totalCountForDate} Patients</h3>
-            <p className="text-[10px] text-blue-600 font-bold truncate max-w-[170px]">{selectedDate}</p>
-          </div>
-          <div className="h-10 w-10 rounded-xl bg-[#EBF3FE] text-[#3683F8] flex items-center justify-center font-bold">
-            <CalendarDays size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Paid Appointments</p>
-            <h3 className="text-xl font-black text-emerald-700 mt-0.5">{paidCountForDate} Cleared</h3>
-            <p className="text-[10px] text-emerald-600 font-bold">Fee collected ✓</p>
-          </div>
-          <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <CheckCircle2 size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Pending Due</p>
-            <h3 className="text-xl font-black text-rose-600 mt-0.5">{pendingCountForDate} Unpaid</h3>
-            <p className="text-[10px] text-rose-500 font-bold">Collect at reception</p>
-          </div>
-          <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-            <Clock size={20} />
-          </div>
+      {/* Date strip */}
+      <div className="bg-white rounded-2xl border border-[#D8D8D8] p-3">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {days.map(d => {
+            const ymd = toYMD(d);
+            const active = ymd === selectedDate;
+            const count = bookedOn(ymd);
+            return (
+              <button
+                key={ymd}
+                type="button"
+                onClick={() => setSelectedDate(ymd)}
+                className={`shrink-0 w-[72px] rounded-xl border py-2 text-center transition-all ${active ? 'bg-[#060606] border-[#060606] text-white' : 'bg-white border-[#D8D8D8] hover:border-[#3683F8]'}`}
+              >
+                <div className={`text-[10px] font-bold uppercase ${active ? 'text-slate-300' : 'text-slate-400'}`}>
+                  {ymd === today ? 'Today' : d.toLocaleDateString('en-IN', { weekday: 'short' })}
+                </div>
+                <div className="text-lg font-black leading-tight">{d.getDate()}</div>
+                <div className={`text-[10px] font-bold ${active ? 'text-slate-300' : 'text-slate-400'}`}>{d.toLocaleDateString('en-IN', { month: 'short' })}</div>
+                <div className={`mt-1 text-[10px] font-extrabold ${count > 0 ? (active ? 'text-[#7fb2ff]' : 'text-[#3683F8]') : 'opacity-0'}`}>{count} booked</div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendar Card */}
-        <div className="bg-white rounded-2xl p-5 border border-[#D8D8D8] shadow-xs flex flex-col">
-          <div className="flex justify-between items-center mb-3 border-b border-[#D8D8D8] pb-3">
-            <div>
-              <h2 className="text-sm font-extrabold text-[#060606] tracking-tight">Select Date</h2>
-              <p className="text-[10px] text-slate-400 font-bold">Max 15 Days Ahead</p>
-            </div>
-            <div className="flex gap-1 items-center">
-              <button
-                onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))}
-                className="p-1.5 hover:bg-[#EBF3FE] rounded-full text-slate-600 transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-xs font-bold text-[#060606] px-1">
-                {currentMonth.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-              </span>
-              <button
-                onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))}
-                className="p-1.5 hover:bg-[#EBF3FE] rounded-full text-slate-600 transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+      <div className="bg-white rounded-2xl border border-[#D8D8D8] overflow-hidden">
+        <div className="p-4 border-b border-[#D8D8D8] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-extrabold flex items-center gap-2">
+              <CalendarDays size={17} className="text-[#3683F8]" />
+              {fromYMD(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h2>
+            <p className="text-[11px] text-slate-500 font-semibold">{summary.booked} booked · {summary.checkedIn} checked in · {summary.closed} cancelled / no-show</p>
           </div>
-
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
-            {weekDays.map(d => <div key={d}>{d}</div>)}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 flex-1">
-            {days.map((day, idx) => {
-              if (!day) return <div key={`empty-${idx}`} className="h-9"></div>;
-              const dateStr = day.toDateString();
-              const isSelected = selectedDate === dateStr;
-              const isToday = new Date().toDateString() === dateStr;
-
-              // Date boundaries check
-              const dayObj = new Date(day);
-              dayObj.setHours(0,0,0,0);
-              const isPast = dayObj < today;
-              const isTooFar = dayObj > max15Days;
-              const isDisabled = isPast || isTooFar;
-
-              const apptCount = allAppointments.filter(a => a.date === dateStr).length;
-
-              return (
-                <button
-                  key={dateStr}
-                  disabled={isDisabled}
-                  onClick={() => {
-                    if (!isDisabled) {
-                      setSelectedDate(dateStr);
-                      setApptDateInput(formatToLocalYYYYMMDD(day));
-                    }
-                  }}
-                  title={isDisabled ? (isPast ? 'Past date not allowed' : 'Max 15 days ahead') : dateStr}
-                  className={`h-10 rounded-xl flex flex-col items-center justify-center text-xs font-semibold relative transition-all duration-150 ${
-                    isDisabled ? 'opacity-30 cursor-not-allowed bg-slate-50 text-slate-400' :
-                    isSelected ? 'bg-[#3683F8] text-white font-extrabold shadow-xs scale-105' : 
-                    isToday ? 'bg-[#EBF3FE] text-[#3683F8] border border-blue-300 font-bold' :
-                    'hover:bg-[#EBF3FE]/50 text-[#060606]'
-                  }`}
-                >
-                  <span>{day.getDate()}</span>
-                  {apptCount > 0 && !isDisabled && (
-                    <span className={`w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-white' : 'bg-[#3683F8]'}`}></span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name or phone" className="h-9 w-44 pl-8 pr-3 rounded-xl border border-[#D8D8D8] text-xs font-semibold focus:outline-none focus:border-[#3683F8]" />
+            </div>
+            <select value={doctorFilter} onChange={e => setDoctorFilter(e.target.value)} className="h-9 px-2 rounded-xl border border-[#D8D8D8] text-xs font-bold bg-white">
+              <option value="All">All doctors</option>
+              {doctors.map(d => <option key={d.id} value={d.name}>{doctorTitle(d.name)}</option>)}
+            </select>
+            <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 cursor-pointer">
+              <input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} className="rounded border-[#D8D8D8]" />
+              Show cancelled
+            </label>
           </div>
         </div>
 
-        {/* Schedule & Appointment List */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Add Form */}
-          {showAddForm && (
-            <div className="bg-white border border-[#D8D8D8] rounded-2xl p-5 shadow-xs space-y-4 animate-in slide-in-from-top duration-200">
-              <div className="flex justify-between items-center border-b border-[#D8D8D8] pb-2">
-                <h2 className="text-sm font-extrabold text-[#060606] flex items-center gap-1.5">
-                  <Plus size={16} className="text-[#3683F8]" /> New Appointment Form
-                </h2>
-                <span className="text-[10px] font-bold text-[#3683F8] bg-[#EBF3FE] px-2.5 py-1 rounded-lg">
-                  15-Day Booking Limit Active
-                </span>
+        <div className="divide-y divide-[#D8D8D8]/70">
+          {list.map(a => (
+            <div key={a.id} className={`p-4 flex flex-col md:flex-row md:items-center gap-3 ${a.status === 'Cancelled' ? 'opacity-60' : ''}`}>
+              <div className="w-24 shrink-0">
+                <div className="text-sm font-black text-[#3683F8] flex items-center gap-1"><Clock size={13} /> {a.time}</div>
+                <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${statusStyle[a.status]}`}>{a.status}</span>
               </div>
-
-              {/* Auto-fill Notification Banner */}
-              {existingPatientFound && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-between animate-in fade-in">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                    <span>
-                      Registered Patient Found: <strong>{existingPatientFound.name}</strong> ({existingPatientFound.patientNo || 'PAT-1001'}). Medical details auto-filled!
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md">
-                    {existingPatientFound.phone}
-                  </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-extrabold truncate">{a.patientName} <span className="text-xs font-semibold text-slate-500">· {a.age}{(a.gender || 'M')[0]}</span></div>
+                <div className="text-xs text-slate-500 font-semibold flex flex-wrap gap-x-3">
+                  <span className="inline-flex items-center gap-1"><Phone size={11} /> {a.phone}</span>
+                  <span>{doctorTitle(a.doctorName)}</span>
+                  {a.notes && <span className="italic truncate">“{a.notes}”</span>}
                 </div>
-              )}
-
-              <form onSubmit={handleCreateAppointment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Phone Number (Auto-Lookup)"
-                  required
-                  value={newAppt.phone}
-                  onChange={e => handlePhoneChange(e.target.value)}
-                  maxLength={10}
-                  pattern="[0-9]{10}"
-                  placeholder="Enter 10-digit mobile"
-                  className="border-[#D8D8D8] text-xs font-mono"
-                />
-
-                <Input
-                  label="Patient Full Name"
-                  required
-                  value={newAppt.name}
-                  onChange={e => setNewAppt({ ...newAppt, name: e.target.value })}
-                  placeholder="e.g. Rahul Verma"
-                  className="border-[#D8D8D8] text-xs font-bold"
-                />
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label="Age (Years)"
-                    type="number"
-                    required
-                    value={newAppt.age}
-                    onChange={e => setNewAppt({ ...newAppt, age: e.target.value })}
-                    placeholder="e.g. 34"
-                    className="border-[#D8D8D8] text-xs font-mono"
-                  />
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gender</label>
-                    <select
-                      className="flex h-10 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] font-bold text-[#060606]"
-                      value={newAppt.gender}
-                      onChange={e => setNewAppt({ ...newAppt, gender: e.target.value })}
-                    >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Appointment Date</label>
-                    <input
-                      type="date"
-                      required
-                      min={todayStr}
-                      max={max15DaysStr}
-                      value={apptDateInput}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setApptDateInput(val);
-                        if (val) {
-                          const [y, m, d] = val.split('-').map(Number);
-                          const selObj = new Date(y, m - 1, d);
-                          setSelectedDate(selObj.toDateString());
-                        }
-                      }}
-                      className="flex h-10 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slot Time</label>
-                    <input
-                      type="text"
-                      className="flex h-10 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
-                      value={newAppt.time}
-                      onChange={e => setNewAppt({ ...newAppt, time: e.target.value })}
-                      placeholder="10:00 AM"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Consulting Physician</label>
-                  <select
-                    className="flex h-10 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] font-bold text-[#060606]"
-                    value={newAppt.doctorId}
-                    onChange={e => setNewAppt({ ...newAppt, doctorId: e.target.value })}
-                  >
-                    {doctors.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.department || 'General OPD'})</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Vitals */}
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clinical Vitals &amp; Medical History</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsVitalsModalOpen(true)}
-                    className={`w-full py-2 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all duration-200 ${
-                      vitals.length > 0
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        : 'border-blue-200 bg-[#EBF3FE] text-[#3683F8]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Activity size={14} className={vitals.length > 0 ? "animate-pulse text-emerald-600" : "text-[#3683F8]"} />
-                      {vitals.length > 0 ? 'Vitals & History Saved' : 'Add Vitals & Medical History'}
-                    </span>
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                      vitals.length > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-[#3683F8]'
-                    }`}>
-                      {vitals.length > 0 ? `${vitals.length} Recorded` : 'Pending'}
-                    </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 md:justify-end">
+                {a.status === 'Booked' && isTodaySelected && (
+                  <button type="button" onClick={() => openCheckIn(a)} className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold inline-flex items-center gap-1.5">
+                    <CheckCircle2 size={14} /> Check in
                   </button>
+                )}
+                {a.status === 'Booked' && (
+                  <>
+                    <button type="button" onClick={() => openReschedule(a)} className="h-9 px-3 rounded-xl border border-[#D8D8D8] text-xs font-bold text-slate-700 hover:border-[#3683F8] inline-flex items-center gap-1.5">
+                      <CalendarClock size={14} /> Reschedule
+                    </button>
+                    {isTodaySelected && (
+                      <button type="button" onClick={() => changeStatus(a, 'No Show', 'marked as no-show')} className="h-9 px-3 rounded-xl border border-[#D8D8D8] text-xs font-bold text-amber-700 hover:border-amber-400 inline-flex items-center gap-1.5">
+                        <UserX size={14} /> No-show
+                      </button>
+                    )}
+                    <button type="button" onClick={() => changeStatus(a, 'Cancelled', 'appointment cancelled')} className="h-9 px-3 rounded-xl border border-[#D8D8D8] text-xs font-bold text-rose-600 hover:border-rose-300 inline-flex items-center gap-1.5">
+                      <XCircle size={14} /> Cancel
+                    </button>
+                  </>
+                )}
+                {(a.status === 'Cancelled' || a.status === 'No Show') && (
+                  <button type="button" onClick={() => changeStatus(a, 'Booked', 'appointment restored')} className="h-9 px-3 rounded-xl border border-[#D8D8D8] text-xs font-bold text-slate-700 inline-flex items-center gap-1.5">
+                    <RotateCcw size={14} /> Restore
+                  </button>
+                )}
+                {a.status === 'Checked In' && <span className="text-xs font-bold text-emerald-700">In today's OPD queue</span>}
+              </div>
+            </div>
+          ))}
+          {list.length === 0 && (
+            <div className="py-14 text-center">
+              <CalendarClock size={32} className="mx-auto text-slate-200 mb-2" />
+              <p className="text-sm font-bold text-slate-400">No appointments for this day.</p>
+              <button type="button" onClick={openBook} className="mt-3 text-xs font-bold text-[#3683F8]">+ Book one now</button>
+            </div>
+          )}
+        </div>
+      </div>
 
-                  {vitals.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5 p-2 bg-emerald-50/30 border border-emerald-100/40 rounded-lg max-h-16 overflow-y-auto">
-                      {vitals.map(v => (
-                        <span key={v.name} className="text-[8px] font-bold px-1.5 py-0.5 bg-white border border-emerald-100 text-emerald-700 rounded-md">
-                          {v.name.replace('Pressure', 'BP').replace('Temperature', 'Temp')}: {v.value}
-                        </span>
-                      ))}
-                      {pastDiagnoses && (
-                        <span className="text-[8px] font-bold px-1.5 py-0.5 bg-white border border-[#D8D8D8] text-slate-500 rounded-md truncate max-w-[200px]" title={pastDiagnoses}>
-                          Dx: {pastDiagnoses}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
+      {/* Book / reschedule */}
+      <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title={editing ? `Reschedule · ${editing.patientName}` : 'Book appointment'} className="max-w-xl">
+        <form onSubmit={submitForm} className="space-y-4 max-h-[75vh] overflow-y-auto -mx-1 px-1">
+          {formError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex gap-2"><AlertTriangle size={15} className="shrink-0" /> {formError}</div>
+          )}
 
-                <div className="md:col-span-2 pt-2 border-t border-[#D8D8D8] flex justify-end gap-2.5">
-                  <Button type="button" variant="ghost" onClick={() => setShowAddForm(false)} className="text-xs font-bold">Cancel</Button>
-                  <Button type="submit" className="bg-[#3683F8] hover:bg-blue-600 text-white font-extrabold text-xs rounded-xl shadow-md px-6">
-                    Confirm Appointment Slot
-                  </Button>
+          {!editing && (
+            <div className="space-y-2">
+              <div className="relative">
+                <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  autoFocus
+                  inputMode="numeric"
+                  placeholder="Mobile number (10 digits)"
+                  value={form.phone}
+                  onChange={e => set({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                  className="w-full h-11 pl-9 pr-9 rounded-xl border border-[#D8D8D8] text-sm font-mono font-bold focus:outline-none focus:border-[#3683F8]"
+                />
+                {form.phone && <button type="button" onClick={() => set({ phone: '' })} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" aria-label="Clear phone"><X size={15} /></button>}
+              </div>
+              {form.phone.length === 10 && knownPeople.length > 0 && <PersonPicker people={knownPeople} selectedKey={form.personKey} onSelect={choosePerson} />}
+              <div className="grid grid-cols-6 gap-2">
+                <input placeholder="Patient full name" value={form.name} onChange={e => set({ name: e.target.value })} className="col-span-6 sm:col-span-3 h-10 px-3 rounded-xl border border-[#D8D8D8] text-sm font-semibold focus:outline-none focus:border-[#3683F8]" />
+                <input type="number" min={0} max={120} placeholder="Age" value={form.age} onChange={e => set({ age: e.target.value })} className="col-span-2 sm:col-span-1 h-10 px-3 rounded-xl border border-[#D8D8D8] text-sm font-semibold focus:outline-none focus:border-[#3683F8]" />
+                <div className="col-span-4 sm:col-span-2 grid grid-cols-3 gap-1">
+                  {['Male', 'Female', 'Other'].map(g => (
+                    <button key={g} type="button" onClick={() => set({ gender: g })} className={`h-10 rounded-xl border text-[11px] font-bold ${form.gender === g ? 'bg-[#060606] text-white border-[#060606]' : 'border-[#D8D8D8] text-slate-600'}`}>{g === 'Other' ? 'Other' : g.slice(0, 4)}</button>
+                  ))}
                 </div>
-              </form>
+              </div>
             </div>
           )}
 
-          {/* List Card */}
-          <div className="bg-white rounded-2xl p-5 border border-[#D8D8D8] shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[#D8D8D8] pb-3">
-              <div>
-                <h2 className="text-sm font-extrabold text-[#060606] tracking-tight">
-                  Bookings for {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
-                </h2>
-                <p className="text-[11px] text-slate-400 font-medium">Real-time doctor appointment &amp; payment tracking</p>
-              </div>
-              <div className="space-y-1">
-                <select
-                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-[#EBF3FE]/40 px-3 py-1.5 text-xs font-extrabold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
-                  value={selectedDoctor}
-                  onChange={e => setSelectedDoctor(e.target.value)}
-                >
-                  <option value="All">All Doctors ({doctors.length})</option>
-                  {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Doctor</span>
+              <select value={form.doctorId} onChange={e => set({ doctorId: e.target.value, time: '' })} className="w-full h-10 px-2 rounded-xl border border-[#D8D8D8] text-sm font-bold bg-white">
+                {doctors.map(d => <option key={d.id} value={d.id}>{doctorTitle(d.name)} · {d.department || 'General'}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Date</span>
+              <input type="date" min={today} max={lastDay} value={form.date} onChange={e => set({ date: e.target.value, time: '' })} className="w-full h-10 px-3 rounded-xl border border-[#D8D8D8] text-sm font-bold" />
+            </label>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Time slot</span>
+              <span className="text-[11px] font-semibold text-slate-400">OPD hours: {hoursLabel}</span>
             </div>
-
-            <div className="divide-y divide-[#D8D8D8]/60 overflow-hidden">
-              {filteredAppointments.map(appt => {
-                const pInv = invoices.find(i => i.patientName === appt.patientName || i.patientPhone === appt.phone);
-                const isPaid = appt.status.includes('Paid') || appt.paymentStatus === 'Paid' || pInv?.status === 'Paid';
-
+            {!worksThatDay && (
+              <p className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                {formDoctor ? doctorTitle(formDoctor.name) : 'This doctor'} is not scheduled on this day ({formSchedule?.days}). You can still book if needed.
+              </p>
+            )}
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-0.5">
+              {slots.map(slot => {
+                const past = form.date === today && timeToMinutes(slot) <= nowMinutes;
+                const taken = takenSlots.has(slot);
+                const active = form.time === slot;
                 return (
-                  <div key={appt.id} className="py-3.5 flex items-center justify-between hover:bg-[#EBF3FE]/20 px-2 rounded-xl transition-all duration-150">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs text-[#060606]">{appt.patientName}</span>
-                        <span className="text-[10px] font-bold text-[#3683F8] bg-[#EBF3FE] px-1.5 py-0.5 rounded font-mono">
-                          {appt.patientNo || 'PAT-1001'}
-                        </span>
-                        <span className="text-[9px] font-bold text-slate-400">({appt.age} Yrs / {appt.gender || 'Male'})</span>
-                        <span className={`text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-bold ${
-                          appt.type === 'Walk-In' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-[#EBF3FE] text-[#3683F8] border border-blue-200'
-                        }`}>
-                          {appt.type}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-[10px] text-slate-500 font-semibold">
-                        <span className="flex items-center gap-1"><Clock size={12} className="text-[#3683F8]" /> {appt.time}</span>
-                        <span className="flex items-center gap-1"><Users size={12} className="text-slate-400" /> {appt.doctorName}</span>
-                        <span className="text-slate-400 font-mono">{appt.phone}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {/* Payment Status Badge */}
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border flex items-center gap-1 ${
-                        isPaid
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
-                      }`}>
-                        {isPaid ? <CheckCircle2 size={11} className="text-emerald-600" /> : <Clock size={11} className="text-rose-500" />}
-                        {isPaid ? 'Paid ₹500 ✓' : 'Pending ₹500 ⏳'}
-                      </span>
-
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-1.5">
-                        {!isPaid ? (
-                          <button
-                            type="button"
-                            onClick={() => handleApptCheckIn(appt, true)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all"
-                            title="Collect Fee ₹500 & Check-In into Doctor Queue"
-                          >
-                            <IndianRupee size={11} /> Collect &amp; Check-In
-                          </button>
-                        ) : (
-                          !appt.status.includes('Checked-In') && (
-                            <button
-                              type="button"
-                              onClick={() => handleApptCheckIn(appt, true)}
-                              className="px-2.5 py-1 bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all"
-                              title="Check-in into Doctor Queue"
-                            >
-                              <UserPlus size={11} /> Check-In
-                            </button>
-                          )
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const slipHtml = buildOpdQueueSlipHtml({
-                              tokenNumber: appt.tokenNumber || 'APP-01',
-                              patientName: appt.patientName,
-                              patientId: appt.id,
-                              patientNo: appt.patientNo || 'PAT-1001',
-                              age: appt.age,
-                              gender: appt.gender || 'Male',
-                              phone: appt.phone,
-                              doctorName: appt.doctorName,
-                              feeType: 'OPD Consultation Fee',
-                              amount: 500,
-                              date: appt.date
-                            });
-                            printIsolatedHtml("OPD Appointment Slip", slipHtml);
-                          }}
-                          className="p-1.5 hover:bg-[#EBF3FE] text-[#3683F8] rounded-xl text-xs font-bold border border-blue-200 transition-colors"
-                          title="Print Thermal Slip"
-                        >
-                          <Printer size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <button
+                    key={slot}
+                    type="button"
+                    disabled={past || taken}
+                    onClick={() => set({ time: slot })}
+                    title={taken ? 'Already booked' : past ? 'Time has passed' : ''}
+                    className={`h-9 rounded-lg border text-[11px] font-bold transition-all ${active ? 'bg-[#3683F8] border-[#3683F8] text-white' : taken ? 'bg-slate-100 border-slate-200 text-slate-300 line-through' : past ? 'border-slate-100 text-slate-300' : 'border-[#D8D8D8] text-slate-700 hover:border-[#3683F8]'}`}
+                  >
+                    {slot.replace(' AM', 'a').replace(' PM', 'p')}
+                  </button>
                 );
               })}
-
-              {filteredAppointments.length === 0 && (
-                <div className="py-12 text-center text-slate-400 text-xs font-semibold space-y-1">
-                  <CalendarDays size={28} className="mx-auto text-slate-300 opacity-60" />
-                  <p>No appointments scheduled for this physician on {selectedDate}.</p>
-                </div>
-              )}
             </div>
           </div>
-        </div>
-      </div>
 
-      <VitalsModal
-        isOpen={isVitalsModalOpen}
-        onClose={() => setIsVitalsModalOpen(false)}
-        onSave={(savedVitals, savedDiagnoses) => {
-          setVitals(savedVitals);
-          setPastDiagnoses(savedDiagnoses);
-        }}
-        initialVitals={vitals}
-        initialPastDiagnoses={pastDiagnoses}
-      />
+          <input placeholder="Note (optional) — e.g. follow-up, reports to bring" value={form.notes} onChange={e => set({ notes: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-[#D8D8D8] text-sm focus:outline-none focus:border-[#3683F8]" />
+
+          <button type="submit" disabled={saving} className="w-full h-11 rounded-xl bg-[#3683F8] hover:bg-blue-600 disabled:opacity-60 text-white font-extrabold text-sm">
+            {saving ? 'Saving…' : editing ? 'Save new time' : form.time ? `Book for ${form.time}` : 'Book appointment'}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Check-in */}
+      <Modal isOpen={!!checkIn} onClose={() => setCheckIn(null)} title="Check in appointment" className="max-w-sm">
+        {checkIn && (
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-slate-50 border border-[#D8D8D8] p-4">
+              <div className="text-sm font-extrabold">{checkIn.patientName}</div>
+              <div className="text-xs text-slate-500 font-semibold">{checkIn.time} · {doctorTitle(checkIn.doctorName)}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {checkInFees.map(f => (
+                <button key={f.key} type="button" onClick={() => setFeeKey(f.key)} className={`text-left px-2.5 py-2 rounded-xl border text-xs font-bold ${feeKey === f.key ? 'border-[#3683F8] bg-[#EBF3FE]' : 'border-[#D8D8D8] text-slate-600'}`}>
+                  <span className="block truncate">{f.label}</span><span className="text-[#3683F8]">₹{f.amount.toLocaleString('en-IN')}</span>
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => setPayNow(true)} className={`h-10 rounded-xl border text-xs font-bold ${payNow ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-[#D8D8D8]'}`}>Paid now</button>
+              <button type="button" onClick={() => setPayNow(false)} className={`h-10 rounded-xl border text-xs font-bold ${!payNow ? 'bg-rose-600 border-rose-600 text-white' : 'border-[#D8D8D8]'}`}>Pay later</button>
+            </div>
+            {payNow && checkInFee.amount > 0 && <PaymentModePicker value={mode} onChange={setMode} />}
+            <button type="button" disabled={busy} onClick={confirmCheckIn} className="w-full h-11 rounded-xl bg-[#3683F8] hover:bg-blue-600 disabled:opacity-60 text-white font-extrabold text-sm">
+              {busy ? 'Checking in…' : 'Check in & print token'}
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      <ToastStack toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
-

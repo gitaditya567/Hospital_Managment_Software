@@ -5,34 +5,33 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { VitalsModal } from '../../components/VitalsModal';
 import {
-  Users, Search, FileText, UserPlus, Calendar, Shield, CheckCircle2,
-  TrendingUp, Award, UserCheck, Activity, Printer
+  Users, Search, FileText, UserPlus, Calendar, CheckCircle2,
+  TrendingUp, UserCheck, Activity, Printer
 } from 'lucide-react';
 import { DataNavigationToolbar, INITIAL_FILTER_STATE, applyDataFilters } from '../../components/common/DataNavigationToolbar';
 import type { FilterState } from '../../components/common/DataNavigationToolbar';
 import { getHospitalDisplayName } from '../../utils/printSettings';
+import type { PaymentMode } from '../../store/useHospitalStore';
+import { doctorTitle } from '../../lib/utils';
+import { PaymentModePicker, feeOptionsFor, isToday, printOpdSlip, roomFor, type SlipData } from './reception/receptionShared';
 
 export function ReceptionistPatients() {
-  const { patients, staff, registerPatient, invoices, addPatientInvoice } = useHospitalStore();
+  const { patients, staff, registerPatient, invoices, fees, schedules } = useHospitalStore();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'ALL' | 'NEXT_APPOINTMENT' | 'FIRST_APPOINTMENT'>('ALL');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
 
-  const formatToLocalYYYYMMDD = (d: Date) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
   // Quick check-in states
   const [checkInDoctorId, setCheckInDoctorId] = useState('');
-  const [checkInDateInput, setCheckInDateInput] = useState(formatToLocalYYYYMMDD(new Date()));
-  const [checkInFeeType, setCheckInFeeType] = useState('OPD Consultation Fee');
+  const [checkInFeeType, setCheckInFeeType] = useState('opd');
+  const [checkInMode, setCheckInMode] = useState<PaymentMode>('Cash');
+  const [checkInBusy, setCheckInBusy] = useState(false);
+  const [checkInError, setCheckInError] = useState('');
   const [payNow, setPayNow] = useState(true);
-  const [checkInSuccessData, setCheckInSuccessData] = useState<any>(null);
+  const [checkInSuccessData, setCheckInSuccessData] = useState<SlipData | null>(null);
 
   // Vitals & diagnoses state for Quick Check-In
   const [vitals, setVitals] = useState<Array<{ name: string; value: string }>>([]);
@@ -47,11 +46,9 @@ export function ReceptionistPatients() {
 
   (patients || []).forEach(p => {
     if (!p) return;
-    const key = (p.phone && p.phone.trim())
-      ? `phone:${p.phone.trim()}`
-      : (p.patientNo && p.patientNo.trim())
-        ? `no:${p.patientNo.trim()}`
-        : `id:${p.id || p.name ? p.name.trim().toLowerCase() : Math.random().toString()}`;
+    const key = (p.patientNo && p.patientNo.trim())
+      ? `no:${p.patientNo.trim()}`
+      : `person:${(p.phone || '').trim()}:${(p.name || '').trim().toLowerCase()}`;
 
     const existing = uniquePatientsMap.get(key);
     if (existing) {
@@ -215,11 +212,13 @@ export function ReceptionistPatients() {
   const totalUnique = uniquePatients.length;
   const returningPatients = uniquePatients.filter(p => p.visitsCount > 1).length;
   const returningRate = totalUnique > 0 ? Math.round((returningPatients / totalUnique) * 100) : 0;
-  const newPatientsToday = uniquePatients.filter(p => p.timeRegistered === 'Just now' || p.timeRegistered.includes('mins')).length;
+  const newPatientsToday = uniquePatients.filter(p => p.visitsCount === 1 && isToday(p.createdAt)).length;
+  const visitsToday = (patients || []).filter(p => isToday(p.createdAt)).length;
 
   const handleOpenHistory = (patient: any) => {
-    // Find billing records linked to this patient's phone
-    const patientBilling = invoices.filter(inv => inv.patientPhone === patient.phone);
+    // Billing records for this person's visits (legacy invoices are matched by phone)
+    const visitIds = new Set((patient.allVisits || []).map((v: PatientRecord) => v.id));
+    const patientBilling = invoices.filter(inv => inv.patientId ? visitIds.has(inv.patientId) : inv.patientPhone === patient.phone);
     setSelectedPatient({
       ...patient,
       billing: patientBilling
@@ -230,6 +229,10 @@ export function ReceptionistPatients() {
   const handleOpenCheckIn = (patient: PatientRecord) => {
     setSelectedPatient(patient);
     setCheckInSuccessData(null);
+    setCheckInError('');
+    setCheckInFeeType('opd');
+    setCheckInMode('Cash');
+    setPayNow(true);
     setVitals([]);
     setPastDiagnoses('');
     if (activeDoctors.length > 0) {
@@ -238,51 +241,53 @@ export function ReceptionistPatients() {
     setIsCheckInModalOpen(true);
   };
 
+  const checkInDoctor = activeDoctors.find(d => d.id === checkInDoctorId);
+  const checkInFees = feeOptionsFor(fees, checkInDoctor);
+  const checkInFee = checkInFees.find(f => f.key === checkInFeeType) || checkInFees[0];
+
   const handleQuickCheckInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient || !checkInDoctorId) return;
-
-    const selectedDoc = activeDoctors.find(d => d.id === checkInDoctorId);
-    const doctorName = selectedDoc ? selectedDoc.name : 'General Physician';
-
-    const [y, m, d] = checkInDateInput.split('-').map(Number);
-    const chosenDateObj = new Date(y, m - 1, d);
-    const apptDateFormatted = chosenDateObj.toDateString();
-
-    // Register
-    const newPatient = await registerPatient({
-      name: selectedPatient.name,
-      phone: selectedPatient.phone,
-      age: selectedPatient.age,
-      gender: selectedPatient.gender || 'Male',
-      doctorName,
-      vitals,
-      pastDiagnoses,
-      appointmentDate: apptDateFormatted,
-      appointmentTime: 'OPD Walk-In',
-      payNow
-    });
-
-    // Add Invoice
-    const feeAmount = checkInFeeType === 'Emergency Consultation Fee' ? 1200 : 500;
-    addPatientInvoice({
-      patientName: selectedPatient.name,
-      patientPhone: selectedPatient.phone,
-      amount: feeAmount,
-      status: payNow ? 'Paid' : 'Pending',
-      doctorName,
-      feeType: checkInFeeType
-    });
-
-    setCheckInSuccessData({
-      tokenNumber: newPatient.tokenNumber,
-      doctorName,
-      amount: feeAmount,
-      feeType: checkInFeeType
-    });
-
-    setVitals([]);
-    setPastDiagnoses('');
+    if (!selectedPatient || !checkInDoctor || checkInBusy) return;
+    setCheckInError('');
+    setCheckInBusy(true);
+    try {
+      const visit = await registerPatient({
+        name: selectedPatient.name,
+        phone: selectedPatient.phone,
+        age: selectedPatient.age,
+        gender: selectedPatient.gender || 'Male',
+        doctorName: checkInDoctor.name,
+        vitals,
+        pastDiagnoses,
+        appointmentDate: new Date().toDateString(),
+        appointmentTime: '',
+        payNow,
+        fee: { amount: checkInFee.amount, feeType: checkInFee.feeType, paymentMode: checkInMode }
+      });
+      const paid = visit.paymentStatus === 'Paid';
+      setCheckInSuccessData({
+        tokenNumber: visit.tokenNumber,
+        patientId: visit.id,
+        patientNo: visit.patientNo,
+        patientName: visit.name,
+        phone: visit.phone,
+        age: visit.age,
+        gender: visit.gender || 'Male',
+        doctorName: visit.doctorName,
+        room: roomFor(schedules, checkInDoctor),
+        feeType: checkInFee.feeType,
+        amount: checkInFee.amount,
+        paid,
+        paymentMode: paid && checkInFee.amount > 0 ? checkInMode : undefined,
+        invoiceNo: visit.invoice?.id
+      });
+      setVitals([]);
+      setPastDiagnoses('');
+    } catch (err: any) {
+      setCheckInError(err?.message || 'Check-in failed. Please try again.');
+    } finally {
+      setCheckInBusy(false);
+    }
   };
 
   return (
@@ -338,17 +343,15 @@ export function ReceptionistPatients() {
           </div>
         </div>
 
-        {/* Standard Medical Grade Badge */}
+        {/* Visits today */}
         <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
           <div className="space-y-1">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Security Clearance</p>
-            <h3 className="text-sm font-extrabold text-[#060606] mt-1.5 flex items-center gap-1">
-              <Shield size={14} className="text-emerald-500" /> AES-256 Compliant
-            </h3>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">HIPAA compliant records</p>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Visits Today</p>
+            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{visitsToday}</h3>
+            <p className="text-[10px] text-slate-400 font-medium">OPD check-ins registered today</p>
           </div>
           <div className="h-12 w-12 rounded-xl bg-slate-50 border border-[#D8D8D8] text-slate-600 flex items-center justify-center">
-            <Award size={22} />
+            <Activity size={22} />
           </div>
         </div>
       </div>
@@ -645,8 +648,12 @@ export function ReceptionistPatients() {
                   <p className="text-[10px] text-slate-500 font-bold font-mono mt-0.5">Phone: {selectedPatient.phone} • Age: {selectedPatient.age}</p>
                 </div>
 
+                {checkInError && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{checkInError}</div>
+                )}
+
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Assign OPD Shift Doctor</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Doctor (today's OPD)</label>
                   <select
                     className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                     value={checkInDoctorId}
@@ -654,35 +661,28 @@ export function ReceptionistPatients() {
                     required
                   >
                     {activeDoctors.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.department})</option>
+                      <option key={d.id} value={d.id}>{doctorTitle(d.name)} ({d.department || 'General'})</option>
                     ))}
                     {activeDoctors.length === 0 && <option value="">No doctors active on shift</option>}
                   </select>
+                  <p className="text-[10px] text-slate-400 font-semibold">For a future date, use Appointments instead.</p>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">OPD Billing Config</label>
-                  <select
-                    className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    value={checkInFeeType}
-                    onChange={e => setCheckInFeeType(e.target.value)}
-                  >
-                    <option>OPD Consultation Fee</option>
-                    <option>Emergency Consultation Fee</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Appointment Date</label>
-                  <input
-                    type="date"
-                    value={checkInDateInput}
-                    min={formatToLocalYYYYMMDD(new Date())}
-                    max={formatToLocalYYYYMMDD(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))}
-                    onChange={e => setCheckInDateInput(e.target.value)}
-                    className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    required
-                  />
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fee</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {checkInFees.map(f => (
+                      <button
+                        key={f.key}
+                        type="button"
+                        onClick={() => setCheckInFeeType(f.key)}
+                        className={`text-left px-2.5 py-2 rounded-xl border text-xs font-bold ${checkInFee.key === f.key ? 'border-[#3683F8] bg-[#EBF3FE]' : 'border-slate-200 text-slate-600'}`}
+                      >
+                        <span className="block truncate">{f.label}</span>
+                        <span className="text-[#3683F8]">₹{f.amount.toLocaleString('en-IN')}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Patient Vitals & History Action Button */}
@@ -725,32 +725,19 @@ export function ReceptionistPatients() {
                   )}
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl flex items-center justify-between text-xs font-semibold">
-                  <span className="text-slate-500">Consultation Fee</span>
-                  <span className="text-slate-800 font-extrabold text-sm">
-                    ₹{(checkInFeeType === 'Emergency Consultation Fee' ? 1200 : 500).toLocaleString('en-IN')}
-                  </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button type="button" onClick={() => setPayNow(true)} className={`h-9 rounded-xl border text-xs font-bold ${payNow ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 text-slate-600'}`}>Paid now</button>
+                  <button type="button" onClick={() => setPayNow(false)} className={`h-9 rounded-xl border text-xs font-bold ${!payNow ? 'bg-rose-600 border-rose-600 text-white' : 'border-slate-200 text-slate-600'}`}>Pay later</button>
                 </div>
-
-                <div className="flex items-center justify-between p-2.5 bg-blue-50/50 border border-blue-100 rounded-xl px-3">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-extrabold text-slate-800">Collect Fee Upfront (Pay Now)</span>
-                    <span className="text-[8px] text-slate-500 font-bold">Paid status routes directly to Doctor Queue</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={payNow}
-                    onChange={e => setPayNow(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer"
-                  />
-                </div>
+                {payNow && checkInFee.amount > 0 && <PaymentModePicker value={checkInMode} onChange={setCheckInMode} />}
 
                 <div className="flex gap-2 pt-2">
                   <Button
                     type="submit"
-                    className="flex-1 font-bold rounded-full text-xs bg-blue-600 hover:bg-blue-500 text-white"
+                    disabled={checkInBusy || activeDoctors.length === 0}
+                    className="flex-1 font-bold rounded-full text-xs bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-60"
                   >
-                    Register Check-In
+                    {checkInBusy ? 'Checking in…' : 'Check in today'}
                   </Button>
                   <Button
                     type="button"
@@ -778,21 +765,32 @@ export function ReceptionistPatients() {
                     <span className="font-black text-xs text-slate-900">{checkInSuccessData.tokenNumber}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Assigned Doc:</span>
-                    <span className="font-bold text-slate-800">{checkInSuccessData.doctorName}</span>
+                    <span className="text-slate-400">Doctor:</span>
+                    <span className="font-bold text-slate-800">{doctorTitle(checkInSuccessData.doctorName)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Fee Logged:</span>
-                    <span className="font-bold text-slate-800">₹{checkInSuccessData.amount} ({checkInSuccessData.feeType})</span>
+                    <span className="text-slate-400">Fee:</span>
+                    <span className={`font-bold ${checkInSuccessData.paid ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      ₹{checkInSuccessData.amount} · {checkInSuccessData.paid ? `Paid${checkInSuccessData.paymentMode ? ` (${checkInSuccessData.paymentMode})` : ''}` : 'Due'}
+                    </span>
                   </div>
                 </div>
 
-                <Button
-                  onClick={() => setIsCheckInModalOpen(false)}
-                  className="w-full font-bold rounded-full text-xs mt-2"
-                >
-                  Done & Close
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => printOpdSlip(checkInSuccessData)}
+                    className="flex-1 font-bold rounded-full text-xs bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    <Printer size={14} className="mr-1" /> Print token
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCheckInModalOpen(false)}
+                    className="flex-1 font-bold rounded-full text-xs"
+                  >
+                    Done
+                  </Button>
+                </div>
               </div>
             )}
           </div>

@@ -1,323 +1,273 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  UserPlus, Clock, Printer, CreditCard, CheckCircle2, Keyboard, Trash2, Activity, Users, Search,
+  RefreshCw, Stethoscope, IndianRupee, CalendarClock, ArrowRight, AlertTriangle, DoorOpen, Phone, X
+} from 'lucide-react';
 import { useHospitalStore } from '../../store/useHospitalStore';
-import type { PatientRecord } from '../../store/useHospitalStore';
+import type { PatientRecord, PaymentMode } from '../../store/useHospitalStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { VitalsModal } from '../../components/VitalsModal';
-import { 
-  UserPlus, Clock, Printer, CreditCard, Check, 
-  Wifi, CheckCircle2, Keyboard, Trash2, Activity, Users
-} from 'lucide-react';
-import { getPrintSettings, PRINT_SETTINGS_EVENT } from '../../utils/printSettings';
-import type { PrintSettings } from '../../utils/printSettings';
-import { printIsolatedHtml } from '../../utils/printHelper';
-import { buildOpdQueueSlipHtml } from '../../utils/thermalSlipTemplates';
+import { doctorTitle } from '../../lib/utils';
+import {
+  CollectFeeModal, PaymentModePicker, PersonPicker, ToastStack, feeOptionsFor, formatWait, invoiceDateLabel,
+  isToday, isVisitUnpaid, peopleForPhone, printOpdSlip, roomFor, timeToMinutes, toYMD, useDoctorLoad, useNow, useToasts,
+  type SlipData
+} from './reception/receptionShared';
+
+type QueueTab = 'Waiting' | 'In Consultation' | 'Completed' | 'Unpaid' | 'All';
+
+const AUTO_PRINT_KEY = 'reception_auto_print';
+const REFRESH_MS = 15000;
+
+const statusStyle: Record<PatientRecord['status'], string> = {
+  'Waiting': 'bg-amber-50 text-amber-700 border-amber-200',
+  'In Consultation': 'bg-[#EBF3FE] text-[#3683F8] border-blue-200',
+  'Completed': 'bg-emerald-50 text-emerald-700 border-emerald-200'
+};
 
 export function ReceptionistDashboard() {
-  const { 
-    patients, 
-    staff, 
-    fees, 
-    invoices, 
-    registerPatient, 
-    updatePatientStatus, 
-    addPatientInvoice, 
-    collectPatientFee,
-    collectPatientFeeDirectly,
-    cancelPatient,
-    hospitalName
+  const {
+    patients, staff, fees, invoices, schedules, appointments,
+    registerPatient, updatePatientStatus, collectPatientFeeDirectly, cancelPatient,
+    fetchHospitalData, fetchAppointments, checkInAppointment
   } = useHospitalStore();
-
-  const [queueTab, setQueueTab] = useState<'PAID' | 'UNPAID'>('PAID');
-
+  const { user } = useAuthStore();
   const { searchQuery } = useSuperAdminStore();
+  const { toasts, push, dismiss } = useToasts();
+  const now = useNow(30000);
 
-  // Active doctors scheduled for today
-  const activeDoctors = staff.filter(s => s.role === 'Doctor' && s.status === 'Active');
+  const doctors = useMemo(() => staff.filter(s => s.role === 'Doctor' && s.status === 'Active'), [staff]);
+  const doctorLoad = useDoctorLoad(patients);
 
-  const formatToLocalYYYYMMDD = (d: Date) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Form State
+  // ───────── Registration form ─────────
   const [phone, setPhone] = useState('');
+  const [personKey, setPersonKey] = useState('new');
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('Male');
   const [doctorId, setDoctorId] = useState('');
-  const [appointmentDateInput, setAppointmentDateInput] = useState(formatToLocalYYYYMMDD(new Date()));
-  const [charges, setCharges] = useState('500');
+  const [feeKey, setFeeKey] = useState('opd');
+  const [amount, setAmount] = useState('');
   const [payNow, setPayNow] = useState(true);
-
-  // Patient vitals and diagnoses states
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash');
   const [vitals, setVitals] = useState<Array<{ name: string; value: string }>>([]);
   const [pastDiagnoses, setPastDiagnoses] = useState('');
-  const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
+  const [isVitalsOpen, setIsVitalsOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [autoPrint, setAutoPrint] = useState(() => {
+    try { return localStorage.getItem(AUTO_PRINT_KEY) === '1'; } catch { return false; }
+  });
+  const phoneRef = useRef<HTMLInputElement>(null);
 
-  // System States
-  const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
-  const [activeTab, setActiveTab] = useState<'details' | 'billing'>('details');
-  const [existingPatientFound, setExistingPatientFound] = useState<boolean>(false);
-  const [printInvoiceData, setPrintInvoiceData] = useState<any>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  
-  // simulated websocket events log
-  const [wsLogs, setWsLogs] = useState<string[]>(['WebSocket initialized. Session connected. 🟢']);
-  const [isWsActive, setIsWsActive] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
-
-  const [printSettings, setPrintSettings] = useState<PrintSettings>(getPrintSettings());
+  const selectedDoctor = doctors.find(d => d.id === doctorId);
+  const feeOptions = useMemo(() => feeOptionsFor(fees, selectedDoctor), [fees, selectedDoctor]);
+  const selectedFee = feeOptions.find(f => f.key === feeKey) || feeOptions[0];
+  const knownPeople = useMemo(() => peopleForPhone(patients, phone), [patients, phone]);
 
   useEffect(() => {
-    const handleSettingsChange = (e: any) => {
-      if (e.detail) {
-        setPrintSettings(e.detail);
-      }
-    };
-    window.addEventListener(PRINT_SETTINGS_EVENT, handleSettingsChange);
-    return () => {
-      window.removeEventListener(PRINT_SETTINGS_EVENT, handleSettingsChange);
-    };
-  }, []);
+    if (!doctorId && doctors.length > 0) setDoctorId(doctors[0].id);
+  }, [doctors, doctorId]);
 
-  // Focus ref for quick entry
-  const phoneInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-fill existing patients when phone matches
+  // Amount follows the selected fee option (still editable)
   useEffect(() => {
-    if (phone.length === 10) {
-      // Check in existing patients
-      const match = patients.find(p => p.phone === phone);
-      if (match) {
-        setName(match.name);
-        setAge(match.age.toString());
-        setGender(match.gender || 'Male');
-        setExistingPatientFound(true);
-        setWsLogs(prev => [`System: Autofilled returning patient "${match.name}" from phone records.`, ...prev]);
-      } else {
-        setExistingPatientFound(false);
-      }
+    if (!feeOptions.some(f => f.key === feeKey)) setFeeKey('opd');
+    else if (selectedFee) setAmount(String(selectedFee.amount));
+  }, [feeKey, feeOptions, selectedFee]);
+
+  const choosePerson = (key: string) => {
+    setPersonKey(key);
+    const person = knownPeople.find(p => p.key === key);
+    if (person) {
+      setName(person.name);
+      setAge(String(person.age));
+      setGender(person.gender);
     } else {
-      setExistingPatientFound(false);
+      setName('');
+      setAge('');
+      setGender('Male');
     }
-  }, [phone, patients]);
+  };
 
-  // Set default doctor on load
+  // Phone lookup: pre-select the most recent person on this number
   useEffect(() => {
-    if (activeDoctors.length > 0 && !doctorId) {
-      setDoctorId(activeDoctors[0].id);
-    }
-  }, [activeDoctors, doctorId]);
+    if (knownPeople.length > 0) choosePerson(knownPeople[0].key);
+    else choosePerson('new');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone.length === 10 ? phone : '']);
 
-  // Set default charges on load/fee changes
-  useEffect(() => {
-    if (fees?.opdFee) {
-      setCharges(fees.opdFee.toString());
-    }
-  }, [fees]);
 
-  // Keyboard shortcut listener (F9 to Register & Print Slip)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F9') {
-        e.preventDefault();
-        // Trigger register form submission
-        const submitBtn = document.getElementById('register-submit-btn');
-        if (submitBtn) {
-          submitBtn.click();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Simulated WebSockets (Socket.io Mock)
-  // When a doctor completes a session in another room, status updates automatically
-  useEffect(() => {
-    if (!isWsActive) return;
-
-    const interval = setInterval(() => {
-      // Find a waiting patient and move them to consulting, or consulting to completed
-      const waiting = patients.filter(p => p.status === 'Waiting');
-      const consulting = patients.filter(p => p.status === 'In Consultation');
-
-      if (consulting.length > 0 && Math.random() > 0.6) {
-        // Complete consultation
-        const target = consulting[Math.floor(Math.random() * consulting.length)];
-        updatePatientStatus(target.id, 'Completed');
-        setWsLogs(prev => [
-          `WebSocket [Dr. Shanti]: Marked patient "${target.name}" as Completed. Sent prescription to pharmacy.`,
-          ...prev
-        ]);
-      } else if (waiting.length > 0 && Math.random() > 0.5) {
-        // Start consultation
-        const target = waiting[Math.floor(Math.random() * waiting.length)];
-        updatePatientStatus(target.id, 'In Consultation');
-        setWsLogs(prev => [
-          `WebSocket [OPD Room 104]: Patient "${target.name}" called in by doctor. Status: In Consultation.`,
-          ...prev
-        ]);
-      }
-    }, 18000); // Trigger every 18 seconds for active demo look
-
-    return () => clearInterval(interval);
-  }, [isWsActive, patients, updatePatientStatus]);
-
-  // Handle new patient registration
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !phone || !age || !doctorId) return;
-
-    const selectedDoc = activeDoctors.find(d => d.id === doctorId);
-    const doctorName = selectedDoc ? selectedDoc.name : 'General Physician';
-
-    const [y, m, d] = appointmentDateInput.split('-').map(Number);
-    const chosenDateObj = new Date(y, m - 1, d);
-    const apptDateFormatted = chosenDateObj.toDateString();
-
-    // 1. Optimistic UI Updates - instantly trigger registered states before server callbacks
-    setWsLogs(prev => [`Optimistic UI: Registering patient "${name}" for ${apptDateFormatted}...`, ...prev]);
-
-    const patientData = {
-      name,
-      phone,
-      age: parseInt(age) || 30,
-      gender,
-      doctorName,
-      vitals,
-      pastDiagnoses,
-      appointmentDate: apptDateFormatted,
-      appointmentTime: 'OPD Walk-In',
-      payNow
-    };
-
-    // Store Registration
-    const newPatient = await registerPatient(patientData);
-
-    // 2. Billing Logging: Custom charges and status based on payNow
-    const invoiceAmount = parseInt(charges) || 500;
-    const paymentStatus = payNow ? 'Paid' : 'Pending';
-
-    addPatientInvoice({
-      patientName: name,
-      patientPhone: phone,
-      amount: invoiceAmount,
-      status: paymentStatus,
-      doctorName,
-      feeType: 'OPD Consultation Fee'
-    });
-
-    setWsLogs(prev => [
-      `System: Token "${newPatient.tokenNumber}" issued. Invoice generated (₹${invoiceAmount}) [${paymentStatus}].`,
-      ...prev
-    ]);
-
-    // Print Receipt preview popup instantly
-    const receiptData = {
-      patientId: newPatient.id,
-      patientNo: newPatient.patientNo,
-      patientName: name,
-      phone,
-      age,
-      gender,
-      doctorName,
-      tokenNumber: newPatient.tokenNumber,
-      amount: invoiceAmount,
-      feeType: 'OPD Consultation Fee',
-      status: paymentStatus,
-      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    };
-
-    setPrintInvoiceData(receiptData);
-    setIsPrintModalOpen(true);
-
-    // Reset Form
-    setName('');
+  const resetForm = () => {
     setPhone('');
+    setPersonKey('new');
+    setName('');
     setAge('');
     setGender('Male');
-    setExistingPatientFound(false);
+    setFeeKey('opd');
+    setPayNow(true);
+    setPaymentMode('Cash');
     setVitals([]);
     setPastDiagnoses('');
-    phoneInputRef.current?.focus();
+    setFormError('');
+    phoneRef.current?.focus();
   };
 
-  // Find invoice linked to selected patient
-  const linkedInvoice = selectedPatient 
-    ? invoices.find(inv => inv.patientPhone === selectedPatient.phone && inv.status === 'Pending')
-    : null;
+  const toggleAutoPrint = (on: boolean) => {
+    setAutoPrint(on);
+    try { localStorage.setItem(AUTO_PRINT_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+  };
 
-  // Filter patients based on Topbar universal search query or standard list
-  const filteredPatients = patients.filter(p => {
-    const query = searchQuery.trim().toLowerCase();
+  // ───────── Slip preview ─────────
+  const [slip, setSlip] = useState<SlipData | null>(null);
+
+  const showSlip = (data: SlipData) => {
+    if (autoPrint) {
+      printOpdSlip(data);
+      push('success', `Token ${data.tokenNumber} printed for ${data.patientName}.`);
+    } else {
+      setSlip(data);
+    }
+  };
+
+  const handleRegister = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (submitting) return;
+    setFormError('');
+    if (phone.length !== 10) return setFormError('Enter a 10-digit mobile number.');
+    if (!name.trim()) return setFormError('Enter the patient name.');
+    if (!age || Number(age) < 0 || Number(age) > 120) return setFormError('Enter a valid age (0–120).');
+    if (!selectedDoctor) return setFormError('No doctor is on duty. Ask the admin to activate a doctor.');
+    const fee = Math.max(0, Number(amount) || 0);
+
+    setSubmitting(true);
+    try {
+      const visit = await registerPatient({
+        name: name.trim(),
+        phone,
+        age: Number(age),
+        gender,
+        doctorName: selectedDoctor.name,
+        vitals,
+        pastDiagnoses,
+        appointmentDate: new Date().toDateString(),
+        appointmentTime: '',
+        payNow,
+        fee: { amount: fee, feeType: selectedFee.feeType, paymentMode }
+      });
+      const paid = visit.paymentStatus === 'Paid';
+      showSlip({
+        tokenNumber: visit.tokenNumber,
+        patientId: visit.id,
+        patientNo: visit.patientNo,
+        patientName: visit.name,
+        phone: visit.phone,
+        age: visit.age,
+        gender: visit.gender || gender,
+        doctorName: visit.doctorName,
+        room: roomFor(schedules, selectedDoctor),
+        feeType: selectedFee.feeType,
+        amount: fee,
+        paid,
+        paymentMode: paid && fee > 0 ? paymentMode : undefined,
+        invoiceNo: visit.invoice?.id
+      });
+      if (!autoPrint) push('success', `${visit.name} registered · Token ${visit.tokenNumber}${paid ? '' : ' · fee due'}`);
+      resetForm();
+    } catch (err: any) {
+      setFormError(err?.message || 'Registration failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // F9 registers, F2 jumps to the phone box
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F9') { e.preventDefault(); document.getElementById('register-submit-btn')?.click(); }
+      if (e.key === 'F2') { e.preventDefault(); phoneRef.current?.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // ───────── Live refresh ─────────
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastSync, setLastSync] = useState(Date.now());
+  const [refreshing, setRefreshing] = useState(false);
+  const today = toYMD(new Date());
+
+  const refresh = async () => {
+    if (!user?.hospitalId) return;
+    setRefreshing(true);
+    await Promise.all([fetchHospitalData(user.hospitalId), fetchAppointments(today, today)]);
+    setLastSync(Date.now());
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    fetchAppointments(today, today);
+  }, [fetchAppointments, today]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh();
+    }, REFRESH_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, user?.hospitalId]);
+
+  // ───────── Today's queue ─────────
+  const [tab, setTab] = useState<QueueTab>('Waiting');
+  const [doctorFilter, setDoctorFilter] = useState('All');
+  const [search, setSearch] = useState('');
+
+  const todays = useMemo(
+    () => patients
+      .filter(p => isToday(p.createdAt))
+      .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()),
+    [patients]
+  );
+
+  const invoiceFor = (p: PatientRecord) =>
+    invoices.find(i => i.patientId === p.id) ||
+    invoices.find(i => !i.patientId && i.patientPhone === p.phone && i.status === 'Pending');
+
+  const counts = {
+    Waiting: todays.filter(p => p.status === 'Waiting' && !isVisitUnpaid(p)).length,
+    'In Consultation': todays.filter(p => p.status === 'In Consultation').length,
+    Completed: todays.filter(p => p.status === 'Completed').length,
+    Unpaid: todays.filter(isVisitUnpaid).length,
+    All: todays.length
+  };
+
+  const todayLabel = invoiceDateLabel();
+  const todayInvoices = invoices.filter(i => i.date === todayLabel);
+  const collectedToday = todayInvoices.filter(i => i.status === 'Paid').reduce((s, i) => s + i.amount, 0);
+  const dueToday = todayInvoices.filter(i => i.status === 'Pending').reduce((s, i) => s + i.amount, 0);
+
+  const query = (search || searchQuery).trim().toLowerCase();
+  const rows = todays.filter(p => {
+    if (doctorFilter !== 'All' && p.doctorName !== doctorFilter) return false;
+    if (tab === 'Unpaid' && !isVisitUnpaid(p)) return false;
+    if (tab === 'Waiting' && (p.status !== 'Waiting' || isVisitUnpaid(p))) return false;
+    if ((tab === 'In Consultation' || tab === 'Completed') && p.status !== tab) return false;
     if (!query) return true;
-    return (
-      (p.name && p.name.toLowerCase().includes(query)) ||
-      (p.phone && p.phone.includes(query)) ||
-      (p.tokenNumber && p.tokenNumber.toLowerCase().includes(query))
-    );
+    return [p.name, p.phone, p.tokenNumber, p.patientNo].some(v => (v || '').toLowerCase().includes(query));
   });
 
-  // Strictly sort paidPatients by FIFO (First-In, First-Out: createdAt ascending timestamp)
-  const paidPatients = filteredPatients
-    .filter(p => p.paymentStatus === 'Paid' || (!p.paymentStatus && !invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending')))
-    .sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return timeA - timeB;
-    });
+  // Position in each doctor's paid waiting line
+  const positionOf = (p: PatientRecord) =>
+    todays.filter(x => x.doctorName === p.doctorName && x.status === 'Waiting' && !isVisitUnpaid(x)).findIndex(x => x.id === p.id) + 1;
 
-  const unpaidPatients = filteredPatients
-    .filter(p => p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Pending' || invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending'))
-    .sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return timeA - timeB;
-    });
-
-  const displayedPatients = queueTab === 'PAID' ? paidPatients : unpaidPatients;
-
-  // Dynamic counts for receptionist dashboard interactive visualizer
-  const waitingCount = paidPatients.filter(p => p.status === 'Waiting').length;
-  const consultingCount = paidPatients.filter(p => p.status === 'In Consultation').length;
-  const completedCount = paidPatients.filter(p => p.status === 'Completed').length;
-  const totalCount = paidPatients.length;
-  const maxVal = Math.max(waitingCount, consultingCount, completedCount, 2);
-
-  // Status Tap-to-Cycle click handler with Strict Payment Validation
-  const handleStatusCycle = (e: React.MouseEvent, p: PatientRecord) => {
-    e.stopPropagation();
-
-    const isUnpaid = p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Pending' || invoices.some(i => i.patientPhone === p.phone && i.status === 'Pending');
-
-    if (p.status === 'Waiting' && isUnpaid) {
-      alert(`Payment Compulsory!\n\nPatient "${p.name}" has not paid the OPD consultation fee. Please click "Pay Now" to collect payment before routing patient to Doctor Consultation.`);
-      return;
-    }
-
-    const nextStatusMap: Record<PatientRecord['status'], PatientRecord['status']> = {
-      'Waiting': 'In Consultation',
-      'In Consultation': 'Completed',
-      'Completed': 'Waiting'
-    };
-    const nextStatus = nextStatusMap[p.status];
-    updatePatientStatus(p.id, nextStatus);
-    setWsLogs(prev => [`System: Direct cycle trigger on "${p.name}". Status changed to "${nextStatus}".`, ...prev]);
-  };
-
-  // Duplicate Print click handler
-  const handleQuickPrint = (e: React.MouseEvent, p: PatientRecord) => {
-    e.stopPropagation();
-    const invoice = invoices.find(inv => inv.patientPhone === p.phone);
-    const invoiceAmount = invoice ? invoice.amount : (parseInt(charges) || 500);
-    const invoiceType = invoice ? invoice.feeType : 'OPD Consultation Fee';
-    setPrintInvoiceData({
+  const slipFor = (p: PatientRecord): SlipData => {
+    const inv = invoiceFor(p);
+    const doc = doctors.find(d => d.name === p.doctorName);
+    return {
+      tokenNumber: p.tokenNumber,
       patientId: p.id,
       patientNo: p.patientNo,
       patientName: p.name,
@@ -325,947 +275,582 @@ export function ReceptionistDashboard() {
       age: p.age,
       gender: p.gender || 'Male',
       doctorName: p.doctorName,
-      tokenNumber: p.tokenNumber,
-      amount: invoiceAmount,
-      feeType: invoiceType,
-      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    });
-    setIsPrintModalOpen(true);
+      room: roomFor(schedules, doc || { name: p.doctorName }),
+      feeType: inv?.feeType || 'OPD Consultation Fee',
+      amount: inv?.amount ?? 0,
+      paid: !isVisitUnpaid(p),
+      paymentMode: inv?.paymentMode || undefined,
+      invoiceNo: inv?.id
+    };
   };
 
+  // ───────── Row actions ─────────
+  const [collectTarget, setCollectTarget] = useState<PatientRecord | null>(null);
+  const [detail, setDetail] = useState<PatientRecord | null>(null);
+  const detailLive = detail ? patients.find(p => p.id === detail.id) || detail : null;
 
+  const confirmCollect = async (mode: PaymentMode) => {
+    if (!collectTarget) return;
+    const inv = invoiceFor(collectTarget);
+    const result = await collectPatientFeeDirectly(collectTarget.id, inv?.amount ?? fees?.opdFee, inv?.feeType, mode);
+    if (result) {
+      push('success', `₹${result.amount.toLocaleString('en-IN')} received from ${collectTarget.name} (${mode}). Sent to doctor queue.`);
+      showSlip({ ...slipFor(collectTarget), paid: true, paymentMode: mode, amount: result.amount, invoiceNo: result.id });
+    } else {
+      push('error', 'Could not record the payment. Please try again.');
+    }
+    setCollectTarget(null);
+  };
 
-  // Cancel Appointment check-in click handler
-  const handleQuickCancel = (e: React.MouseEvent, p: PatientRecord) => {
-    e.stopPropagation();
-    if (window.confirm(`Are you sure you want to cancel and remove the check-in logs for "${p.name}"?`)) {
-      cancelPatient(p.id);
-      setWsLogs(prev => [`System: Cancelled front desk check-in for "${p.name}".`, ...prev]);
-      if (selectedPatient?.id === p.id) {
-        setSelectedPatient(null);
-      }
+  const cancelVisit = async (p: PatientRecord) => {
+    const paid = !isVisitUnpaid(p) && (invoiceFor(p)?.amount || 0) > 0;
+    const msg = paid
+      ? `Cancel ${p.name}'s check-in (${p.tokenNumber})?\n\nThe fee was already collected — it stays in the accounts, so refund it manually if needed.`
+      : `Cancel ${p.name}'s check-in (${p.tokenNumber})?`;
+    if (!window.confirm(msg)) return;
+    await cancelPatient(p.id);
+    setDetail(null);
+    push('success', `Check-in for ${p.name} cancelled.`);
+  };
+
+  const setStatus = async (p: PatientRecord, status: PatientRecord['status']) => {
+    if (status !== 'Waiting' && isVisitUnpaid(p)) {
+      push('error', `${p.name} has not paid yet. Collect the fee first.`);
+      return;
+    }
+    await updatePatientStatus(p.id, status);
+    push('success', `${p.name} → ${status}`);
+  };
+
+  // ───────── Today's appointments ─────────
+  const todaysAppointments = appointments.filter(a => a.date === today && a.status === 'Booked').sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  const [apptTarget, setApptTarget] = useState<typeof todaysAppointments[number] | null>(null);
+  const [apptPayNow, setApptPayNow] = useState(true);
+  const [apptMode, setApptMode] = useState<PaymentMode>('Cash');
+  const [apptBusy, setApptBusy] = useState(false);
+  const apptDoctor = apptTarget ? doctors.find(d => d.name === apptTarget.doctorName) : undefined;
+  const apptFee = feeOptionsFor(fees, apptDoctor)[apptDoctor?.consultationFee && apptDoctor.consultationFee !== fees?.opdFee ? 1 : 0];
+
+  const confirmApptCheckIn = async () => {
+    if (!apptTarget) return;
+    setApptBusy(true);
+    try {
+      const visit = await checkInAppointment(apptTarget.id, {
+        payNow: apptPayNow,
+        fee: { amount: apptFee.amount, feeType: apptFee.feeType, paymentMode: apptMode }
+      });
+      const paid = visit.paymentStatus === 'Paid';
+      showSlip({
+        tokenNumber: visit.tokenNumber, patientId: visit.id, patientNo: visit.patientNo, patientName: visit.name,
+        phone: visit.phone, age: visit.age, gender: visit.gender || 'Male', doctorName: visit.doctorName,
+        room: roomFor(schedules, apptDoctor || { name: visit.doctorName }), feeType: apptFee.feeType, amount: apptFee.amount,
+        paid, paymentMode: paid ? apptMode : undefined, invoiceNo: visit.invoice?.id
+      });
+      push('success', `${visit.name} checked in · Token ${visit.tokenNumber}`);
+      setApptTarget(null);
+    } catch (err: any) {
+      push('error', err?.message || 'Check-in failed.');
+    } finally {
+      setApptBusy(false);
     }
   };
 
+  const syncedAgo = Math.max(0, Math.round((now - lastSync) / 1000));
+
   return (
-    <div className="space-y-6 h-full flex flex-col animate-in fade-in duration-200 font-sans pb-16">
-      
-      {/* Top Header Banner Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 text-white relative overflow-hidden">
-        <div className="space-y-1 relative z-10">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">OPD Receptionist Desk</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/30 backdrop-blur-xs">
-              Live Front Desk Mode
-            </span>
-          </div>
-          <p className="text-blue-50 text-xs font-medium">Real-time patient search, OPD queue allocation, fee collection &amp; token printing desk</p>
+    <div className="space-y-5 font-sans pb-16">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#3683F8] p-5 sm:p-6 rounded-2xl shadow-lg text-white">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">OPD Front Desk</h1>
+          <p className="text-blue-50 text-xs font-medium mt-1">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · Register patients, collect fees and manage today's queue
+          </p>
         </div>
-
-        <div className="flex items-center gap-3 relative z-10">
-          <div className="text-right hidden md:block">
-            <p className="text-[10px] font-bold text-blue-100 uppercase tracking-wider">Queue Manager</p>
-            <p className="text-xs font-extrabold text-white">{waitingCount} Waiting • {completedCount} Done</p>
-          </div>
-          <div className="h-10 w-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white backdrop-blur-xs">
-            <Users size={20} />
-          </div>
+        <div className="flex items-center gap-2 text-[11px] font-bold">
+          <span className="hidden sm:inline-flex items-center gap-1.5 bg-white/15 border border-white/20 rounded-xl px-3 py-2">
+            <Keyboard size={13} /> F2 phone · F9 register
+          </span>
+          <Link to="/receptionist/appointments" className="inline-flex items-center gap-1.5 bg-white text-[#3683F8] rounded-xl px-3 py-2 hover:bg-blue-50">
+            <CalendarClock size={14} /> Book appointment
+          </Link>
         </div>
       </div>
 
-      {/* SECTION 1: Top KPI Telemetry Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Today */}
-        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">Today's Walk-Ins</p>
-            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{totalCount}</h3>
-            <p className="text-[10px] text-slate-400 font-semibold">Registered patients</p>
-          </div>
-          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
-            <UserPlus size={22} />
-          </div>
-        </div>
-
-        {/* Currently Waiting */}
-        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Active In Queue</p>
-            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{waitingCount}</h3>
-            <p className="text-[10px] text-slate-400 font-semibold">Waiting for doctor</p>
-          </div>
-          <div className="h-12 w-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
-            <Clock size={22} />
-          </div>
-        </div>
-
-        {/* Completed */}
-        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Completed OPD</p>
-            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">{completedCount}</h3>
-            <p className="text-[10px] text-slate-400 font-semibold">Consultations finished</p>
-          </div>
-          <div className="h-12 w-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
-            <CheckCircle2 size={22} />
-          </div>
-        </div>
-
-        {/* Fee Revenue Collected */}
-        <div className="bg-white p-5 rounded-2xl border border-[#D8D8D8] shadow-xs flex items-center justify-between hover:shadow-md transition-all">
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-wider">OPD Collections</p>
-            <h3 className="text-2xl font-extrabold text-[#060606] tracking-tight">₹{(paidPatients.length * 500).toLocaleString('en-IN')}</h3>
-            <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Paid OPD Receipts
-            </p>
-          </div>
-          <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
-            <CreditCard size={22} />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-10 gap-6 min-h-0">
-        
-        {/* Left Side: Today's Live Queue (70% width -> span 7) */}
-        <div className="lg:col-span-7 bg-white text-[#060606] rounded-2xl shadow-xs border border-[#D8D8D8] flex flex-col overflow-hidden">
-          <div className="p-5 border-b border-[#D8D8D8] flex justify-between items-center bg-[#EBF3FE]/30">
-            <div>
-              <h2 className="text-base font-extrabold text-[#060606] tracking-tight">Today's Live Doctor Queue</h2>
-              <p className="text-xs text-slate-500 font-medium">Real-time walk-in registration queue tracker</p>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {[
+          { label: "Today's patients", value: counts.All, icon: Users, tone: 'text-[#3683F8] bg-[#EBF3FE] border-blue-200' },
+          { label: 'Waiting', value: counts.Waiting, icon: Clock, tone: 'text-amber-600 bg-amber-50 border-amber-200' },
+          { label: 'With doctor', value: counts['In Consultation'], icon: Stethoscope, tone: 'text-[#3683F8] bg-[#EBF3FE] border-blue-200' },
+          { label: 'Collected today', value: `₹${collectedToday.toLocaleString('en-IN')}`, icon: IndianRupee, tone: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+          { label: 'Fees due today', value: `₹${dueToday.toLocaleString('en-IN')}`, icon: AlertTriangle, tone: 'text-rose-600 bg-rose-50 border-rose-200' }
+        ].map(k => (
+          <div key={k.label} className="bg-white p-4 rounded-2xl border border-[#D8D8D8] flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">{k.label}</p>
+              <p className="text-2xl font-extrabold text-[#060606] tracking-tight">{k.value}</p>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Integrated sync status toggler */}
-              <button
-                type="button"
-                onClick={() => setIsWsActive(!isWsActive)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold tracking-tight transition-all duration-200 hover:scale-105 active:scale-95 ${
-                  isWsActive
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : 'bg-slate-100 border-slate-200 text-slate-500'
-                }`}
-                title={isWsActive ? "Click to pause automated test simulations" : "Click to resume automated test simulations"}
-              >
-                <Wifi size={12} className={isWsActive ? "animate-pulse" : ""} />
-                <span>{isWsActive ? "LIVE SYNC: ON" : "LIVE SYNC: OFF"}</span>
-              </button>
+            <div className={`h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 ${k.tone}`}><k.icon size={19} /></div>
+          </div>
+        ))}
+      </div>
 
-              {searchQuery && (
-                <span className="text-[10px] font-bold px-2.5 py-0.5 bg-[#EBF3FE] text-[#3683F8] rounded-full border border-blue-200 animate-pulse">
-                  Filtered: {filteredPatients.length} Matches
-                </span>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+        {/* ───── Registration ───── */}
+        <form onSubmit={handleRegister} className="xl:col-span-4 bg-white rounded-2xl border border-[#D8D8D8] p-5 space-y-4 xl:sticky xl:top-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-extrabold flex items-center gap-2"><UserPlus size={18} className="text-[#3683F8]" /> New OPD check-in</h2>
+            <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 cursor-pointer" title="Print the token slip automatically after registration">
+              <input type="checkbox" checked={autoPrint} onChange={e => toggleAutoPrint(e.target.checked)} className="rounded border-[#D8D8D8] text-[#3683F8]" />
+              Auto-print slip
+            </label>
+          </div>
+
+          {formError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex gap-2">
+              <AlertTriangle size={15} className="shrink-0" /> {formError}
+            </div>
+          )}
+
+          {/* 1. Phone */}
+          <div className="space-y-1.5">
+            <label htmlFor="rx-phone" className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">1 · Mobile number</label>
+            <div className="relative">
+              <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id="rx-phone"
+                ref={phoneRef}
+                autoFocus
+                inputMode="numeric"
+                placeholder="10-digit mobile"
+                value={phone}
+                onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                className="w-full h-11 pl-9 pr-9 rounded-xl border border-[#D8D8D8] text-sm font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
+              />
+              {phone && (
+                <button type="button" onClick={() => setPhone('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label="Clear phone"><X size={15} /></button>
               )}
             </div>
+            {phone.length === 10 && (knownPeople.length > 0
+              ? <PersonPicker people={knownPeople} selectedKey={personKey} onSelect={choosePerson} />
+              : <p className="text-[11px] font-bold text-amber-700">New patient — fill in the details below.</p>)}
           </div>
 
-          {/* Interactive Appointment Dashboard Chart */}
-          <div className="m-5 bg-[#EBF3FE]/20 text-[#060606] p-5 rounded-2xl border border-[#D8D8D8] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#D8D8D8]">
-              <div>
-                <h3 className="text-sm font-extrabold text-[#060606] tracking-tight">Receptionist Appointment Dashboard</h3>
-                <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Interactive queue metrics bar visualizer</p>
-              </div>
-              
-              {/* Legend with Color Blocks */}
-              <div className="flex gap-4 text-xs font-bold text-slate-600">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 bg-[#3683F8] inline-block rounded-xs"></span>
-                  Waiting
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 bg-[#10b981] inline-block rounded-xs"></span>
-                  In Consultation
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 bg-[#f59e0b] inline-block rounded-xs"></span>
-                  Completed
-                </span>
-              </div>
-            </div>
-
-            {/* Custom Bar Chart with Y-Axis and Gridlines */}
-            <div className="grid grid-cols-[55px_1fr] gap-2 pt-2">
-              
-              {/* Y-Axis Column */}
-              <div className="flex flex-col justify-between text-[10px] font-bold text-slate-500 text-right pr-2 select-none h-36 pb-6 pt-2">
-                <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase self-end mb-1">Patients ↑</span>
-                <span>{Math.round(maxVal)}</span>
-                <span>{Math.round(maxVal * 0.75)}</span>
-                <span>{Math.round(maxVal * 0.50)}</span>
-                <span>{Math.round(maxVal * 0.25)}</span>
-                <span>0</span>
-              </div>
-
-              {/* Chart Plot Area & Bars */}
-              <div className="h-36 relative flex flex-col justify-between">
-                
-                {/* Horizontal Gridlines */}
-                <div className="absolute inset-x-0 bottom-6 top-2 flex flex-col justify-between pointer-events-none opacity-20">
-                  <div className="border-t border-[#D8D8D8] w-full"></div>
-                  <div className="border-t border-[#D8D8D8] w-full"></div>
-                  <div className="border-t border-[#D8D8D8] w-full"></div>
-                  <div className="border-t border-[#D8D8D8] w-full"></div>
-                  <div className="border-t border-[#D8D8D8] w-full"></div>
-                </div>
-
-                {/* Vertical Bars container */}
-                <div className="flex justify-around items-end h-[calc(100%-24px)] px-6 relative z-10">
-                  
-                  {/* Waiting Bar */}
-                  <div className="flex flex-col items-center gap-1.5 w-24 group select-none">
-                    <span className="text-[11px] font-extrabold text-[#3683F8] font-mono transition-transform group-hover:scale-110">
-                      {waitingCount}
-                    </span>
-                    <div 
-                      style={{ height: `${(waitingCount / maxVal) * 85}%` }}
-                      className="w-12 bg-[#3683F8] rounded-t shadow-xs transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
-                    ></div>
-                  </div>
-
-                  {/* In Consultation Bar */}
-                  <div className="flex flex-col items-center gap-1.5 w-24 group select-none">
-                    <span className="text-[11px] font-extrabold text-[#10b981] font-mono transition-transform group-hover:scale-110">
-                      {consultingCount}
-                    </span>
-                    <div 
-                      style={{ height: `${(consultingCount / maxVal) * 85}%` }}
-                      className="w-12 bg-[#10b981] rounded-t shadow-xs transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
-                    ></div>
-                  </div>
-
-                  {/* Completed Bar */}
-                  <div className="flex flex-col items-center gap-1.5 w-24 group select-none">
-                    <span className="text-[11px] font-extrabold text-[#f59e0b] font-mono transition-transform group-hover:scale-110">
-                      {completedCount}
-                    </span>
-                    <div 
-                      style={{ height: `${(completedCount / maxVal) * 85}%` }}
-                      className="w-12 bg-[#f59e0b] rounded-t shadow-xs transition-all duration-500 ease-out hover:brightness-105 cursor-pointer min-h-[4px]"
-                    ></div>
-                  </div>
-
-                </div>
-
-                {/* X-Axis Labels */}
-                <div className="h-6 border-t border-[#D8D8D8] flex justify-around items-center text-[10px] font-extrabold text-slate-500 uppercase tracking-wider select-none">
-                  <span className="w-24 text-center">Waiting</span>
-                  <span className="w-24 text-center">In Consultation</span>
-                  <span className="w-24 text-center">Completed</span>
-                </div>
-
+          {/* 2. Patient */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">2 · Patient</span>
+            <input
+              placeholder="Full name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full h-10 px-3 rounded-xl border border-[#D8D8D8] text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
+            />
+            <div className="grid grid-cols-5 gap-2">
+              <input
+                type="number"
+                min={0}
+                max={120}
+                placeholder="Age"
+                value={age}
+                onChange={e => setAge(e.target.value)}
+                className="col-span-2 h-10 px-3 rounded-xl border border-[#D8D8D8] text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
+              />
+              <div className="col-span-3 grid grid-cols-3 gap-1">
+                {['Male', 'Female', 'Other'].map(g => (
+                  <button key={g} type="button" onClick={() => setGender(g)} className={`h-10 rounded-xl border text-[11px] font-bold ${gender === g ? 'bg-[#060606] text-white border-[#060606]' : 'bg-white border-[#D8D8D8] text-slate-600'}`}>
+                    {g}
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
-
-          {/* OPD Queue Payment Filter Tabs */}
-          <div className="px-5 py-3 border-b border-[#D8D8D8] bg-[#EBF3FE]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex gap-2 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setQueueTab('PAID')}
-                className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all ${
-                  queueTab === 'PAID'
-                    ? 'bg-[#3683F8] text-white border-[#3683F8] shadow-xs'
-                    : 'bg-white text-slate-600 border-[#D8D8D8] hover:bg-slate-50'
-                }`}
-              >
-                <CheckCircle2 size={14} />
-                <span>Active Doctor Queue (Paid)</span>
-                <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold ${
-                  queueTab === 'PAID' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-                }`}>
-                  {paidPatients.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setQueueTab('UNPAID')}
-                className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all ${
-                  queueTab === 'UNPAID'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                }`}
-              >
-                <CreditCard size={14} />
-                <span>Unpaid Patients (Fee Pending)</span>
-                <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold ${
-                  queueTab === 'UNPAID' ? 'bg-white/20 text-white' : 'bg-rose-200 text-rose-800'
-                }`}>
-                  {unpaidPatients.length}
-                </span>
-              </button>
-            </div>
-
-            <div className={`px-3 py-1.5 rounded-full border text-[11px] font-extrabold flex items-center gap-2 shadow-xs transition-all ${
-              queueTab === 'PAID'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                : 'bg-rose-50 border-rose-200 text-rose-700'
-            }`}>
-              <span className={`h-2 w-2 rounded-full ${queueTab === 'PAID' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-              <span>
-                {queueTab === 'PAID' 
-                  ? 'Verified Paid Queue • Patients Ready for Doctor Consultation' 
-                  : 'Fee Pending Queue • Payment Required for OPD Routing'}
-              </span>
-            </div>
-          </div>
-
-          {/* Today's Queue Data Table */}
-          <div className="flex-1 overflow-y-auto max-h-[420px] relative border-t border-[#D8D8D8]">
-            <table className="w-full text-left border-collapse">
-              <thead className="sticky top-0 z-10 bg-[#EBF3FE] shadow-xs">
-                <tr className="border-b border-[#D8D8D8] text-slate-600 text-[10px] font-extrabold uppercase tracking-wider">
-                  <th className="px-5 py-3.5">Token No</th>
-                  <th className="px-5 py-3.5">Patient Name</th>
-                  <th className="px-5 py-3.5">Age/Gender</th>
-                  <th className="px-5 py-3.5">Assigned Doctor</th>
-                  <th className="px-5 py-3.5">Payment &amp; Status</th>
-                  <th className="px-5 py-3.5 text-right">Wait Time</th>
-                  <th className="px-5 py-3.5 text-right">Quick Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#D8D8D8]/60 text-slate-700 text-xs font-semibold">
-                {displayedPatients.map((patient) => {
-                  const isSelected = selectedPatient?.id === patient.id;
-                  const isWaiting = patient.status === 'Waiting';
-                  const isConsulting = patient.status === 'In Consultation';
-                  const isUnpaid = queueTab === 'UNPAID' || patient.paymentStatus === 'Unpaid' || patient.paymentStatus === 'Pending' || invoices.some(inv => inv.patientPhone === patient.phone && inv.status === 'Pending');
-                  
-                  return (
-                    <tr 
-                      key={patient.id} 
-                      onClick={() => {
-                        setSelectedPatient(patient);
-                        setActiveTab('details');
-                      }}
-                      className={`cursor-pointer hover:bg-[#EBF3FE]/20 transition-all duration-150 ${
-                        isSelected ? 'bg-[#EBF3FE]/60 border-l-4 border-l-[#3683F8]' : ''
-                      }`}
-                    >
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="px-2.5 py-1 bg-[#EBF3FE] border border-blue-200 text-[#3683F8] rounded-lg font-bold font-mono">
-                            {patient.tokenNumber}
-                          </span>
-                          {queueTab === 'PAID' && (
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold whitespace-nowrap ${
-                              patient.status === 'In Consultation'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-[#EBF3FE] text-[#3683F8] border border-blue-200'
-                            }`}>
-                              {patient.status === 'In Consultation' ? 'Active' : `Pos #${paidPatients.filter(p => p.status === 'Waiting').indexOf(patient) + 1}`}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="font-extrabold text-[#060606] flex items-center gap-1.5">
-                          {patient.name}
-                          {patient.patientNo && (
-                            <span className="px-1.5 py-0.5 bg-[#EBF3FE] text-[#3683F8] border border-blue-200 rounded text-[9px] font-bold font-mono">
-                              {patient.patientNo}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold font-mono mt-0.5">{patient.id}</div>
-                      </td>
-                      <td className="px-5 py-3.5 text-slate-600">
-                        {patient.age} Yrs / <span className="font-semibold text-slate-500">{patient.gender || 'Male'}</span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="text-[#060606] font-extrabold">{patient.doctorName}</span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex flex-col gap-1 items-start">
-                          <span 
-                            onClick={(e) => handleStatusCycle(e, patient)}
-                            title="Click directly to cycle status"
-                            className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-extrabold border transition-all hover:scale-105 ${
-                              isWaiting ? 'bg-[#3683F8]/10 text-[#3683F8] border-blue-300 hover:bg-blue-100' :
-                              isConsulting ? 'bg-[#10b981]/10 text-[#10b981] border-emerald-300 hover:bg-emerald-100' :
-                              'bg-[#f59e0b]/10 text-[#f59e0b] border-amber-300 hover:bg-amber-100'
-                            }`}
-                          >
-                            <span className={`h-1.5 w-1.5 rounded-full ${
-                              isWaiting ? 'bg-[#3683F8]' : isConsulting ? 'bg-[#10b981] animate-pulse' : 'bg-[#f59e0b]'
-                            }`}></span>
-                            {patient.status}
-                          </span>
-
-                          <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                            isUnpaid ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'
-                          }`}>
-                            {isUnpaid ? 'Fee Unpaid' : 'Fee Paid ✓'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-slate-500 font-mono text-[10px]">
-                        {patient.waitTime || '0m'} ago
-                      </td>
-                      <td className="px-5 py-3.5 text-right" onClick={e => e.stopPropagation()}>
-                        <div className="flex gap-1.5 justify-end items-center">
-                          {isUnpaid ? (
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                await collectPatientFeeDirectly(patient.id, 500, 'OPD Consultation Fee');
-                                setWsLogs(prev => [`Payment Success: Collected ₹500 for "${patient.name}". Activated into Doctor Queue.`, ...prev]);
-                                setQueueTab('PAID');
-                              }}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shadow-xs transition-all"
-                            >
-                              <CreditCard size={12} /> Pay Now (₹500)
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => handleQuickPrint(e, patient)}
-                              title="Print Duplicate OPD Slip"
-                              className="p-1 hover:bg-[#EBF3FE] text-[#3683F8] rounded-lg transition-colors"
-                            >
-                              <Printer size={14} />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => handleQuickCancel(e, patient)}
-                            title="Cancel patient check-in"
-                            className="p-1 hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-lg transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {displayedPatients.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="text-center py-16 text-slate-400 font-bold">
-                      {queueTab === 'PAID' ? 'No paid patients currently in Doctor queue.' : 'No unpaid patients in pending fee list.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Statistics Footer */}
-          <div className="flex justify-between items-center text-xs font-bold px-6 py-4 bg-[#EBF3FE]/30 border-t border-[#D8D8D8] text-[#060606] select-none">
-            <div>
-              <span className="text-slate-500 uppercase tracking-wider text-[10px] mr-2">Total Today</span>
-              <span className="text-[#060606] font-extrabold font-mono bg-white px-2 py-1 rounded border border-[#D8D8D8]">{totalCount}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 uppercase tracking-wider text-[10px] mr-2">Currently Waiting</span>
-              <span className="text-[#3683F8] font-extrabold font-mono bg-[#EBF3FE] px-2 py-1 rounded border border-blue-200">{waitingCount}</span>
-            </div>
-          </div>
-
-          {/* WebSocket stream logger inside the panel */}
-          <div className="border-t border-[#D8D8D8] bg-[#EBF3FE]/20 px-4 py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold truncate max-w-[280px] sm:max-w-md">
-                Latest Event: {wsLogs[0] || 'System listening for EMR triggers'}
-              </span>
-            </div>
-            
             <button
               type="button"
-              onClick={() => setShowLogs(!showLogs)}
-              className="text-[9px] font-black uppercase text-[#3683F8] hover:text-blue-700 tracking-wider transition-colors"
+              onClick={() => setIsVitalsOpen(true)}
+              className={`w-full h-9 px-3 rounded-xl border flex items-center justify-between text-xs font-bold ${vitals.length > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-dashed border-[#D8D8D8] text-slate-500 hover:border-[#3683F8] hover:text-[#3683F8]'}`}
             >
-              {showLogs ? "Hide Console Logs" : `Show Logs (${wsLogs.length})`}
+              <span className="flex items-center gap-1.5"><Activity size={14} /> {vitals.length > 0 ? `${vitals.length} vitals recorded` : 'Add vitals & history (optional)'}</span>
+              <span>{vitals.length > 0 ? 'Edit' : '+'}</span>
             </button>
           </div>
 
-          {showLogs && (
-            <div className="bg-[#060606] text-slate-300 p-3.5 border-t border-slate-800 max-h-28 overflow-y-auto font-mono text-[9px] space-y-1 animate-in slide-in-from-bottom duration-150">
-              {wsLogs.slice(0, 10).map((log, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <span className="text-slate-500">[{new Date().toLocaleTimeString()}]</span>
-                  <span className="text-emerald-400 font-bold">✓</span>
-                  <span className="truncate">{log}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Right Side: Step-by-Step Patient Search & Token Generation Form (30% width -> span 3) */}
-        <div className="lg:col-span-3 flex flex-col gap-5 min-h-0">
-          
-          {/* Quick Registration & Token Booking Form */}
-          <div className="bg-white rounded-2xl p-5 border border-[#D8D8D8] shadow-xs flex flex-col relative">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#D8D8D8]">
-              <h2 className="text-sm font-extrabold text-[#060606] tracking-tight flex items-center gap-1.5">
-                <UserPlus size={16} className="text-[#3683F8]" /> Walk-In Check-In
-              </h2>
-              <div className="flex items-center gap-1 text-[9px] font-bold bg-[#EBF3FE] text-[#3683F8] px-2 py-0.5 rounded-lg border border-blue-200 font-mono">
-                <Keyboard size={10} /> F9 Ready
-              </div>
-            </div>
-
-            <form onSubmit={handleRegister} className="space-y-3.5">
-              <div>
-                <Input 
-                  ref={phoneInputRef}
-                  label="Step 2: Search Patient (Phone)" 
-                  placeholder="Enter 10-digit mobile..." 
-                  required
-                  value={phone}
-                  onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  maxLength={10}
-                  pattern="[0-9]{10}"
-                  className="font-mono text-xs border-[#D8D8D8]"
-                />
-                {phone.length === 10 && (
-                  existingPatientFound ? (
-                    <p className="text-[10px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1 animate-in fade-in bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
-                      <CheckCircle2 size={12} /> Patient Found! Loaded Profile.
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-amber-700 font-bold mt-1.5 flex items-center gap-1 animate-in fade-in bg-amber-50 p-1.5 rounded-lg border border-amber-200">
-                      <UserPlus size={12} /> Patient Not Found! Please Register Below.
-                    </p>
-                  )
-                )}
-              </div>
-
-              <div className="grid grid-cols-5 gap-2">
-                <div className="col-span-3">
-                  <Input 
-                    label="Patient Name" 
-                    placeholder="Full name" 
-                    required
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    readOnly={existingPatientFound}
-                    className="text-xs border-[#D8D8D8]"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Input 
-                    label="Age" 
-                    type="number"
-                    placeholder="Yrs" 
-                    required
-                    value={age}
-                    onChange={e => setAge(e.target.value)}
-                    readOnly={existingPatientFound}
-                    className="text-xs font-mono border-[#D8D8D8]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gender</label>
-                <select 
-                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1 text-xs font-semibold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
-                  value={gender}
-                  onChange={e => setGender(e.target.value)}
-                  disabled={existingPatientFound}
-                >
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Step 5: Book Doctor Appointment</label>
-                <select 
-                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1.5 text-xs font-bold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
-                  value={doctorId}
-                  onChange={e => setDoctorId(e.target.value)}
-                  required
-                >
-                  {activeDoctors.map(d => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.department})</option>
-                  ))}
-                  {activeDoctors.length === 0 && <option value="">No doctors active on shift</option>}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Appointment Date</label>
-                <input
-                  type="date"
-                  value={appointmentDateInput}
-                  min={formatToLocalYYYYMMDD(new Date())}
-                  max={formatToLocalYYYYMMDD(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))}
-                  onChange={e => setAppointmentDateInput(e.target.value)}
-                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1 text-xs font-bold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
-                  required
-                />
-              </div>
-
-              {/* Patient Vitals & History Action Button */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clinical Vitals &amp; History</label>
-                <button
-                  type="button"
-                  onClick={() => setIsVitalsModalOpen(true)}
-                  className={`w-full py-2 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all duration-200 ${
-                    vitals.length > 0
-                      ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-                      : 'border-blue-200 bg-[#EBF3FE] hover:bg-blue-100 text-[#3683F8]'
-                  }`}
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Activity size={14} className={vitals.length > 0 ? "animate-pulse text-emerald-600" : "text-[#3683F8]"} />
-                    {vitals.length > 0 ? 'Vitals & History Saved' : 'Add Vitals & Medical History'}
-                  </span>
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                    vitals.length > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-[#3683F8]'
-                  }`}>
-                    {vitals.length > 0 ? `${vitals.length} Recorded` : 'Pending'}
-                  </span>
-                </button>
-                
-                {/* Visual mini-pill grid showing recorded vitals */}
-                {vitals.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1.5 p-2 bg-emerald-50/30 border border-emerald-100/40 rounded-lg max-h-16 overflow-y-auto">
-                    {vitals.map(v => (
-                      <span key={v.name} className="text-[8px] font-bold px-1.5 py-0.5 bg-white border border-emerald-100 text-emerald-700 rounded-md">
-                        {v.name.replace('Pressure', 'BP').replace('Temperature', 'Temp')}: {v.value}
-                      </span>
-                    ))}
-                    {pastDiagnoses && (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 bg-white border border-[#D8D8D8] text-slate-500 rounded-md truncate max-w-[150px]" title={pastDiagnoses}>
-                        Dx: {pastDiagnoses}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Charges (₹)</label>
-                <input
-                  type="number"
-                  placeholder="Enter charge amount"
-                  required
-                  value={charges}
-                  onChange={e => setCharges(e.target.value)}
-                  className="flex h-9 w-full rounded-xl border border-[#D8D8D8] bg-white px-3 py-1.5 text-xs font-extrabold text-[#060606] focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] font-mono"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 bg-[#EBF3FE]/30 border border-[#D8D8D8] rounded-xl px-3.5">
-                <div className="flex flex-col">
-                  <span className="text-[11px] font-extrabold text-[#060606]">Pay Now</span>
-                  <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Immediate collection clearance</span>
-                </div>
-                <input 
-                  type="checkbox" 
-                  checked={payNow}
-                  onChange={e => setPayNow(e.target.checked)}
-                  className="h-4.5 w-4.5 text-[#3683F8] focus:ring-[#3683F8] border-[#D8D8D8] rounded cursor-pointer transition-all"
-                />
-              </div>
-
-              <Button 
-                id="register-submit-btn"
-                type="submit" 
-                className="w-full text-xs h-10 font-bold bg-[#3683F8] hover:bg-blue-600 text-white rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all mt-2"
-              >
-                <Printer size={16} /> Step 6: Generate Token (F9)
-              </Button>
-            </form>
-          </div>
-
-          {/* Quick Actions for Selected Patient */}
-          <div className="flex-1 bg-white rounded-2xl p-5 border border-[#D8D8D8] shadow-xs flex flex-col min-h-0 overflow-y-auto">
-            {selectedPatient ? (
-              <div className="space-y-4 animate-in slide-in-from-right-4 duration-200">
-                <div className="pb-3.5 border-b border-[#D8D8D8]">
-                  <span className="px-2.5 py-0.5 bg-[#EBF3FE] text-[#3683F8] border border-blue-200 rounded-md text-[9px] font-bold font-mono uppercase">
-                    Step 4: Selected Patient Profile
-                  </span>
-                  <h3 className="text-base font-extrabold text-[#060606] tracking-tight mt-1">{selectedPatient.name}</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold font-mono mt-0.5">{selectedPatient.id} • {selectedPatient.phone}</p>
-                </div>
-
-                <div className="flex border-b border-[#D8D8D8] text-xs font-bold text-slate-400">
-                  <button 
-                    onClick={() => setActiveTab('details')}
-                    className={`flex-1 pb-2 border-b-2 text-center transition-colors ${
-                      activeTab === 'details' ? 'border-[#3683F8] text-[#3683F8]' : 'border-transparent hover:text-slate-600'
-                    }`}
-                  >
-                    Details
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('billing')}
-                    className={`flex-1 pb-2 border-b-2 text-center transition-colors ${
-                      activeTab === 'billing' ? 'border-[#3683F8] text-[#3683F8]' : 'border-transparent hover:text-slate-600'
-                    }`}
-                  >
-                    Fee Receipt
-                  </button>
-                </div>
-
-                {activeTab === 'details' ? (
-                  <div className="space-y-3.5 text-xs">
-                    <div className="bg-[#EBF3FE]/30 p-3 rounded-xl border border-[#D8D8D8] space-y-2 font-medium">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 text-[10px]">Token No</span>
-                        <span className="text-[#060606] font-extrabold">{selectedPatient.tokenNumber}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 text-[10px]">Assigned Doctor</span>
-                        <span className="text-[#060606] font-extrabold">{selectedPatient.doctorName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 text-[10px]">Registry Date</span>
-                        <span className="text-[#060606] font-semibold">Today (Live)</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 text-[10px]">Wait Duration</span>
-                        <span className="text-[#060606] font-bold">{selectedPatient.waitTime || '0m'}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Step 7: Doctor Queue Status</label>
-                      <div className="grid grid-cols-3 gap-1">
-                        {(['Waiting', 'In Consultation', 'Completed'] as const).map(s => {
-                          const isCurrent = selectedPatient.status === s;
-                          return (
-                            <button
-                              key={s}
-                              onClick={() => {
-                                setSelectedPatient(prev => prev ? { ...prev, status: s } : null);
-                                updatePatientStatus(selectedPatient.id, s);
-                                setWsLogs(prev => [`System: Manually changed "${selectedPatient.name}" status to "${s}".`, ...prev]);
-                              }}
-                              className={`py-1.5 px-1 rounded-xl font-bold text-[9px] border text-center transition-all ${
-                                isCurrent 
-                                  ? 'bg-[#3683F8] border-[#3683F8] text-white shadow-xs' 
-                                  : 'bg-white border-[#D8D8D8] text-slate-600 hover:bg-slate-50'
-                              }`}
-                            >
-                              {s.replace('In ', '')}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3.5 text-xs">
-                    {linkedInvoice ? (
-                      <div className="bg-rose-50 border border-rose-100 p-3.5 rounded-xl space-y-2">
-                        <div className="flex justify-between font-bold text-rose-800 text-xs">
-                          <span>{linkedInvoice.feeType}</span>
-                          <span>Pending</span>
-                        </div>
-                        <p className="text-[10px] text-rose-600 font-medium">
-                          Patient is registered but hasn't cleared the fee yet.
-                        </p>
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-800 border-t border-rose-200/60 pt-2 mt-1">
-                          <span>Amount Due</span>
-                          <span className="text-sm font-extrabold text-rose-700">₹{linkedInvoice.amount.toLocaleString('en-IN')}</span>
-                        </div>
-                        <Button 
-                          onClick={() => {
-                            collectPatientFee(linkedInvoice.id);
-                            setWsLogs(prev => [`System: Payment collected for "${selectedPatient.name}" (₹${linkedInvoice.amount}). Invoice Paid.`, ...prev]);
-                          }}
-                          className="w-full mt-2 h-9 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-xl flex items-center justify-center gap-1 transition-all"
-                        >
-                          <CreditCard size={14} /> Collect &amp; Clearance
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="bg-emerald-50 border border-emerald-100 p-3.5 rounded-xl space-y-2 text-center">
-                        <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto border border-emerald-200 mb-1">
-                          <Check size={18} />
-                        </div>
-                        <h4 className="font-extrabold text-emerald-800 text-xs">Fee Cleared successfully</h4>
-                        <p className="text-[10px] text-emerald-600 font-medium leading-relaxed">
-                          All collections for this patient walk-in profile completed. Duplicates can be reprinted.
-                        </p>
-                      </div>
-                    )}
-
-                    <Button 
-                      onClick={() => {
-                        const receiptData = {
-                          patientId: selectedPatient.id,
-                          patientNo: selectedPatient.patientNo,
-                          patientName: selectedPatient.name,
-                          phone: selectedPatient.phone,
-                          age: selectedPatient.age,
-                          gender: selectedPatient.gender || 'Male',
-                          doctorName: selectedPatient.doctorName,
-                          tokenNumber: selectedPatient.tokenNumber,
-                          amount: linkedInvoice ? linkedInvoice.amount : 500,
-                          feeType: linkedInvoice ? linkedInvoice.feeType : 'OPD Consultation Fee',
-                          date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                        };
-                        setPrintInvoiceData(receiptData);
-                        setIsPrintModalOpen(true);
-                      }}
-                      variant="outline" 
-                      className="w-full text-xs h-9 font-bold flex items-center justify-center gap-1 rounded-xl border-[#D8D8D8] text-[#3683F8]"
-                    >
-                      <Printer size={14} /> Print Duplicate OPD Slip
-                    </Button>
-                  </div>
-                )}
-              </div>
+          {/* 3. Doctor */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">3 · Doctor</span>
+            {doctors.length === 0 ? (
+              <p className="text-xs font-semibold text-rose-600">No active doctors. Ask the hospital admin to add or activate a doctor.</p>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-                <Clock size={40} className="mb-3.5 text-slate-200" />
-                <p className="text-xs font-medium text-slate-400">Select patient in waiting queue list to view Profile details, print copy slips, or manage checkout.</p>
+              <div className="grid gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+                {doctors.map(d => {
+                  const room = roomFor(schedules, d);
+                  const active = d.id === doctorId;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDoctorId(d.id)}
+                      className={`text-left px-3 py-2 rounded-xl border transition-all ${active ? 'border-[#3683F8] bg-[#EBF3FE] ring-2 ring-[#3683F8]/15' : 'border-[#D8D8D8] hover:border-slate-400'}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-extrabold truncate">{doctorTitle(d.name)}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${(doctorLoad[d.name] || 0) > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {doctorLoad[d.name] || 0} waiting
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-semibold truncate">
+                        {d.department || 'General'}{room ? ` · ${/room/i.test(room) ? room : `Room ${room}`}` : ''}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
-        </div>
 
-      </div>
+          {/* 4. Fee */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">4 · Fee</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {feeOptions.map(f => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setFeeKey(f.key)}
+                  className={`text-left px-2.5 py-2 rounded-xl border text-xs font-bold ${feeKey === f.key ? 'border-[#3683F8] bg-[#EBF3FE] text-[#060606]' : 'border-[#D8D8D8] text-slate-600 hover:border-slate-400'}`}
+                >
+                  <span className="block truncate">{f.label}</span>
+                  <span className="text-[#3683F8]">₹{f.amount.toLocaleString('en-IN')}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">₹</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  aria-label="Fee amount"
+                  className="w-full h-10 pl-7 pr-3 rounded-xl border border-[#D8D8D8] text-sm font-extrabold focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-1 w-[150px]">
+                <button type="button" onClick={() => setPayNow(true)} className={`h-10 rounded-xl border text-[11px] font-bold ${payNow ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-[#D8D8D8] text-slate-600'}`}>Paid now</button>
+                <button type="button" onClick={() => setPayNow(false)} className={`h-10 rounded-xl border text-[11px] font-bold ${!payNow ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-[#D8D8D8] text-slate-600'}`}>Pay later</button>
+              </div>
+            </div>
+            {payNow && Number(amount) > 0 && <PaymentModePicker value={paymentMode} onChange={setPaymentMode} />}
+            {!payNow && <p className="text-[11px] font-semibold text-rose-600">The patient joins the doctor's queue only after the fee is collected.</p>}
+          </div>
 
-      {/* 3-Inch Thermal Print Preview Modal */}
-      <Modal 
-        isOpen={isPrintModalOpen} 
-        onClose={() => setIsPrintModalOpen(false)} 
-        title="Thermal Slip Print Preview"
-        className="max-w-xs sm:max-w-sm"
-      >
-        {printInvoiceData && (
-          <div className="space-y-5 font-sans">
-            <div className="bg-[#EBF3FE]/40 p-4 rounded-2xl border border-[#D8D8D8] flex justify-center">
-              {/* Receipts Template Mock */}
-              <div 
-                id="thermal-slip-template" 
-                className="bg-white border border-[#D8D8D8] shadow-xs text-[#060606] transition-all duration-250 font-mono text-[10px] rounded-xl w-full max-w-[220px]"
-                style={{
-                  padding: `${printSettings.padding}px`,
-                  fontSize: `${printSettings.fontSize}px`,
-                  fontFamily: 'monospace',
-                  borderTop: `4px solid ${printSettings.accentColor}`
-                }}
-              >
-                {printSettings.showHeader && (
-                  <div className="text-center pb-2 border-b border-dashed border-[#D8D8D8] space-y-1">
-                    {printSettings.logoUrl && (
-                      <div className="flex justify-center mb-1">
-                        <img src={printSettings.logoUrl} alt="Logo" className="max-h-8 object-contain" />
-                      </div>
-                    )}
-                    <h3 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: printSettings.accentColor }}>
-                      {printSettings.customHeaderText || hospitalName}
-                    </h3>
-                    <div className="flex justify-between text-[7px] text-slate-500 pt-1 border-t border-dashed border-slate-200">
-                      <span>Bill No: <strong>{printInvoiceData.patientNo || (printInvoiceData.patientId && printInvoiceData.patientId.length !== 24 ? printInvoiceData.patientId : 'OPD-101')}</strong></span>
-                      <span>Date: <strong>{printInvoiceData.date}</strong></span>
-                    </div>
+          <button
+            id="register-submit-btn"
+            type="submit"
+            disabled={submitting || doctors.length === 0}
+            className="w-full h-12 rounded-xl bg-[#3683F8] hover:bg-blue-600 disabled:opacity-60 text-white font-extrabold text-sm inline-flex items-center justify-center gap-2 shadow-md shadow-[#3683F8]/25"
+          >
+            <Printer size={17} /> {submitting ? 'Registering…' : 'Register & get token (F9)'}
+          </button>
+        </form>
+
+        {/* ───── Queue ───── */}
+        <div className="xl:col-span-8 space-y-5">
+          {todaysAppointments.length > 0 && (
+            <div className="bg-white rounded-2xl border border-[#D8D8D8] p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-extrabold flex items-center gap-2"><CalendarClock size={16} className="text-[#3683F8]" /> Today's appointments ({todaysAppointments.length})</h3>
+                <Link to="/receptionist/appointments" className="text-xs font-bold text-[#3683F8] inline-flex items-center gap-1">All appointments <ArrowRight size={13} /></Link>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {todaysAppointments.map(a => (
+                  <div key={a.id} className="shrink-0 w-56 rounded-xl border border-[#D8D8D8] p-3">
+                    <div className="text-xs font-black text-[#3683F8]">{a.time}</div>
+                    <div className="text-sm font-extrabold truncate">{a.patientName}</div>
+                    <div className="text-[11px] text-slate-500 font-semibold truncate">{doctorTitle(a.doctorName)} · {a.phone}</div>
+                    <button
+                      type="button"
+                      onClick={() => { setApptTarget(a); setApptPayNow(true); setApptMode('Cash'); }}
+                      className="mt-2 w-full h-8 rounded-lg bg-[#060606] hover:bg-slate-800 text-white text-[11px] font-bold"
+                    >
+                      Patient arrived — check in
+                    </button>
                   </div>
-                )}
+                ))}
+              </div>
+            </div>
+          )}
 
-                <div className="text-center py-2 border rounded-xl my-2 bg-[#EBF3FE]/50 space-y-0.5" style={{ borderColor: `${printSettings.accentColor}30` }}>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">OPD Queue Token</p>
-                  <h2 className="text-xl font-black leading-none" style={{ color: printSettings.accentColor }}>{printInvoiceData.tokenNumber}</h2>
-                  <p className="text-[8px] font-extrabold text-slate-500">{printInvoiceData.doctorName}</p>
+          <div className="bg-white rounded-2xl border border-[#D8D8D8] overflow-hidden">
+            <div className="p-4 border-b border-[#D8D8D8] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-extrabold">Today's OPD queue</h2>
+                <p className="text-[11px] text-slate-500 font-semibold flex items-center gap-1.5">
+                  <span className={`h-1.5 w-1.5 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                  {autoRefresh ? `Live · updated ${syncedAgo < 5 ? 'just now' : `${syncedAgo}s ago`}` : 'Auto-refresh paused'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Name, phone, token…"
+                    className="h-9 w-44 sm:w-56 pl-8 pr-3 rounded-xl border border-[#D8D8D8] text-xs font-semibold focus:outline-none focus:border-[#3683F8]"
+                  />
                 </div>
-
-                <div className="space-y-1 border-b border-dashed border-[#D8D8D8] pb-2 text-[0.9em]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Patient:</span>
-                    <span className="font-bold">{printInvoiceData.patientName}</span>
-                  </div>
-                  {(printInvoiceData.patientNo || (printInvoiceData.patientId && printInvoiceData.patientId.length !== 24)) && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Patient No:</span>
-                      <span className="font-bold text-[#3683F8]">{printInvoiceData.patientNo || printInvoiceData.patientId}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Age/Gender:</span>
-                    <span className="font-bold">{printInvoiceData.age} Yrs / {printInvoiceData.gender}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Contact:</span>
-                    <span className="font-bold">{printInvoiceData.phone}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1 pb-1 text-[0.9em]">
-                  <div className="flex justify-between font-bold">
-                    <span>{printInvoiceData.feeType}:</span>
-                    <span>₹{printInvoiceData.amount}</span>
-                  </div>
-                  <div className="flex justify-between font-black border-t pt-1.5 mt-1" style={{ borderTopColor: printSettings.accentColor }}>
-                    <span>TOTAL AMOUNT:</span>
-                    <span style={{ color: printSettings.accentColor }}>₹{printInvoiceData.amount}</span>
-                  </div>
-                </div>
-
-                {printSettings.showFooter && (
-                  <div className="text-center pt-2.5 border-t border-dashed border-[#D8D8D8] mt-2 space-y-1">
-                    <p className="text-[7.5px] text-slate-400 uppercase tracking-wider leading-normal">E &amp; O.E</p>
-                    <p className="text-[7.5px] text-slate-600 font-semibold leading-normal">
-                      {printSettings.customFooterText || `Please wait outside Room ${printInvoiceData.doctorName.includes('Sarah') ? '101' : '202'}`}
-                    </p>
-                    <p className="text-[9px] font-extrabold text-slate-800 tracking-tight pt-0.5">Thank You</p>
-                  </div>
-                )}
+                <button type="button" onClick={() => setAutoRefresh(!autoRefresh)} className={`h-9 px-3 rounded-xl border text-[11px] font-bold ${autoRefresh ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-[#D8D8D8] text-slate-500'}`}>
+                  {autoRefresh ? 'Live on' : 'Live off'}
+                </button>
+                <button type="button" onClick={refresh} title="Refresh now" className="h-9 w-9 rounded-xl border border-[#D8D8D8] flex items-center justify-center text-slate-600 hover:border-[#3683F8] hover:text-[#3683F8]">
+                  <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+                </button>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => {
-                  const slipHtml = buildOpdQueueSlipHtml({
-                    tokenNumber: printInvoiceData.tokenNumber,
-                    patientName: printInvoiceData.patientName,
-                    patientId:   printInvoiceData.patientId,
-                    patientNo:   printInvoiceData.patientNo,
-                    age:         printInvoiceData.age,
-                    gender:      printInvoiceData.gender,
-                    phone:       printInvoiceData.phone,
-                    doctorName:  printInvoiceData.doctorName,
-                    feeType:     printInvoiceData.feeType,
-                    amount:      printInvoiceData.amount,
-                    date:        printInvoiceData.date,
-                    billNo:      printInvoiceData.patientNo || printInvoiceData.patientId,
-                  });
-                  printIsolatedHtml("OPD Queue Slip", slipHtml);
-                  setIsPrintModalOpen(false);
-                }} 
-                className="flex-1 font-bold rounded-xl bg-[#3683F8] hover:bg-blue-600 text-white"
-              >
-                <Printer size={16} className="mr-1.5" /> Execute Print
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsPrintModalOpen(false)}
-                className="flex-1 font-bold rounded-xl border-[#D8D8D8]"
-              >
-                Close Preview
-              </Button>
+            <div className="px-4 py-3 border-b border-[#D8D8D8] flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/60">
+              <div className="flex gap-1.5 overflow-x-auto">
+                {(['Waiting', 'In Consultation', 'Completed', 'Unpaid', 'All'] as QueueTab[]).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTab(t)}
+                    className={`shrink-0 h-8 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 border ${tab === t
+                      ? t === 'Unpaid' ? 'bg-rose-600 border-rose-600 text-white' : 'bg-[#060606] border-[#060606] text-white'
+                      : t === 'Unpaid' && counts.Unpaid > 0 ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-[#D8D8D8] text-slate-600'}`}
+                  >
+                    {t === 'In Consultation' ? 'With doctor' : t === 'Unpaid' ? 'Fee due' : t}
+                    <span className={`text-[10px] px-1.5 rounded ${tab === t ? 'bg-white/20' : 'bg-slate-100'}`}>{counts[t]}</span>
+                  </button>
+                ))}
+              </div>
+              <select value={doctorFilter} onChange={e => setDoctorFilter(e.target.value)} className="h-8 px-2 rounded-lg border border-[#D8D8D8] text-xs font-bold bg-white">
+                <option value="All">All doctors</option>
+                {doctors.map(d => <option key={d.id} value={d.name}>{doctorTitle(d.name)}</option>)}
+              </select>
             </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#EBF3FE]/60 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Token</th>
+                    <th className="px-4 py-3">Patient</th>
+                    <th className="px-4 py-3">Doctor</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Fee</th>
+                    <th className="px-4 py-3">Waiting</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#D8D8D8]/60">
+                  {rows.map(p => {
+                    const inv = invoiceFor(p);
+                    const unpaid = isVisitUnpaid(p);
+                    const pos = p.status === 'Waiting' && !unpaid ? positionOf(p) : 0;
+                    return (
+                      <tr key={p.id} onClick={() => setDetail(p)} className="cursor-pointer hover:bg-[#EBF3FE]/30">
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-1 rounded-lg bg-[#060606] text-white font-mono font-bold text-[11px] whitespace-nowrap">{p.tokenNumber}</span>
+                          {pos > 0 && <span className="block text-[10px] font-bold text-slate-400 mt-1">{pos === 1 ? 'Next in line' : `#${pos} in line`}</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-extrabold text-[#060606] text-sm">{p.name}</div>
+                          <div className="text-[11px] text-slate-500 font-semibold">{p.patientNo} · {p.age}{(p.gender || 'M')[0]} · {p.phone}</div>
+                        </td>
+                        <td className="px-4 py-3 font-bold text-slate-700">{doctorTitle(p.doctorName)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-extrabold whitespace-nowrap ${statusStyle[p.status]}`}>{p.status === 'In Consultation' ? 'With doctor' : p.status}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {unpaid
+                            ? <span className="font-extrabold text-rose-600 whitespace-nowrap">₹{(inv?.amount ?? 0).toLocaleString('en-IN')} due</span>
+                            : <span className="font-bold text-emerald-700 whitespace-nowrap">{(inv?.amount ?? 0) > 0 ? `₹${inv!.amount.toLocaleString('en-IN')}` : 'Free'}{inv?.paymentMode ? ` · ${inv.paymentMode}` : ''}</span>}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 font-semibold whitespace-nowrap">{p.status === 'Completed' ? '—' : formatWait(p.createdAt, now)}</td>
+                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                          <div className="flex justify-end items-center gap-1">
+                            {unpaid && (
+                              <button type="button" onClick={() => setCollectTarget(p)} className="h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                                <CreditCard size={13} /> Collect ₹{(inv?.amount ?? 0).toLocaleString('en-IN')}
+                              </button>
+                            )}
+                            <button type="button" onClick={() => setSlip(slipFor(p))} title="Print token slip" className="h-8 w-8 rounded-lg hover:bg-[#EBF3FE] text-[#3683F8] inline-flex items-center justify-center">
+                              <Printer size={15} />
+                            </button>
+                            {p.status === 'Waiting' && (
+                              <button type="button" onClick={() => cancelVisit(p)} title="Cancel check-in" className="h-8 w-8 rounded-lg hover:bg-rose-50 text-rose-600 inline-flex items-center justify-center">
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-14 text-center">
+                        <Users size={32} className="mx-auto text-slate-200 mb-2" />
+                        <p className="text-sm font-bold text-slate-400">
+                          {todays.length === 0 ? 'No patients registered yet today.' : query ? 'No patients match your search.' : 'No patients in this list.'}
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Patient detail */}
+      <Modal isOpen={!!detailLive} onClose={() => setDetail(null)} title={detailLive ? `${detailLive.name} · ${detailLive.tokenNumber}` : ''} className="max-w-lg">
+        {detailLive && (() => {
+          const inv = invoiceFor(detailLive);
+          const unpaid = isVisitUnpaid(detailLive);
+          const room = roomFor(schedules, doctors.find(d => d.name === detailLive.doctorName) || { name: detailLive.doctorName });
+          return (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['Patient no.', detailLive.patientNo || '—'],
+                  ['Age / gender', `${detailLive.age} / ${detailLive.gender || 'Male'}`],
+                  ['Phone', detailLive.phone],
+                  ['Doctor', doctorTitle(detailLive.doctorName)],
+                  ['Room', room || '—'],
+                  ['Waiting', detailLive.status === 'Completed' ? '—' : formatWait(detailLive.createdAt, now)]
+                ].map(([k, v]) => (
+                  <div key={k} className="rounded-xl bg-slate-50 border border-[#D8D8D8] px-3 py-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{k}</div>
+                    <div className="font-bold truncate">{v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {(detailLive.vitals || []).length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {(detailLive.vitals || []).map(v => (
+                    <span key={v.name} className="text-[11px] font-bold px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">{v.name}: {v.value}</span>
+                  ))}
+                </div>
+              )}
+
+              <div className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${unpaid ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{inv?.feeType || 'Consultation fee'}{inv ? ` · ${inv.id}` : ''}</div>
+                  <div className={`font-extrabold ${unpaid ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    ₹{(inv?.amount ?? 0).toLocaleString('en-IN')} {unpaid ? 'due' : `paid${inv?.paymentMode ? ` by ${inv.paymentMode}` : ''}`}
+                  </div>
+                </div>
+                {unpaid && (
+                  <button type="button" onClick={() => setCollectTarget(detailLive)} className="h-9 px-3 rounded-xl bg-emerald-600 text-white text-xs font-bold">Collect fee</button>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Queue status</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['Waiting', 'In Consultation', 'Completed'] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatus(detailLive, s)}
+                      className={`h-9 rounded-xl border text-xs font-bold ${detailLive.status === s ? 'bg-[#3683F8] border-[#3683F8] text-white' : 'bg-white border-[#D8D8D8] text-slate-600 hover:border-slate-400'}`}
+                    >
+                      {s === 'In Consultation' ? 'With doctor' : s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setSlip(slipFor(detailLive))} className="flex-1 h-10 rounded-xl border border-[#D8D8D8] text-xs font-bold text-[#3683F8] inline-flex items-center justify-center gap-1.5">
+                  <Printer size={15} /> Print slip
+                </button>
+                {detailLive.status === 'Waiting' && (
+                  <button type="button" onClick={() => cancelVisit(detailLive)} className="flex-1 h-10 rounded-xl border border-rose-200 text-xs font-bold text-rose-600 inline-flex items-center justify-center gap-1.5">
+                    <Trash2 size={15} /> Cancel check-in
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Slip preview */}
+      <Modal isOpen={!!slip} onClose={() => setSlip(null)} title="Token slip" className="max-w-sm">
+        {slip && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-center font-mono">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">OPD token</div>
+              <div className="text-4xl font-black text-[#3683F8] my-1">{slip.tokenNumber}</div>
+              <div className="text-sm font-bold">{doctorTitle(slip.doctorName)}</div>
+              {slip.room && <div className="text-xs text-slate-500 inline-flex items-center gap-1 mt-1"><DoorOpen size={12} /> {/room/i.test(slip.room) ? slip.room : `Room ${slip.room}`}</div>}
+              <div className="mt-3 pt-3 border-t border-dashed border-slate-300 text-left text-xs space-y-1">
+                <div className="flex justify-between"><span className="text-slate-500">Patient</span><span className="font-bold">{slip.patientName}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Patient no.</span><span className="font-bold">{slip.patientNo}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">{slip.feeType}</span><span className="font-bold">₹{slip.amount.toLocaleString('en-IN')}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Payment</span><span className={`font-black ${slip.paid ? 'text-emerald-600' : 'text-rose-600'}`}>{slip.paid ? `PAID${slip.paymentMode ? ` · ${slip.paymentMode}` : ''}` : 'FEE DUE'}</span></div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { printOpdSlip(slip); setSlip(null); }} className="flex-1 h-11 rounded-xl bg-[#3683F8] hover:bg-blue-600 text-white font-bold text-sm inline-flex items-center justify-center gap-1.5">
+                <Printer size={16} /> Print
+              </button>
+              <button type="button" onClick={() => setSlip(null)} className="flex-1 h-11 rounded-xl border border-[#D8D8D8] font-bold text-sm">Close</button>
+            </div>
+            {!autoPrint && (
+              <button type="button" onClick={() => toggleAutoPrint(true)} className="w-full text-[11px] font-bold text-slate-500 hover:text-[#3683F8] inline-flex items-center justify-center gap-1">
+                <CheckCircle2 size={12} /> Always print automatically after registration
+              </button>
+            )}
           </div>
         )}
       </Modal>
 
-      <VitalsModal 
-        isOpen={isVitalsModalOpen}
-        onClose={() => setIsVitalsModalOpen(false)}
-        onSave={(savedVitals, savedDiagnoses) => {
-          setVitals(savedVitals);
-          setPastDiagnoses(savedDiagnoses);
-        }}
+      {/* Appointment check-in */}
+      <Modal isOpen={!!apptTarget} onClose={() => setApptTarget(null)} title="Check in appointment" className="max-w-sm">
+        {apptTarget && (
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-slate-50 border border-[#D8D8D8] p-4">
+              <div className="text-sm font-extrabold">{apptTarget.patientName}</div>
+              <div className="text-xs text-slate-500 font-semibold">{apptTarget.time} · {doctorTitle(apptTarget.doctorName)}</div>
+              <div className="text-xs text-slate-500 font-semibold mt-1">{apptFee.feeType}: <span className="font-extrabold text-[#060606]">₹{apptFee.amount.toLocaleString('en-IN')}</span></div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => setApptPayNow(true)} className={`h-10 rounded-xl border text-xs font-bold ${apptPayNow ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-[#D8D8D8]'}`}>Paid now</button>
+              <button type="button" onClick={() => setApptPayNow(false)} className={`h-10 rounded-xl border text-xs font-bold ${!apptPayNow ? 'bg-rose-600 border-rose-600 text-white' : 'border-[#D8D8D8]'}`}>Pay later</button>
+            </div>
+            {apptPayNow && apptFee.amount > 0 && <PaymentModePicker value={apptMode} onChange={setApptMode} />}
+            <button type="button" disabled={apptBusy} onClick={confirmApptCheckIn} className="w-full h-11 rounded-xl bg-[#3683F8] hover:bg-blue-600 disabled:opacity-60 text-white font-extrabold text-sm">
+              {apptBusy ? 'Checking in…' : 'Check in & issue token'}
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      <CollectFeeModal
+        open={!!collectTarget}
+        onClose={() => setCollectTarget(null)}
+        patientName={collectTarget?.name || ''}
+        amount={collectTarget ? invoiceFor(collectTarget)?.amount ?? fees?.opdFee ?? 0 : 0}
+        feeType={collectTarget ? invoiceFor(collectTarget)?.feeType || 'OPD Consultation Fee' : ''}
+        onConfirm={confirmCollect}
+      />
+
+      <VitalsModal
+        isOpen={isVitalsOpen}
+        onClose={() => setIsVitalsOpen(false)}
+        onSave={(v, dx) => { setVitals(v); setPastDiagnoses(dx); }}
         initialVitals={vitals}
         initialPastDiagnoses={pastDiagnoses}
       />
+
+      <ToastStack toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

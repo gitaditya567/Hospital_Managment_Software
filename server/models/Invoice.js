@@ -13,6 +13,8 @@ const invoiceSchema = new mongoose.Schema({
   },
   doctorName: { type: String, required: true },
   feeType: { type: String, required: true },
+  patientId: { type: String, default: null },
+  paymentMode: { type: String, enum: ['', 'Cash', 'UPI', 'Card'], default: '' },
   hospitalId: { type: String, required: true }
 }, { timestamps: true });
 
