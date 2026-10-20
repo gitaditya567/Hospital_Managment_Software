@@ -140,7 +140,14 @@ const LIVE_EVENTS = [
   { icon: BellRing, tone: 'bg-amber-50 text-amber-600', title: 'Low stock: Metformin 500mg', sub: '9 units left · reorder' }
 ];
 
-const MARQUEE = ['OPD Registration', 'Live Doctor Queue', 'Voice e-Prescription', 'Pharmacy POS', 'Batch & Expiry Tracking', 'Thermal Slips', 'Sequential Invoices', 'Revenue Analytics', 'Staff & Roles', 'Departments & Beds', 'Doctor Schedules', 'Patient Master Directory'];
+const MARQUEE = [
+  { icon: UserPlus, label: 'OPD Registration' }, { icon: ClipboardList, label: 'Live Doctor Queue' },
+  { icon: Mic, label: 'Voice e-Prescription' }, { icon: Pill, label: 'Pharmacy POS' },
+  { icon: Boxes, label: 'Batch & Expiry Tracking' }, { icon: Printer, label: 'Thermal Slips' },
+  { icon: Receipt, label: 'Sequential Invoices' }, { icon: ChartColumn, label: 'Revenue Analytics' },
+  { icon: Users, label: 'Staff & Roles' }, { icon: Building2, label: 'Departments & Beds' },
+  { icon: CalendarClock, label: 'Doctor Schedules' }, { icon: Search, label: 'Patient Master Directory' }
+];
 
 const TOUR_MS = 6000;
 
@@ -374,13 +381,19 @@ export function Home() {
         </div>
 
         {/* Module marquee */}
-        <div className="relative border-y border-blue-100 bg-white/70 backdrop-blur py-4 marquee-mask overflow-hidden mt-6">
-          <div className="marquee-track gap-10 pr-10">
-            {[...MARQUEE, ...MARQUEE].map((item, i) => (
-              <span key={i} className="flex items-center gap-2.5 text-sm font-bold text-slate-500 whitespace-nowrap">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#3683F8]" /> {item}
-              </span>
-            ))}
+        <div className="relative border-y border-blue-100 bg-white/70 backdrop-blur py-4 mt-6">
+          <div className="marquee-mask overflow-hidden" aria-label="Modules included">
+            <div className="marquee-track gap-4 pr-4">
+              {[...MARQUEE, ...MARQUEE].map((item, i) => (
+                <span
+                  key={i}
+                  aria-hidden={i >= MARQUEE.length}
+                  className="group flex items-center gap-2 h-10 px-4 rounded-full bg-white border border-blue-100 text-sm font-bold text-slate-600 whitespace-nowrap shadow-sm transition-colors hover:border-[#3683F8] hover:text-[#3683F8]"
+                >
+                  <item.icon size={16} className="text-[#3683F8] transition-transform group-hover:scale-125" /> {item.label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </section>

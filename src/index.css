@@ -223,6 +223,10 @@
     width: max-content;
     animation: marquee 38s linear infinite;
   }
+  .marquee-mask {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  }
   .marquee-mask:hover .marquee-track { animation-play-state: paused; }
 
   .btn-shine { position: relative; overflow: hidden; isolation: isolate; }
@@ -275,10 +279,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; transition: none; }
-  .marquee-track, .blob-drift, .blob-drift-slow, .gradient-text, .toast-in,
-  .animate-float, .animate-float-slow, .animate-heartbeat { animation: none !important; }
-  .tour-progress { animation: none; width: 100%; }
+  /* Gentle mode: keep fades and the slow marquee, drop large movement */
+  .reveal, .reveal[data-reveal] { transform: none; transition: opacity 0.6s ease; }
+  .marquee-track { animation-duration: 70s; }
+  .blob-drift, .blob-drift-slow, .animate-float, .animate-float-slow { animation: none !important; }
   html { scroll-behavior: auto !important; }
 }
 

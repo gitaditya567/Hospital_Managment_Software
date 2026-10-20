@@ -60,10 +60,6 @@ export function CountUp({ to, duration = 1600, prefix = '', suffix = '' }: { to:
 
   useEffect(() => {
     if (!inView) return;
-    if (prefersReducedMotion()) {
-      setValue(to);
-      return;
-    }
     let frame = 0;
     const start = performance.now();
     const tick = (now: number) => {
