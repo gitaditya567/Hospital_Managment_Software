@@ -9,7 +9,9 @@ const licenseCodeSchema = new mongoose.Schema({
     enum: ['Unused', 'Used', 'Expired'], 
     default: 'Unused' 
   },
-  isUsed: { type: Boolean, default: false }
+  isUsed: { type: Boolean, default: false },
+  licenseType: { type: String, enum: ['Paid', 'Trial'], default: 'Paid' },
+  activatedByHospitalId: { type: String, default: null }
 }, { timestamps: true });
 
 export const LicenseCode = mongoose.model('LicenseCode', licenseCodeSchema);

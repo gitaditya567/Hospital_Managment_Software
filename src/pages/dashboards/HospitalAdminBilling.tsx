@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useHospitalStore } from '../../store/useHospitalStore';
-import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { CreditCard, CheckCircle, AlertTriangle, ShieldCheck, Download, Calendar, HardDrive, UserCheck, Printer, Sliders, Sparkles, X, Key, Zap, PackageCheck, Check, Mail } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -8,8 +7,8 @@ import { getPrintSettings, savePrintSettings } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
 
 export function HospitalAdminBilling() {
-  const { staff, fees, renewSubscription } = useHospitalStore();
-  const { tenants, plans, invoices, fetchSuperAdminData } = useSuperAdminStore();
+  const { staff, fees, renewSubscription, subscriptionTenant, subscriptionPlans: plans, subscriptionInvoices: invoices, fetchSubscription, hospitalName: storeHospitalName } = useHospitalStore();
+  const tenants = subscriptionTenant ? [subscriptionTenant] : [];
   const { user } = useAuthStore();
 
   const [printSettings, setPrintSettings] = useState<PrintSettings>(getPrintSettings());
@@ -22,8 +21,8 @@ export function HospitalAdminBilling() {
   const [renewStatus, setRenewStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
-    fetchSuperAdminData();
-  }, [fetchSuperAdminData]);
+    fetchSubscription();
+  }, [fetchSubscription]);
 
   const updateSetting = (key: keyof PrintSettings, value: any) => {
     setPrintSettings(prev => ({
@@ -59,18 +58,18 @@ export function HospitalAdminBilling() {
   // Find active tenant and its plan
   const currentHospitalId = user?.hospitalId || tenants[0]?.id || 'tenant-1';
   const currentHospital = tenants.find(t => t.id === currentHospitalId);
-  const hospitalName = currentHospital?.hospitalName || 'City Care Hospital';
+  const hospitalName = currentHospital?.hospitalName || storeHospitalName || '';
   const plan = currentHospital ? plans.find(p => p.id === currentHospital.planId) : plans[0] || null;
 
   // Calculate subscription validity days remaining
-  const expiryDateStr = currentHospital?.subscriptionExpiryDate || '2027-05-23';
-  const expiryDate = new Date(expiryDateStr);
-  const diffTime = expiryDate.getTime() - new Date().getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const expiryDateStr = currentHospital?.subscriptionExpiryDate || '';
+  const expiryDate = new Date(`${expiryDateStr}T00:00:00`);
+  const diffTime = expiryDate.getTime() - new Date().setHours(0, 0, 0, 0);
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-  // Determine subscription health status
-  const isExpiringSoon = diffDays > 0 && diffDays <= 30;
-  const isExpired = diffDays <= 0;
+  // Determine subscription health status (valid through the expiry date itself)
+  const isExpiringSoon = diffDays >= 0 && diffDays <= 30;
+  const isExpired = diffDays < 0;
 
   // Filter invoices for THIS hospital
   const hospitalInvoices = invoices.filter(
@@ -82,7 +81,7 @@ export function HospitalAdminBilling() {
   const receptionistsCreated = staff.filter(s => s.role === 'Receptionist').length;
   const pharmacistsCreated = staff.filter(s => s.role === 'Pharmacy').length;
 
-  const storageUsed = currentHospital?.storageUsed || 1.15; // dynamically fetched from backend API (in MB)
+  const storageUsed = currentHospital?.storageUsed || 0; // dynamically fetched from backend API (in MB)
 
   const handleLicenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +94,7 @@ export function HospitalAdminBilling() {
     if (res.success) {
       setRenewStatus({ type: 'success', message: res.message || 'Subscription renewed successfully!' });
       setLicenseInput('');
-      await fetchSuperAdminData();
+      await fetchSubscription();
     } else {
       setRenewStatus({ type: 'error', message: res.error || 'Invalid or used License Key.' });
     }

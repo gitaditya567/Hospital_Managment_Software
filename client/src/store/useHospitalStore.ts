@@ -88,6 +88,52 @@ export interface PatientInvoice {
   feeType: string;
 }
 
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  price: number;
+  maxDoctors: number;
+  maxReceptionists: number;
+  maxPharmacists: number;
+  maxStorage: number;
+  durationMonths: number;
+}
+
+export interface SubscriptionTenant {
+  id: string;
+  hospitalName: string;
+  adminEmail: string;
+  adminPhone: string;
+  address: string;
+  status: 'Active' | 'Suspended' | 'Past Due';
+  licenseCodeUsed: string;
+  subscriptionExpiryDate: string;
+  planId: string;
+  isTrial: boolean;
+  staffCreated: number;
+  storageUsed: number;
+  createdAt?: string;
+}
+
+export interface SubscriptionInvoiceRow {
+  id: string;
+  hospitalName: string;
+  planName: string;
+  amount: number;
+  status: 'Paid' | 'Failed' | 'Pending';
+  date: string;
+  method: 'Manual Invoice' | 'Stripe' | 'Razorpay';
+}
+
+export interface HospitalProfileDetails {
+  adminEmail: string;
+  adminPhone: string;
+  address: string;
+}
+
+// Server errors come back as objects; never let them crash list rendering
+const asArray = (value: any): any[] => (Array.isArray(value) ? value : []);
+
 interface HospitalState {
   staff: StaffMember[];
   departments: Department[];
@@ -97,6 +143,12 @@ interface HospitalState {
   invoices: PatientInvoice[];
   hospitalName: string;
   hospitalLogo: string;
+  profileDetails: HospitalProfileDetails;
+  subscriptionTenant: SubscriptionTenant | null;
+  subscriptionPlans: SubscriptionPlan[];
+  subscriptionInvoices: SubscriptionInvoiceRow[];
+  fetchSubscription: () => Promise<void>;
+  saveHospitalProfile: (updates: { hospitalName?: string; adminPhone?: string; address?: string; hospitalLogo?: string }) => Promise<{ success: boolean; error?: string }>;
   loading: boolean;
 
   // Actions
@@ -135,7 +187,50 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
   invoices: [],
   hospitalName: localStorage.getItem('medisaas_hospital_name') || 'Smart Hospital',
   hospitalLogo: localStorage.getItem('medisaas_hospital_logo') || '',
+  profileDetails: { adminEmail: '', adminPhone: '', address: '' },
+  subscriptionTenant: null,
+  subscriptionPlans: [],
+  subscriptionInvoices: [],
   loading: false,
+
+  fetchSubscription: async () => {
+    try {
+      const res = await fetch('/api/hospital/subscription');
+      if (!res.ok) return;
+      const data = await res.json();
+      set({
+        subscriptionTenant: data.tenant || null,
+        subscriptionPlans: asArray(data.plans),
+        subscriptionInvoices: asArray(data.invoices)
+      });
+    } catch (err) {
+      console.error('Failed to load subscription details', err);
+    }
+  },
+
+  saveHospitalProfile: async (updates) => {
+    try {
+      const res = await fetch('/api/hospital/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { success: false, error: data.message || 'Failed to save hospital profile.' };
+      if (updates.hospitalName) get().setHospitalName(updates.hospitalName);
+      if (updates.hospitalLogo !== undefined) get().setHospitalLogo(updates.hospitalLogo);
+      set({
+        profileDetails: {
+          ...get().profileDetails,
+          ...(updates.adminPhone !== undefined ? { adminPhone: updates.adminPhone } : {}),
+          ...(updates.address !== undefined ? { address: updates.address } : {})
+        }
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Server connection error.' };
+    }
+  },
 
   setHospitalName: (name: string) => {
     localStorage.setItem('medisaas_hospital_name', name);
@@ -160,11 +255,11 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
         fetch(`/api/hospital/profile?hospitalId=${hospitalId}`)
       ]);
 
-      const staffData = await staffRes.json();
-      const deptData = await deptRes.json();
-      const schedData = await schedRes.json();
-      const patientData = await patientRes.json();
-      const invData = await invRes.json();
+      const staffData = asArray(await staffRes.json());
+      const deptData = asArray(await deptRes.json());
+      const schedData = asArray(await schedRes.json());
+      const patientData = asArray(await patientRes.json());
+      const invData = asArray(await invRes.json());
       const feesData = await feesRes.json();
       const profileData = await profileRes.json();
 
@@ -241,6 +336,11 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
         fees: feesData,
         hospitalName: profileData.hospitalName || get().hospitalName || 'Smart Hospital',
         hospitalLogo: profileData.hospitalLogo || get().hospitalLogo || localStorage.getItem('medisaas_hospital_logo') || '',
+        profileDetails: {
+          adminEmail: profileData.adminEmail || '',
+          adminPhone: profileData.adminPhone || '',
+          address: profileData.address || ''
+        },
         loading: false
       });
 
@@ -542,7 +642,7 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
       if (!response.ok) {
         return { success: false, error: data.message || 'Renewal failed.' };
       }
-      await get().fetchHospitalData(hospitalId);
+      await Promise.all([get().fetchHospitalData(hospitalId), get().fetchSubscription()]);
       return { success: true, message: data.message };
     } catch (err: any) {
       return { success: false, error: err.message || 'Server connection error.' };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -7,7 +7,7 @@ import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { usePharmacyStore } from '../../store/usePharmacyStore';
 
-import { ShieldAlert, LogOut } from 'lucide-react';
+import { ShieldAlert, LogOut, Gift, AlertTriangle } from 'lucide-react';
 
 export function DashboardLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -15,6 +15,8 @@ export function DashboardLayout() {
   const fetchSuperAdminData = useSuperAdminStore((state) => state.fetchSuperAdminData);
   const fetchHospitalData = useHospitalStore((state) => state.fetchHospitalData);
   const fetchPharmacyData = usePharmacyStore((state) => state.fetchPharmacyData);
+  const fetchSubscription = useHospitalStore((state) => state.fetchSubscription);
+  const subscriptionTenant = useHospitalStore((state) => state.subscriptionTenant);
 
   const [isSuspended, setIsSuspended] = useState(false);
   const [isMaintenanceActive, setIsMaintenanceActive] = useState(false);
@@ -31,8 +33,20 @@ export function DashboardLayout() {
 
       // Fetch pharmacy specific inventory/orders
       fetchPharmacyData(user.hospitalId);
+
+      if (user.role === 'HOSPITAL_ADMIN') fetchSubscription();
     }
-  }, [user, fetchSuperAdminData, fetchHospitalData, fetchPharmacyData]);
+  }, [user, fetchSuperAdminData, fetchHospitalData, fetchPharmacyData, fetchSubscription]);
+
+  // Trial / renewal reminder for the hospital admin
+  // Calendar days until expiry; the plan stays valid through the expiry date itself
+  const daysLeft = subscriptionTenant?.subscriptionExpiryDate
+    ? Math.round((new Date(`${subscriptionTenant.subscriptionExpiryDate}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000)
+    : null;
+  const isExpired = daysLeft !== null && daysLeft < 0;
+  const daysLeftText = daysLeft === 0 ? 'today is the last day' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+  const showSubscriptionBanner = user?.role === 'HOSPITAL_ADMIN' && daysLeft !== null
+    && (isExpired || daysLeft <= 15 || !!subscriptionTenant?.isTrial);
 
   // Periodic maintenance & suspension status check
   useEffect(() => {
@@ -100,6 +114,21 @@ export function DashboardLayout() {
         <Topbar onMenuClick={() => setSidebarOpen(prev => !prev)} isSidebarOpen={isSidebarOpen} />
         <main className="flex-1 overflow-auto p-4 md:p-8 medical-grid">
           <div className="max-w-7xl mx-auto">
+            {showSubscriptionBanner && daysLeft !== null && (
+              <div className={`mb-6 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm ${isExpired ? 'bg-rose-50 border-rose-200 text-rose-800' : daysLeft <= 5 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-[#EBF3FE] border-blue-200 text-slate-800'}`}>
+                <div className="flex items-center gap-2.5 font-semibold">
+                  {isExpired ? <AlertTriangle size={18} className="shrink-0" /> : <Gift size={18} className="shrink-0 text-[#3683F8]" />}
+                  {isExpired
+                    ? `Your subscription expired on ${subscriptionTenant?.subscriptionExpiryDate}. Staff logins are paused until you renew.`
+                    : subscriptionTenant?.isTrial
+                      ? `Free trial: ${daysLeftText}. Activate a plan to keep using the software without interruption.`
+                      : `Your subscription is valid until ${subscriptionTenant?.subscriptionExpiryDate} (${daysLeftText}).`}
+                </div>
+                <Link to="/hospital-admin/billing" className="h-9 px-4 inline-flex items-center justify-center rounded-xl bg-[#3683F8] hover:bg-blue-600 text-white text-xs font-bold shrink-0">
+                  {isExpired ? 'Renew now' : 'View plans'}
+                </Link>
+              </div>
+            )}
             <Outlet />
           </div>
         </main>

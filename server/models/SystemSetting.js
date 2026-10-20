@@ -7,7 +7,10 @@ const systemSettingSchema = new mongoose.Schema({
   allowManualOnboarding: { type: Boolean, default: true },
   stripeEnabled: { type: Boolean, default: true },
   razorpayEnabled: { type: Boolean, default: true },
-  taxRate: { type: Number, default: 18 }
+  taxRate: { type: Number, default: 18 },
+  allowSelfSignup: { type: Boolean, default: true },
+  trialDays: { type: Number, default: 14 },
+  trialPlanId: { type: String, default: '' }
 }, { timestamps: true });
 
 export const SystemSetting = mongoose.model('SystemSetting', systemSettingSchema);

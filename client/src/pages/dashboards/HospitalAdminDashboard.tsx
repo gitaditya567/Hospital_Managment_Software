@@ -8,12 +8,14 @@ export function HospitalAdminDashboard() {
 
   // Calculate live counts
   const activeDoctors = staff.filter(s => s.role === 'Doctor' && s.status === 'Active').length;
-  const totalPatientsToday = patients.length;
+  const todayDateString = new Date().toDateString();
+  const todayLabel = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const totalPatientsToday = patients.filter(p => p.createdAt && new Date(p.createdAt).toDateString() === todayDateString).length;
 
-  // Calculate today's revenue based on real-time database records
-  const paidInvoices = invoices.filter(inv => inv.status === 'Paid');
+  // Today's revenue: paid OPD invoices and pharmacy bills dated today
+  const paidInvoices = invoices.filter(inv => inv.status === 'Paid' && inv.date === todayLabel);
   const baseRevenue = paidInvoices.reduce((acc, inv) => acc + inv.amount, 0);
-  const pharmacyRevenue = bills.reduce((acc, b) => acc + b.total, 0);
+  const pharmacyRevenue = bills.filter(b => b.date === todayLabel).reduce((acc, b) => acc + b.total, 0);
   const totalRevenue = baseRevenue + pharmacyRevenue;
 
   const pendingBillsCount = invoices.filter(inv => inv.status === 'Pending').length;
@@ -105,7 +107,7 @@ export function HospitalAdminDashboard() {
               ₹{totalRevenue.toLocaleString('en-IN')}
             </h3>
             <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
-              ▲ 14.2% vs last week avg
+              OPD ₹{baseRevenue.toLocaleString('en-IN')} · Pharmacy ₹{pharmacyRevenue.toLocaleString('en-IN')}
             </p>
           </div>
           <div className="h-12 w-12 rounded-xl bg-[#EBF3FE] text-[#3683F8] flex items-center justify-center border border-blue-200 animate-heartbeat">
@@ -277,7 +279,7 @@ export function HospitalAdminDashboard() {
                   {sec.label}
                 </span>
                 <span className="text-[#060606] font-bold">
-                  ₹{sec.value.toLocaleString('en-IN')} ({(sec.value / totalShare * 100).toFixed(0)}%)
+                  ₹{sec.value.toLocaleString('en-IN')} ({(totalShare > 0 ? (sec.value / totalShare) * 100 : 0).toFixed(0)}%)
                 </span>
               </div>
             ))}

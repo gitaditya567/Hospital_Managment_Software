@@ -3,7 +3,8 @@ import { useAuthStore } from './store/useAuthStore';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { initSecurityProtections } from './utils/securityProtection';
 import { Login } from './pages/auth/Login';
-import { Activate } from './pages/auth/Activate';
+import { Home } from './pages/public/Home';
+import { Register } from './pages/public/Register';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { RoleRoute } from './components/layout/RoleRoute';
 
@@ -48,10 +49,12 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/activate" element={<Activate />} />
-        <Route path="/setup" element={<Activate />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/signup" element={<Navigate to="/register" replace />} />
+        <Route path="/activate" element={<Navigate to="/register?mode=license" replace />} />
+        <Route path="/setup" element={<Navigate to="/register?mode=license" replace />} />
 
         {/* Super Admin Routes */}
         <Route path="/super-admin" element={
@@ -121,6 +124,7 @@ function App() {
           <Route path="orders" element={<PharmacyOrders />} />
         </Route>
 
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { Button } from '../../components/ui/Button';
@@ -25,9 +25,11 @@ import {
 import { RecoverCredentialsModal } from '../../components/auth/RecoverCredentialsModal';
 
 export function Login() {
-  const [selectedRole, setSelectedRole] = useState('SUPER_ADMIN');
-  const [email, setEmail] = useState('admin@hospital.com');
-  const [password, setPassword] = useState('admin123');
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('session') === 'expired';
+  const [selectedRole, setSelectedRole] = useState('HOSPITAL_ADMIN');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
@@ -93,10 +95,8 @@ export function Login() {
       .catch(err => console.error('Failed to query maintenance status', err));
   }, []);
 
-  const handleRoleSelect = (roleKey: string, defaultEmail: string) => {
+  const handleRoleSelect = (roleKey: string) => {
     setSelectedRole(roleKey);
-    setEmail(defaultEmail);
-    setPassword('admin123');
     setError('');
   };
 
@@ -150,7 +150,12 @@ export function Login() {
     }
   };
 
-  const { settings } = useSuperAdminStore();
+  const { settings, loadPublicConfig } = useSuperAdminStore();
+
+  useEffect(() => {
+    document.title = 'Sign in';
+    loadPublicConfig();
+  }, [loadPublicConfig]);
   const platformTitle = settings?.platformName || 'Smart Hospital Management Software';
 
   const roleOptions = [
@@ -255,7 +260,7 @@ export function Login() {
             {/* Quick Demo Role Selector Chips */}
             <div className="mb-6 space-y-2">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Select Account Role (Click to auto-fill credentials)
+                Select your account role
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {roleOptions.map((role) => {
@@ -265,7 +270,7 @@ export function Login() {
                     <button
                       key={role.key}
                       type="button"
-                      onClick={() => handleRoleSelect(role.key, role.email)}
+                      onClick={() => handleRoleSelect(role.key)}
                       className={`flex items-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all border text-left ${
                         isSelected
                           ? 'bg-[#3683F8] text-white border-[#3683F8] shadow-md shadow-[#3683F8]/20 scale-[1.02]'
@@ -281,6 +286,11 @@ export function Login() {
             </div>
 
             {/* Lockout & Error Alerts */}
+            {sessionExpired && !error && (
+              <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold">
+                Your session has ended. Please sign in again to continue.
+              </div>
+            )}
             {isMaintenanceActive && (
               <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs leading-relaxed flex items-start gap-2.5 shadow-xs">
                 <span className="text-amber-500 font-bold shrink-0">⚠️</span>
@@ -324,7 +334,7 @@ export function Login() {
                   </div>
                   <input
                     type="text"
-                    placeholder="admin@hospital.com  or  admindemo"
+                    placeholder="you@yourhospital.com"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
@@ -415,7 +425,7 @@ export function Login() {
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g. HMS-2026-001-R4#1%P (Optional)"
+                    placeholder="Only needed for your first sign-in (optional)"
                     value={accessCode}
                     onChange={(e) => setAccessCode(e.target.value)}
                     disabled={remainingSeconds > 0 || loading}
@@ -463,13 +473,17 @@ export function Login() {
             <span className="text-slate-500 font-bold text-[11px]">
               © Copyright @twinsCloud • Smart Hospital Management
             </span>
-            <button 
-              type="button"
-              onClick={() => navigate('/activate')} 
-              className="text-[#3683F8] font-black hover:text-blue-700 transition-colors flex items-center gap-1 active:scale-95"
-            >
-              Activate Terminal Node <ArrowRight size={14} />
-            </button>
+            <div className="flex items-center gap-4">
+              <Link to="/" className="text-slate-500 font-bold hover:text-[#3683F8] transition-colors">
+                Home
+              </Link>
+              <Link
+                to="/register"
+                className="text-[#3683F8] font-black hover:text-blue-700 transition-colors flex items-center gap-1 active:scale-95"
+              >
+                New hospital? Register free <ArrowRight size={14} />
+              </Link>
+            </div>
           </div>
         </div>
       </div>

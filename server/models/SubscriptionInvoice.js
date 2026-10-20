@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const subscriptionInvoiceSchema = new mongoose.Schema({
   hospitalName: { type: String, required: true },
+  hospitalId: { type: String, default: null },
   planName: { type: String, required: true },
   amount: { type: Number, required: true },
   status: { 

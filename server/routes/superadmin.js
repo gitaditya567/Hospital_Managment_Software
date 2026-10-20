@@ -16,54 +16,14 @@ import { PharmacyBill } from '../models/PharmacyBill.js';
 import { Department } from '../models/Department.js';
 import { DoctorSchedule } from '../models/DoctorSchedule.js';
 import { sendTenantWelcomeEmail } from '../utils/email.js';
+import { getHospitalStorageUsed, TENANT_SCOPED_MODELS } from '../utils/storage.js';
+import { clearMaintenanceCache } from '../middleware/auth.js';
 
 export const superadminRouter = express.Router();
 
 // ----------------------------------------------------
 // 1. HOSPITAL TENANT MANAGEMENT
 // ----------------------------------------------------
-
-// Helper to calculate the actual dynamic database storage occupied by a hospital tenant in MB
-const getHospitalStorageUsed = async (hospitalId) => {
-  try {
-    const collections = [
-      { model: Staff, isTenant: false },
-      { model: Patient, isTenant: false },
-      { model: Invoice, isTenant: false },
-      { model: Medicine, isTenant: false },
-      { model: Prescription, isTenant: false },
-      { model: PharmacyBill, isTenant: false },
-      { model: Department, isTenant: false },
-      { model: DoctorSchedule, isTenant: false },
-      { model: User, isTenant: false },
-      { model: Tenant, isTenant: true }
-    ];
-
-    let totalBytes = 0;
-
-    await Promise.all(collections.map(async (col) => {
-      const matchQuery = col.isTenant 
-        ? { _id: mongoose.Types.ObjectId.isValid(hospitalId) ? new mongoose.Types.ObjectId(hospitalId) : null }
-        : { hospitalId };
-
-      const result = await col.model.aggregate([
-        { $match: matchQuery },
-        { $group: { _id: null, totalSize: { $sum: { $bsonSize: "$$ROOT" } } } }
-      ]);
-
-      if (result && result[0]) {
-        totalBytes += result[0].totalSize;
-      }
-    }));
-
-    // Convert bytes to MB
-    const totalMB = totalBytes / (1024 * 1024);
-    return Number(totalMB.toFixed(6));
-  } catch (error) {
-    console.error("Error in getHospitalStorageUsed BSON calculation:", error);
-    return 0.00034;
-  }
-};
 
 // Get all onboarded hospital tenants
 superadminRouter.get('/tenants', async (req, res) => {
@@ -86,6 +46,8 @@ superadminRouter.get('/tenants', async (req, res) => {
         emergencyFee: t.emergencyFee || 1200,
         bedChargePerDay: t.bedChargePerDay || 2500,
         status: t.status || 'Active',
+        isTrial: !!t.isTrial,
+        signupSource: t.signupSource || 'operator',
         staffCreated: staffCount,
         storageUsed: storageMB,
         createdAt: t.createdAt || new Date().toISOString()
@@ -101,6 +63,13 @@ superadminRouter.get('/tenants', async (req, res) => {
 superadminRouter.post('/tenants', async (req, res) => {
   const { hospitalName, adminEmail, adminPersonalEmail, adminPhone, adminPassword, address, licenseCodeUsed, subscriptionExpiryDate, planId } = req.body;
   try {
+    if (!hospitalName || !adminEmail || !address || !licenseCodeUsed || !subscriptionExpiryDate || !planId) {
+      return res.status(400).json({ message: 'Hospital name, admin email, address, license code, expiry date and plan are required.' });
+    }
+    if (await User.exists({ email: adminEmail })) {
+      return res.status(409).json({ message: `The admin login "${adminEmail}" is already used by another account.` });
+    }
+
     // 1. Check if the license code is valid and unused
     const license = await LicenseCode.findOne({ code: licenseCodeUsed });
     if (!license) {
@@ -136,11 +105,17 @@ superadminRouter.post('/tenants', async (req, res) => {
       role: 'HOSPITAL_ADMIN',
       hospitalId: newTenant._id.toString()
     });
-    await newAdminUser.save();
+    try {
+      await newAdminUser.save();
+    } catch (err) {
+      await Tenant.findByIdAndDelete(newTenant._id);
+      throw err;
+    }
 
     // 3. Mark the License as activated
     license.isUsed = true;
     license.status = 'Used';
+    license.activatedByHospitalId = newTenant._id.toString();
     await license.save();
 
     // 4. Log the activity
@@ -253,7 +228,9 @@ superadminRouter.delete('/tenants/:id', async (req, res) => {
       { isUsed: false, status: 'Unused' }
     );
 
-    // Delete hospital tenant
+    // Delete hospital tenant and every record it owns (users, staff, patients, billing, pharmacy)
+    const hospitalId = tenant._id.toString();
+    await Promise.all(TENANT_SCOPED_MODELS.map(model => model.deleteMany({ hospitalId })));
     await Tenant.findByIdAndDelete(id);
 
     // Log activity
@@ -485,10 +462,11 @@ superadminRouter.get('/invoices', async (req, res) => {
 });
 
 superadminRouter.post('/invoices', async (req, res) => {
-  const { hospitalName, planName, amount, method } = req.body;
+  const { hospitalName, hospitalId, planName, amount, method } = req.body;
   try {
     const newInv = new SubscriptionInvoice({
       hospitalName,
+      hospitalId: hospitalId || null,
       planName,
       amount: Number(amount),
       method,
@@ -558,6 +536,7 @@ superadminRouter.put('/settings', async (req, res) => {
       Object.assign(settings, req.body);
     }
     await settings.save();
+    clearMaintenanceCache();
 
     // Log activity
     const activity = new PlatformActivity({

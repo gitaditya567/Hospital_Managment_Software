@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { useHospitalStore } from '../../store/useHospitalStore';
-import { useSuperAdminStore } from '../../store/useSuperAdminStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Button } from '../../components/ui/Button';
 import { PasswordStrengthMeter } from '../../components/ui/PasswordStrengthMeter';
 import { Users, UserPlus, X, Stethoscope, ShieldCheck, Trash2, ShieldAlert, Edit, History, ArrowRight, Clock } from 'lucide-react';
 
 export function HospitalAdminStaff() {
-  const { staff, addStaff, toggleStaffStatus, deleteStaff, updateStaff } = useHospitalStore();
-  const { tenants, plans } = useSuperAdminStore();
+  const { staff, addStaff, toggleStaffStatus, deleteStaff, updateStaff, subscriptionTenant, subscriptionPlans: plans, fetchSubscription } = useHospitalStore();
+  const tenants = subscriptionTenant ? [subscriptionTenant] : [];
   const { user } = useAuthStore();
+
+  React.useEffect(() => {
+    fetchSubscription();
+  }, [fetchSubscription]);
 
   // Find active tenant and plan to display current limits to the user
   const currentHospitalId = user?.hospitalId || 'tenant-1';

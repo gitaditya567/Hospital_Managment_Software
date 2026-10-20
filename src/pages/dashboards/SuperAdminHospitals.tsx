@@ -174,6 +174,12 @@ export function SuperAdminHospitals() {
         <div>
           <span className="font-semibold text-slate-800 text-xs block">{item.hospitalName}</span>
           <span className="text-[10px] text-slate-400 font-mono block">{item.id}</span>
+          {(item.isTrial || item.signupSource === 'self-signup') && (
+            <span className="mt-1 inline-flex gap-1">
+              {item.isTrial && <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">Free trial</span>}
+              {item.signupSource === 'self-signup' && <span className="text-[9px] font-bold uppercase tracking-wider bg-[#EBF3FE] text-[#3683F8] border border-blue-200 px-1.5 py-0.5 rounded">Website sign-up</span>}
+            </span>
+          )}
         </div>
       )
     },

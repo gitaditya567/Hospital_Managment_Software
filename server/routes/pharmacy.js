@@ -3,8 +3,15 @@ import mongoose from 'mongoose';
 import { Medicine } from '../models/Medicine.js';
 import { Prescription } from '../models/Prescription.js';
 import { PharmacyBill } from '../models/PharmacyBill.js';
+import { requireRole } from '../middleware/auth.js';
+import { escapeRegex, isObjectId } from '../utils/storage.js';
 
 export const pharmacyRouter = express.Router();
+
+const pharmacyStaff = requireRole('PHARMACY', 'HOSPITAL_ADMIN');
+const prescribers = requireRole('DOCTOR', 'HOSPITAL_ADMIN');
+
+const randomRxCode = () => `RX-${Date.now().toString(36).slice(-4).toUpperCase()}${Math.floor(100 + Math.random() * 900)}`;
 
 // 1. GET Inventory Catalog
 pharmacyRouter.get('/inventory', async (req, res) => {
@@ -30,11 +37,12 @@ pharmacyRouter.get('/prescriptions', async (req, res) => {
 
 // GET all historical prescriptions for a patient by phone number
 pharmacyRouter.get('/prescriptions/history', async (req, res) => {
-  const { phone, hospitalId } = req.query;
-  if (!phone) return res.status(400).json({ message: 'phone is required' });
+  const { phone, patientNo, hospitalId } = req.query;
+  if (!phone && !patientNo) return res.status(400).json({ message: 'phone or patientNo is required' });
   if (!hospitalId) return res.status(400).json({ message: 'hospitalId is required' });
   try {
-    const list = await Prescription.find({ patientPhone: phone, hospitalId }).sort({ createdAt: -1 });
+    const filter = phone ? { patientPhone: phone, hospitalId } : { patientNo, hospitalId };
+    const list = await Prescription.find(filter).sort({ createdAt: -1 });
     res.json(list);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -42,11 +50,17 @@ pharmacyRouter.get('/prescriptions/history', async (req, res) => {
 });
 
 // Create a new Prescription from Doctor
-pharmacyRouter.post('/prescriptions', async (req, res) => {
+pharmacyRouter.post('/prescriptions', prescribers, async (req, res) => {
   const { code, patientNo, patientName, patientPhone, doctorName, date, items, hospitalId } = req.body;
   try {
+    // Prescription codes are globally unique; regenerate on a collision instead of failing the doctor's save
+    let rxCode = code || randomRxCode();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!(await Prescription.exists({ code: rxCode }))) break;
+      rxCode = randomRxCode();
+    }
     const newRx = new Prescription({
-      code: code || `RX-${Math.floor(1000 + Math.random() * 9000)}`,
+      code: rxCode,
       patientNo,
       patientName,
       patientPhone,
@@ -83,7 +97,7 @@ pharmacyRouter.get('/bills', async (req, res) => {
 });
 
 // 2. POST Add Medicine
-pharmacyRouter.post('/inventory', async (req, res) => {
+pharmacyRouter.post('/inventory', pharmacyStaff, async (req, res) => {
   const { code, name, category, batchNo, location, stock, minThreshold, expiryDate, price, hospitalId } = req.body;
   try {
     const newMed = new Medicine({
@@ -106,11 +120,14 @@ pharmacyRouter.post('/inventory', async (req, res) => {
 });
 
 // 3. POST Restock Batch
-pharmacyRouter.post('/restock', async (req, res) => {
+pharmacyRouter.post('/restock', pharmacyStaff, async (req, res) => {
   const { medicineName, supplier, batchNo, expiryDate, qty, hospitalId } = req.body;
   try {
+    if (!medicineName || !(Number(qty) > 0)) {
+      return res.status(400).json({ message: 'Medicine name and a positive quantity are required.' });
+    }
     let med = await Medicine.findOne({ 
-      name: { $regex: new RegExp(`^${medicineName}$`, 'i') }, 
+      name: { $regex: new RegExp(`^${escapeRegex(medicineName)}$`, 'i') }, 
       hospitalId 
     });
 
@@ -149,7 +166,7 @@ pharmacyRouter.get('/prescription/:query', async (req, res) => {
       $or: [
         { code: query.toUpperCase() },
         { patientPhone: query },
-        { patientNo: { $regex: new RegExp(`^${query}$`, 'i') } }
+        { patientNo: { $regex: new RegExp(`^${escapeRegex(query)}$`, 'i') } }
       ],
       hospitalId,
       status: 'PENDING'
@@ -164,8 +181,14 @@ pharmacyRouter.get('/prescription/:query', async (req, res) => {
 });
 
 // 5. POST POS Checkout - Bulletproof ACID Mongoose Transactions with standalone local MongoDB fallback
-pharmacyRouter.post('/checkout', async (req, res) => {
+pharmacyRouter.post('/checkout', pharmacyStaff, async (req, res) => {
   const { rxCode, patientNo, patientName, patientPhone, doctorName, date, items, total, paymentMode, hospitalId } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, message: 'Checkout requires at least one medicine item.' });
+  }
+  if (items.some(item => !(Number(item.qty) > 0))) {
+    return res.status(400).json({ success: false, message: 'Every item must have a positive quantity.' });
+  }
   const billDate = date || new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
   // 1. Try with session transaction first
@@ -355,11 +378,11 @@ async function findMedicineHelper(item, hospitalId, session = null) {
 });
 
 // 6. PUT Update Medicine
-pharmacyRouter.put('/inventory/:id', async (req, res) => {
+pharmacyRouter.put('/inventory/:id', pharmacyStaff, async (req, res) => {
   const { id } = req.params;
   const { name, category, batchNo, location, stock, minThreshold, expiryDate, price } = req.body;
   try {
-    const updated = await Medicine.findByIdAndUpdate(id, {
+    const updated = await Medicine.findOneAndUpdate({ _id: isObjectId(id) ? id : null, hospitalId: req.hospitalId }, {
       name,
       category,
       batchNo,
@@ -369,6 +392,7 @@ pharmacyRouter.put('/inventory/:id', async (req, res) => {
       expiryDate,
       price: Number(price)
     }, { new: true });
+    if (!updated) return res.status(404).json({ message: 'Medicine not found.' });
     res.json(updated);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -376,10 +400,10 @@ pharmacyRouter.put('/inventory/:id', async (req, res) => {
 });
 
 // 7. DELETE Medicine
-pharmacyRouter.delete('/inventory/:id', async (req, res) => {
+pharmacyRouter.delete('/inventory/:id', pharmacyStaff, async (req, res) => {
   const { id } = req.params;
   try {
-    await Medicine.findByIdAndDelete(id);
+    await Medicine.findOneAndDelete({ _id: isObjectId(id) ? id : null, hospitalId: req.hospitalId });
     res.json({ message: 'Medicine catalog entry deleted.' });
   } catch (error) {
     res.status(400).json({ message: error.message });

@@ -13,6 +13,8 @@ const tenantSchema = new mongoose.Schema({
   bedChargePerDay: { type: Number, default: 2500 },
   adminPhone: { type: String, default: '' },
   hospitalLogo: { type: String, default: '' },
+  isTrial: { type: Boolean, default: false },
+  signupSource: { type: String, enum: ['operator', 'self-signup', 'license-activation'], default: 'operator' },
   status: { 
     type: String, 
     enum: ['Active', 'Suspended', 'Past Due'], 

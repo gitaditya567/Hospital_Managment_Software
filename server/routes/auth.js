@@ -1,14 +1,13 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
 import { Tenant } from '../models/Tenant.js';
-import { SystemSetting } from '../models/SystemSetting.js';
 import { 
   sendPasswordResetEmail, 
   sendHospitalAdminAlertEmail, 
   sendPlatformSuperAdminAlertEmail,
   sendHospitalAdminResetSuperAdminAlert
 } from '../utils/email.js';
+import { signToken, getSubscriptionInfo, isMaintenanceMode, requireAuth } from '../middleware/auth.js';
 
 export const authRouter = express.Router();
 
@@ -24,7 +23,7 @@ function formatRemainingTime(ms) {
 
 authRouter.post('/login', async (req, res) => {
   const { email, password, code, role: selectedRole } = req.body || {};
-  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const clientIp = req.ip || req.socket.remoteAddress || '127.0.0.1';
   const clientKey = `${clientIp}_${(email || '').toLowerCase().trim()}`;
 
   // 1. Check if client is currently locked out
@@ -77,7 +76,8 @@ authRouter.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    const user = await User.findOne({ email });
+    const rawEmail = String(email).trim();
+    const user = await User.findOne({ email: { $in: [rawEmail, rawEmail.toLowerCase()] } });
     if (!user) {
       const failure = recordFailedAttempt('Invalid credentials. User profile not found.');
       return res.status(failure.status).json(failure.data);
@@ -101,14 +101,14 @@ authRouter.post('/login', async (req, res) => {
 
     // Check if maintenance mode is active (Except for SUPER_ADMIN)
     if (user.role !== 'SUPER_ADMIN') {
-      const { SystemSetting } = await import('../models/SystemSetting.js');
-      const settings = await SystemSetting.findOne({});
-      if (settings && settings.maintenanceMode) {
+      if (await isMaintenanceMode()) {
         return res.status(503).json({ 
           message: 'System is under maintenance. Access restricted to Super Admins only.' 
         });
       }
     }
+
+    let subscription = null;
 
     // Three-Factor Validation: All roles except SUPER_ADMIN must activate terminal on first-time login
     if (user.role !== 'SUPER_ADMIN') {
@@ -134,6 +134,15 @@ authRouter.post('/login', async (req, res) => {
         });
       }
 
+      // Expired subscription: only the hospital admin may sign in (to renew)
+      subscription = getSubscriptionInfo(tenant);
+      if (subscription && subscription.expired && user.role !== 'HOSPITAL_ADMIN') {
+        return res.status(402).json({
+          code: 'SUBSCRIPTION_EXPIRED',
+          message: `Your hospital subscription expired on ${subscription.expiryDate}. Please ask your hospital administrator to renew the plan.`
+        });
+      }
+
       // Enforce Access Code ONLY for first-time activation
       if (!user.isActivated) {
         if (!code) {
@@ -155,11 +164,7 @@ authRouter.post('/login', async (req, res) => {
     // Login successful - Clear failed attempt counter
     loginAttempts.delete(clientKey);
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, hospitalId: user.hospitalId },
-      process.env.JWT_SECRET || 'medisaas_secret_key_12345',
-      { expiresIn: '30d' }
-    );
+    const token = signToken(user);
 
     return res.json({
       token,
@@ -169,18 +174,36 @@ authRouter.post('/login', async (req, res) => {
         email: user.email,
         role: user.role,
         hospitalId: user.hospitalId
-      }
+      },
+      subscription
     });
   } catch (error) {
     return res.status(500).json({ message: error.message || 'Internal server error during authentication.' });
   }
 });
 
-authRouter.get('/maintenance-status', async (req, res) => {
+// Current session details (used by the client to validate a stored token)
+authRouter.get('/me', requireAuth, async (req, res) => {
+  res.json({ user: req.user, subscription: req.subscription || null });
+});
+
+// Signed-in users can change their own password
+authRouter.post('/change-password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
   try {
-    const { SystemSetting } = await import('../models/SystemSetting.js');
-    const settings = await SystemSetting.findOne({});
-    res.json({ maintenanceMode: settings ? settings.maintenanceMode : false });
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required.' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
+    }
+    const user = await User.findById(req.user.id);
+    if (!user || !(await user.comparePassword(currentPassword))) {
+      return res.status(401).json({ message: 'Current password is incorrect.' });
+    }
+    user.password = String(newPassword);
+    await user.save();
+    res.json({ success: true, message: 'Password updated successfully.' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -328,8 +351,7 @@ authRouter.post('/recover-credentials', async (req, res) => {
 
 authRouter.get('/maintenance-status', async (req, res) => {
   try {
-    const settings = await SystemSetting.findOne({});
-    res.json({ maintenanceMode: settings ? !!settings.maintenanceMode : false });
+    res.json({ maintenanceMode: await isMaintenanceMode() });
   } catch (error) {
     res.json({ maintenanceMode: false });
   }

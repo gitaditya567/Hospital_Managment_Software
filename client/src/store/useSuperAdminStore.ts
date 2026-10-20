@@ -29,6 +29,8 @@ export interface Tenant {
   adminPhone?: string;
   address: string;
   status: 'Active' | 'Suspended' | 'Past Due';
+  isTrial?: boolean;
+  signupSource?: 'operator' | 'self-signup' | 'license-activation';
   licenseCodeUsed: string;
   subscriptionExpiryDate: string;
   staffCreated: number;
@@ -62,6 +64,9 @@ export interface PlatformSettings {
   stripeEnabled: boolean;
   razorpayEnabled: boolean;
   taxRate: number; // percentage
+  allowSelfSignup?: boolean;
+  trialDays?: number;
+  trialPlanId?: string;
 }
 
 interface SuperAdminState {
@@ -76,6 +81,7 @@ interface SuperAdminState {
 
   // Actions
   fetchSuperAdminData: () => Promise<void>;
+  loadPublicConfig: () => Promise<void>;
   setSearchQuery: (query: string) => void;
   generateLicense: (planId: string, validityMonths: number) => Promise<string>;
   revokeLicense: (code: string) => Promise<void>;
@@ -174,6 +180,17 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
     } catch (error) {
       console.error('Failed to fetch Super Admin platform data', error);
       set({ loading: false });
+    }
+  },
+
+  loadPublicConfig: async () => {
+    try {
+      const res = await fetch('/api/public/config');
+      if (!res.ok) return;
+      const config = await res.json();
+      set({ settings: { ...get().settings, ...config } });
+    } catch {
+      // keep defaults when the server is unreachable
     }
   },
 

@@ -12,6 +12,8 @@ export function SuperAdminSettings() {
   const [allowManualOnboarding, setAllowManualOnboarding] = useState(settings.allowManualOnboarding);
   const [stripeEnabled, setStripeEnabled] = useState(settings.stripeEnabled);
   const [razorpayEnabled, setRazorpayEnabled] = useState(settings.razorpayEnabled);
+  const [allowSelfSignup, setAllowSelfSignup] = useState(settings.allowSelfSignup !== false);
+  const [trialDays, setTrialDays] = useState(settings.trialDays ?? 14);
   const [isSaved, setIsSaved] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [sendingDiagnostics, setSendingDiagnostics] = useState(false);
@@ -30,6 +32,8 @@ export function SuperAdminSettings() {
       setAllowManualOnboarding(!!settings.allowManualOnboarding);
       setStripeEnabled(!!settings.stripeEnabled);
       setRazorpayEnabled(!!settings.razorpayEnabled);
+      setAllowSelfSignup(settings.allowSelfSignup !== false);
+      setTrialDays(settings.trialDays ?? 14);
     }
   }, [settings]);
 
@@ -43,6 +47,8 @@ export function SuperAdminSettings() {
       allowManualOnboarding,
       stripeEnabled,
       razorpayEnabled,
+      allowSelfSignup,
+      trialDays: Math.max(1, Math.min(90, Number(trialDays) || 14)),
     });
     if (platformName) {
       document.title = platformName;
@@ -131,6 +137,36 @@ export function SuperAdminSettings() {
               >
                 {allowManualOnboarding ? <ToggleRight size={44} className="text-emerald-500" /> : <ToggleLeft size={44} className="text-slate-300" />}
               </button>
+            </div>
+
+            {/* Public Free-Trial Sign-up Toggle */}
+            <div className="flex items-center justify-between p-4 bg-[#EBF3FE]/40 rounded-xl border border-[#D8D8D8]">
+              <div>
+                <p className="text-sm font-semibold text-[#060606]">Public Free-Trial Sign-up</p>
+                <p className="text-xs text-slate-500">Let new hospitals register from the website and start a free trial</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAllowSelfSignup(!allowSelfSignup)}
+                className="text-[#3683F8] focus:outline-none transition-transform active:scale-95"
+              >
+                {allowSelfSignup ? <ToggleRight size={44} className="text-emerald-500" /> : <ToggleLeft size={44} className="text-slate-300" />}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 p-4 bg-[#EBF3FE]/40 rounded-xl border border-[#D8D8D8]">
+              <div>
+                <p className="text-sm font-semibold text-[#060606]">Free Trial Length (days)</p>
+                <p className="text-xs text-slate-500">Applies to new sign-ups only (1–90 days)</p>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={trialDays}
+                onChange={(e) => setTrialDays(Number(e.target.value))}
+                className="w-20 h-10 px-3 border border-[#D8D8D8] rounded-xl text-sm text-center font-bold focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] bg-white"
+              />
             </div>
           </div>
         </div>

@@ -10,10 +10,20 @@ export interface User {
   hospitalId: string | null;
 }
 
+export interface SubscriptionInfo {
+  expiryDate: string;
+  daysLeft: number;
+  expired: boolean;
+  isTrial: boolean;
+  planId: string;
+}
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   token: string | null;
+  subscription: SubscriptionInfo | null;
+  setSession: (token: string, user: any, subscription?: SubscriptionInfo | null) => void;
   login: (email: string, password: string, code: string, role?: string) => Promise<{ success: boolean; error?: string; lockoutUntil?: number; failedAttempts?: number }>;
   logout: () => void;
   initialize: () => void;
@@ -45,10 +55,36 @@ const getInitialAuth = () => {
 
 const initialAuth = getInitialAuth();
 
+const getStoredSubscription = (): SubscriptionInfo | null => {
+  try {
+    const raw = localStorage.getItem('smarthospital_subscription');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const toUser = (user: any): User => ({
+  id: user.id || user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  hospitalId: user.hospitalId
+});
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: initialAuth.user,
   isAuthenticated: initialAuth.isAuthenticated,
   token: initialAuth.token,
+  subscription: getStoredSubscription(),
+
+  setSession: (token, user, subscription = null) => {
+    localStorage.setItem('smarthospital_token', token);
+    localStorage.setItem('smarthospital_user', JSON.stringify(user));
+    if (subscription) localStorage.setItem('smarthospital_subscription', JSON.stringify(subscription));
+    else localStorage.removeItem('smarthospital_subscription');
+    set({ token, user: toUser(user), isAuthenticated: true, subscription });
+  },
 
   login: async (email, password, code, role) => {
     try {
@@ -83,21 +119,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         };
       }
 
-      const { token, user } = data;
-      localStorage.setItem('smarthospital_token', token);
-      localStorage.setItem('smarthospital_user', JSON.stringify(user));
-
-      set({
-        token,
-        user: {
-          id: user.id || user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          hospitalId: user.hospitalId
-        },
-        isAuthenticated: true
-      });
+      const { token, user, subscription } = data;
+      useAuthStore.getState().setSession(token, user, subscription || null);
 
       return { success: true };
     } catch (err: any) {
@@ -110,7 +133,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('smarthospital_user');
     localStorage.removeItem('medisaas_token');
     localStorage.removeItem('medisaas_user');
-    set({ user: null, token: null, isAuthenticated: false });
+    localStorage.removeItem('smarthospital_subscription');
+    set({ user: null, token: null, isAuthenticated: false, subscription: null });
   },
 
   initialize: () => {

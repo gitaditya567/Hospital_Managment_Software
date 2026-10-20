@@ -8,7 +8,9 @@
     "start": "node supervisor.js",
     "dev": "node supervisor.js",
     "direct": "node index.js",
-    "seed": "node seeder.js"
+    "seed": "node seeder.js",
+    "test": "node --test --test-concurrency=1 tests/api.test.js",
+    "sandbox": "node tests/sandbox-server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -18,5 +20,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.1",
     "nodemailer": "^9.0.3"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.1.4"
   }
 }

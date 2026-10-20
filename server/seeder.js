@@ -19,6 +19,13 @@ import { Plan } from './models/Plan.js';
 
 dotenv.config();
 
+// The seeder wipes every collection; require an explicit confirmation so it is never run on live data by accident
+if (!process.argv.includes('--force') && process.env.SEED_CONFIRM !== 'yes') {
+  console.error('⛔ Seeder aborted: this DELETES ALL hospitals, patients, bills and users.');
+  console.error('   Re-run with "npm run seed -- --force" only on a fresh/empty database.');
+  process.exit(1);
+}
+
 // Connect to MongoDB
 connectDB();
 

@@ -1,4 +1,7 @@
 import express from 'express';
+import crypto from 'crypto';
+import { requireRole } from '../middleware/auth.js';
+import { getHospitalStorageUsed, isObjectId } from '../utils/storage.js';
 import { Staff } from '../models/Staff.js';
 import { Department } from '../models/Department.js';
 import { DoctorSchedule } from '../models/DoctorSchedule.js';
@@ -12,6 +15,16 @@ import { SubscriptionInvoice } from '../models/SubscriptionInvoice.js';
 import { PlatformActivity } from '../models/PlatformActivity.js';
 
 export const hospitalRouter = express.Router();
+
+const adminOnly = requireRole('HOSPITAL_ADMIN');
+// Matches a document by id only inside the caller's own hospital
+const scoped = (req, id) => ({ _id: isObjectId(id) ? id : null, hospitalId: req.hospitalId });
+
+const findPlanForTenant = async (planId) => {
+  if (!planId) return null;
+  return await Plan.findOne({ $or: [{ id: planId }, { name: planId }] })
+    || (isObjectId(planId) ? await Plan.findById(planId) : null);
+};
 
 const mapStaffRoleToUserRole = (staffRole) => {
   if (staffRole === 'Doctor') return 'DOCTOR';
@@ -48,9 +61,23 @@ hospitalRouter.get('/staff', async (req, res) => {
 });
 
 // Add a staff member (with subscription tier license validation!)
-hospitalRouter.post('/staff', async (req, res) => {
-  const { name, role, department, contact, email, personalEmail, hospitalId } = req.body;
+hospitalRouter.post('/staff', adminOnly, async (req, res) => {
+  const { name, role, department, contact, personalEmail, hospitalId } = req.body;
+  const email = String(req.body.email || '').trim();
   try {
+    if (!name || !role || !email || !contact) {
+      return res.status(400).json({ message: 'Name, role, email and contact number are required.' });
+    }
+    if (!['Doctor', 'Receptionist', 'Pharmacy'].includes(role)) {
+      return res.status(400).json({ message: 'Role must be Doctor, Receptionist or Pharmacy.' });
+    }
+    if (!req.body.password || String(req.body.password).length < 6) {
+      return res.status(400).json({ message: 'A login password of at least 6 characters is required for new staff.' });
+    }
+    if (await User.exists({ email: { $in: [email, email.toLowerCase()] } })) {
+      return res.status(409).json({ message: `The login email "${email}" is already in use. Please choose a different email/username.` });
+    }
+
     // Subscription limits check
     const tenant = await Tenant.findById(hospitalId);
     if (!tenant) {
@@ -61,7 +88,7 @@ hospitalRouter.post('/staff', async (req, res) => {
     let maxDoc = -1;
     let maxRecep = -1;
     let maxPharm = -1;
-    const planDoc = await Plan.findOne({ id: tenant.planId }) || await Plan.findById(tenant.planId);
+    const planDoc = await findPlanForTenant(tenant.planId);
     if (planDoc) {
       maxDoc = planDoc.maxDoctors;
       maxRecep = planDoc.maxReceptionists;
@@ -104,18 +131,20 @@ hospitalRouter.post('/staff', async (req, res) => {
 
     // Dynamically generate credentials in User collection
     const userRole = mapStaffRoleToUserRole(role);
-    const existingUser = await User.findOne({ email });
-    if (!existingUser) {
+    try {
       const newUser = new User({
         name,
         email,
         personalEmail: personalEmail || email,
-        password: req.body.password || 'demo1234',
+        password: String(req.body.password),
         role: userRole,
         hospitalId,
         isActivated: true // pre-activated under hospital license
       });
       await newUser.save();
+    } catch (err) {
+      await Staff.findByIdAndDelete(newStaff._id);
+      throw err;
     }
 
     res.status(201).json(newStaff);
@@ -125,14 +154,17 @@ hospitalRouter.post('/staff', async (req, res) => {
 });
 
 // Update staff member
-hospitalRouter.put('/staff/:id', async (req, res) => {
+hospitalRouter.put('/staff/:id', adminOnly, async (req, res) => {
   const { id } = req.params;
   const { name, role, department, contact, email, personalEmail, password } = req.body;
   try {
-    const oldStaff = await Staff.findById(id);
+    const oldStaff = await Staff.findOne(scoped(req, id));
     if (!oldStaff) return res.status(404).json({ message: 'Staff member not found.' });
 
     const oldEmail = oldStaff.email;
+    if (email && email !== oldEmail && await User.exists({ email })) {
+      return res.status(409).json({ message: `The login email "${email}" is already in use.` });
+    }
 
     // Track role change history if role changed
     if (role && role !== oldStaff.role) {
@@ -170,7 +202,7 @@ hospitalRouter.put('/staff/:id', async (req, res) => {
 
     // Sync credentials to corresponding User account
     const userRole = mapStaffRoleToUserRole(oldStaff.role);
-    const userAccount = await User.findOne({ email: oldEmail });
+    const userAccount = await User.findOne({ email: oldEmail, hospitalId: oldStaff.hospitalId });
 
     if (userAccount) {
       userAccount.name = oldStaff.name;
@@ -186,7 +218,7 @@ hospitalRouter.put('/staff/:id', async (req, res) => {
       const newUser = new User({
         name: oldStaff.name,
         email: oldStaff.email,
-        password: password || 'demo1234',
+        password: password || crypto.randomBytes(12).toString('hex'),
         role: userRole,
         hospitalId: oldStaff.hospitalId,
         isActivated: true
@@ -201,17 +233,17 @@ hospitalRouter.put('/staff/:id', async (req, res) => {
 });
 
 // Delete staff member
-hospitalRouter.delete('/staff/:id', async (req, res) => {
+hospitalRouter.delete('/staff/:id', adminOnly, async (req, res) => {
   const { id } = req.params;
   try {
-    const deleted = await Staff.findById(id);
+    const deleted = await Staff.findOne(scoped(req, id));
     if (!deleted) return res.status(404).json({ message: 'Staff member not found.' });
 
     const staffEmail = deleted.email;
     await Staff.findByIdAndDelete(id);
 
     // Securely remove their login credentials
-    await User.deleteMany({ email: staffEmail });
+    await User.deleteMany({ email: staffEmail, hospitalId: deleted.hospitalId, role: { $ne: 'HOSPITAL_ADMIN' } });
 
     res.json({ success: true, message: 'Staff member and associated login credentials removed successfully.' });
   } catch (error) {
@@ -235,7 +267,7 @@ hospitalRouter.get('/departments', async (req, res) => {
   }
 });
 
-hospitalRouter.post('/departments', async (req, res) => {
+hospitalRouter.post('/departments', adminOnly, async (req, res) => {
   const { name, head, rooms, status, beds, staffAssigned, hospitalId } = req.body;
   try {
     const newDept = new Department({
@@ -255,20 +287,21 @@ hospitalRouter.post('/departments', async (req, res) => {
   }
 });
 
-hospitalRouter.put('/departments/:id', async (req, res) => {
+hospitalRouter.put('/departments/:id', adminOnly, async (req, res) => {
   const { id } = req.params;
   try {
-    const updated = await Department.findByIdAndUpdate(id, req.body, { new: true });
+    const updated = await Department.findOneAndUpdate(scoped(req, id), req.body, { new: true });
+    if (!updated) return res.status(404).json({ message: 'Department not found.' });
     res.json(updated);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
 
-hospitalRouter.delete('/departments/:id', async (req, res) => {
+hospitalRouter.delete('/departments/:id', adminOnly, async (req, res) => {
   const { id } = req.params;
   try {
-    await Department.findByIdAndDelete(id);
+    await Department.findOneAndDelete(scoped(req, id));
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -291,7 +324,7 @@ hospitalRouter.get('/schedules', async (req, res) => {
   }
 });
 
-hospitalRouter.post('/schedules', async (req, res) => {
+hospitalRouter.post('/schedules', adminOnly, async (req, res) => {
   const { doctorId, doctorName, roomNumber, availability, days, hospitalId } = req.body;
   try {
     const newSched = new DoctorSchedule({ doctorId, doctorName, roomNumber, availability, days, hospitalId });
@@ -302,20 +335,21 @@ hospitalRouter.post('/schedules', async (req, res) => {
   }
 });
 
-hospitalRouter.put('/schedules/:id', async (req, res) => {
+hospitalRouter.put('/schedules/:id', adminOnly, async (req, res) => {
   const { id } = req.params;
   try {
-    const updated = await DoctorSchedule.findByIdAndUpdate(id, req.body, { new: true });
+    const updated = await DoctorSchedule.findOneAndUpdate(scoped(req, id), req.body, { new: true });
+    if (!updated) return res.status(404).json({ message: 'Schedule not found.' });
     res.json(updated);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
 
-hospitalRouter.delete('/schedules/:id', async (req, res) => {
+hospitalRouter.delete('/schedules/:id', adminOnly, async (req, res) => {
   const { id } = req.params;
   try {
-    await DoctorSchedule.findByIdAndDelete(id);
+    await DoctorSchedule.findOneAndDelete(scoped(req, id));
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -341,8 +375,14 @@ hospitalRouter.get('/patients', async (req, res) => {
 hospitalRouter.post('/patients', async (req, res) => {
   const { name, phone, age, gender, doctorName, hospitalId, vitals, pastDiagnoses, paymentStatus, payNow, appointmentTime, appointmentDate } = req.body;
   try {
-    // Generate token number: count patients under this doctor today
-    const doctorPatientsCount = await Patient.countDocuments({ hospitalId, doctorName });
+    if (!name || !phone || age === undefined || age === '' || !doctorName) {
+      return res.status(400).json({ message: 'Patient name, phone, age and doctor are required.' });
+    }
+
+    // Generate token number: count patients under this doctor today (tokens restart every day)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const doctorPatientsCount = await Patient.countDocuments({ hospitalId, doctorName, createdAt: { $gte: startOfDay } });
     const tokenNumber = `OPD-${101 + doctorPatientsCount}`;
 
     // Lookup existing patient to reuse patientNo, or generate a new unique one
@@ -420,7 +460,11 @@ hospitalRouter.put('/patients/:id', async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   try {
-    const updated = await Patient.findByIdAndUpdate(id, { status }, { new: true });
+    if (!['Waiting', 'In Consultation', 'Completed'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid patient status.' });
+    }
+    const updated = await Patient.findOneAndUpdate(scoped(req, id), { status }, { new: true });
+    if (!updated) return res.status(404).json({ message: 'Patient not found.' });
     res.json(updated);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -430,7 +474,7 @@ hospitalRouter.put('/patients/:id', async (req, res) => {
 hospitalRouter.delete('/patients/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await Patient.findByIdAndDelete(id);
+    await Patient.findOneAndDelete(scoped(req, id));
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -513,7 +557,7 @@ hospitalRouter.put('/invoices/:id/collect', async (req, res) => {
   try {
     // Support matching by _id OR invoiceNo
     const updated = await Invoice.findOneAndUpdate(
-      { $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { invoiceNo: id }] },
+      { $or: [{ _id: isObjectId(id) ? id : null }, { invoiceNo: id }], hospitalId: req.hospitalId },
       { status: 'Paid' },
       { new: true }
     );
@@ -533,7 +577,7 @@ hospitalRouter.put('/patients/:id/collect-fee', async (req, res) => {
   const { id } = req.params;
   const { amount, feeType } = req.body;
   try {
-    const patient = await Patient.findById(id);
+    const patient = await Patient.findOne(scoped(req, id));
     if (!patient) return res.status(404).json({ message: 'Patient profile not found.' });
 
     patient.paymentStatus = 'Paid';
@@ -599,7 +643,7 @@ hospitalRouter.get('/fees', async (req, res) => {
   }
 });
 
-hospitalRouter.put('/fees', async (req, res) => {
+hospitalRouter.put('/fees', adminOnly, async (req, res) => {
   const { hospitalId, opdFee, emergencyFee, bedChargePerDay } = req.body;
   try {
     const updatedTenant = await Tenant.findByIdAndUpdate(
@@ -616,32 +660,6 @@ hospitalRouter.put('/fees', async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ message: error.message });
-  }
-});
-
-// GET hospital tenant profile
-hospitalRouter.get('/profile', async (req, res) => {
-  const { hospitalId } = req.query;
-  if (!hospitalId) return res.status(400).json({ message: 'hospitalId is required' });
-  try {
-    const tenant = await Tenant.findById(hospitalId);
-    if (!tenant) {
-      return res.json({ id: hospitalId, hospitalName: 'Smart Hospital' });
-    }
-    res.json({
-      id: tenant._id.toString(),
-      hospitalName: tenant.hospitalName,
-      adminEmail: tenant.adminEmail,
-      adminPhone: tenant.adminPhone || '',
-      address: tenant.address,
-      licenseCodeUsed: tenant.licenseCodeUsed,
-      subscriptionExpiryDate: tenant.subscriptionExpiryDate,
-      planId: tenant.planId,
-      status: tenant.status
-    });
-  } catch (error) {
-    // If ObjectId format invalid or tenant not found, fallback gracefully
-    res.json({ id: hospitalId, hospitalName: 'Smart Hospital' });
   }
 });
 
@@ -664,6 +682,9 @@ hospitalRouter.get('/staff/profile/details', async (req, res) => {
 hospitalRouter.put('/staff/profile/details', async (req, res) => {
   const { email, hospitalId, name, department, contact, consultationFee, licenseNo, signature, status } = req.body;
   if (!email) return res.status(400).json({ message: 'email is required' });
+  if (req.user.role !== 'HOSPITAL_ADMIN' && email !== req.user.email) {
+    return res.status(403).json({ message: 'You can only update your own profile.' });
+  }
   try {
     const staff = await Staff.findOne({ email, hospitalId });
     if (!staff) {
@@ -681,7 +702,7 @@ hospitalRouter.put('/staff/profile/details', async (req, res) => {
     await staff.save();
 
     // Sync user collection name
-    const userAcc = await User.findOne({ email });
+    const userAcc = await User.findOne({ email, hospitalId });
     if (userAcc) {
       userAcc.name = staff.name;
       await userAcc.save();
@@ -704,7 +725,7 @@ hospitalRouter.get('/profile', async (req, res) => {
     const license = await LicenseCode.findOne({ code: tenant.licenseCodeUsed });
     const targetPlanId = (license && license.planId) || tenant.planId;
 
-    let plan = await Plan.findOne({ $or: [{ id: targetPlanId }, { name: targetPlanId }] });
+    let plan = await findPlanForTenant(targetPlanId);
     if (!plan && tenant.planId) {
       plan = await Plan.findOne({ $or: [{ id: tenant.planId }, { name: tenant.planId }] });
     }
@@ -729,8 +750,12 @@ hospitalRouter.get('/profile', async (req, res) => {
       subscriptionExpiryDate: tenant.subscriptionExpiryDate,
       status: tenant.status,
       planName: plan ? plan.name : 'Basic Plan',
+      planId: tenant.planId,
       maxDoctors: plan ? plan.maxDoctors : 2,
+      maxReceptionists: plan ? plan.maxReceptionists : 1,
+      maxPharmacists: plan ? plan.maxPharmacists : 1,
       maxStorage: plan ? plan.maxStorage : 10,
+      isTrial: !!tenant.isTrial,
       validityMonths: license ? license.validityMonths : 12,
       createdAt: tenant.createdAt
     });
@@ -740,7 +765,7 @@ hospitalRouter.get('/profile', async (req, res) => {
 });
 
 // UPDATE Hospital Profile details
-hospitalRouter.put('/profile', async (req, res) => {
+hospitalRouter.put('/profile', adminOnly, async (req, res) => {
   const { hospitalId, hospitalName, adminPhone, address, hospitalLogo } = req.body;
   if (!hospitalId) return res.status(400).json({ message: 'hospitalId is required' });
   try {
@@ -760,7 +785,7 @@ hospitalRouter.put('/profile', async (req, res) => {
 });
 
 // Renew Hospital Subscription Plan using a License Code
-hospitalRouter.post('/renew-subscription', async (req, res) => {
+hospitalRouter.post('/renew-subscription', adminOnly, async (req, res) => {
   const { hospitalId, licenseCode } = req.body;
   if (!hospitalId || !licenseCode) {
     return res.status(400).json({ message: 'Hospital ID and License Code are required.' });
@@ -805,6 +830,7 @@ hospitalRouter.post('/renew-subscription', async (req, res) => {
       tenant.planId = license.planId;
     }
     tenant.status = 'Active';
+    tenant.isTrial = false;
     await tenant.save();
 
     license.isUsed = true;
@@ -814,6 +840,7 @@ hospitalRouter.post('/renew-subscription', async (req, res) => {
 
     const inv = new SubscriptionInvoice({
       hospitalName: tenant.hospitalName,
+      hospitalId: tenant._id.toString(),
       planName: targetPlan ? targetPlan.name : 'Subscription Renewal',
       amount: targetPlan ? targetPlan.price : 0,
       method: 'Manual Invoice',
@@ -842,3 +869,61 @@ hospitalRouter.post('/renew-subscription', async (req, res) => {
 });
 
 
+
+
+// Subscription overview for the hospital billing & staff pages (own hospital only)
+hospitalRouter.get('/subscription', async (req, res) => {
+  try {
+    const tenant = req.tenant;
+    const [plans, staffCount, storageUsed] = await Promise.all([
+      Plan.find({}).sort({ price: 1 }).lean(),
+      Staff.countDocuments({ hospitalId: req.hospitalId }),
+      getHospitalStorageUsed(req.hospitalId)
+    ]);
+    const invoices = req.user.role === 'HOSPITAL_ADMIN'
+      ? await SubscriptionInvoice.find({
+          $or: [{ hospitalId: req.hospitalId }, { hospitalId: null, hospitalName: tenant.hospitalName }]
+        }).sort({ createdAt: -1 }).lean()
+      : [];
+
+    res.json({
+      tenant: {
+        id: tenant._id.toString(),
+        hospitalName: tenant.hospitalName,
+        adminEmail: tenant.adminEmail,
+        adminPhone: tenant.adminPhone || '',
+        address: tenant.address,
+        status: tenant.status,
+        licenseCodeUsed: tenant.licenseCodeUsed,
+        subscriptionExpiryDate: tenant.subscriptionExpiryDate,
+        planId: tenant.planId,
+        isTrial: !!tenant.isTrial,
+        staffCreated: staffCount,
+        storageUsed,
+        createdAt: tenant.createdAt
+      },
+      subscription: req.subscription,
+      plans: plans.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        maxDoctors: p.maxDoctors,
+        maxReceptionists: p.maxReceptionists,
+        maxPharmacists: p.maxPharmacists,
+        maxStorage: p.maxStorage,
+        durationMonths: p.durationMonths
+      })),
+      invoices: invoices.map(inv => ({
+        id: inv._id.toString(),
+        hospitalName: inv.hospitalName,
+        planName: inv.planName,
+        amount: inv.amount,
+        status: inv.status,
+        date: inv.date,
+        method: inv.method
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
