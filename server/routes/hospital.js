@@ -14,12 +14,30 @@ import { User } from '../models/User.js';
 import { Plan } from '../models/Plan.js';
 import { SubscriptionInvoice } from '../models/SubscriptionInvoice.js';
 import { PlatformActivity } from '../models/PlatformActivity.js';
+import { Prescription } from '../models/Prescription.js';
+import { PharmacyBill } from '../models/PharmacyBill.js';
+import { Medicine } from '../models/Medicine.js';
 
 export const hospitalRouter = express.Router();
 
 const adminOnly = requireRole('HOSPITAL_ADMIN');
 // Matches a document by id only inside the caller's own hospital
 const scoped = (req, id) => ({ _id: isObjectId(id) ? id : null, hospitalId: req.hospitalId });
+
+// Doctor names are compared without the "Dr." title, spacing or case
+const normName = (n) => String(n || '').toLowerCase().replace(/^\s*dr(\.\s*|\s+)/, '').replace(/\s+/g, ' ').trim();
+
+// Keep the doctor's queue, bookings, schedule and prescriptions attached after a rename
+const cascadeDoctorRename = async (hospitalId, oldName, newName) => {
+  if (!oldName || !newName || oldName === newName) return;
+  await Promise.all([
+    Patient.updateMany({ hospitalId, doctorName: oldName }, { doctorName: newName }),
+    Appointment.updateMany({ hospitalId, doctorName: oldName }, { doctorName: newName }),
+    DoctorSchedule.updateMany({ hospitalId, doctorName: oldName }, { doctorName: newName }),
+    Invoice.updateMany({ hospitalId, doctorName: oldName }, { doctorName: newName }),
+    Prescription.updateMany({ hospitalId, doctorName: oldName }, { doctorName: newName })
+  ]);
+};
 
 const findPlanForTenant = async (planId) => {
   if (!planId) return null;
@@ -192,6 +210,7 @@ hospitalRouter.put('/staff/:id', adminOnly, async (req, res) => {
     }
 
     // Update staff fields
+    const previousName = oldStaff.name;
     oldStaff.name = name || oldStaff.name;
     oldStaff.department = department !== undefined ? department : oldStaff.department;
     oldStaff.contact = contact || oldStaff.contact;
@@ -200,6 +219,7 @@ hospitalRouter.put('/staff/:id', adminOnly, async (req, res) => {
     if (req.body.status) oldStaff.status = req.body.status;
 
     await oldStaff.save();
+    if (oldStaff.role === 'Doctor') await cascadeDoctorRename(oldStaff.hospitalId, previousName, oldStaff.name);
 
     // Sync credentials to corresponding User account
     const userRole = mapStaffRoleToUserRole(oldStaff.role);
@@ -489,9 +509,20 @@ hospitalRouter.put('/patients/:id', async (req, res) => {
     if (!['Waiting', 'In Consultation', 'Completed'].includes(status)) {
       return res.status(400).json({ message: 'Invalid patient status.' });
     }
-    const updated = await Patient.findOneAndUpdate(scoped(req, id), { status }, { new: true });
-    if (!updated) return res.status(404).json({ message: 'Patient not found.' });
-    res.json(updated);
+    const patient = await Patient.findOne(scoped(req, id));
+    if (!patient) return res.status(404).json({ message: 'Patient not found.' });
+    if (status !== 'Waiting' && (patient.paymentStatus === 'Unpaid' || patient.paymentStatus === 'Pending')) {
+      return res.status(409).json({ code: 'FEE_PENDING', message: `${patient.name} has not paid the consultation fee yet. Please send them to the front desk.` });
+    }
+    if (status === 'In Consultation') {
+      await Patient.updateMany(
+        { hospitalId: req.hospitalId, doctorName: patient.doctorName, status: 'In Consultation', _id: { $ne: patient._id } },
+        { status: 'Waiting' }
+      );
+    }
+    patient.status = status;
+    await patient.save();
+    res.json(patient);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -752,6 +783,125 @@ hospitalRouter.post('/appointments/:id/check-in', async (req, res) => {
 });
 
 // ----------------------------------------------------
+// 5c. DOCTOR CONSULTATION & PATIENT HISTORY
+// ----------------------------------------------------
+
+const roundQty = (q) => Math.max(1, Math.min(999, Math.round(Number(q) || 1)));
+
+// Saves the doctor's notes, sends the prescription to the pharmacy and closes the visit
+hospitalRouter.put('/patients/:id/consultation', requireRole('DOCTOR', 'HOSPITAL_ADMIN'), async (req, res) => {
+  const { complaints, diagnosis, advice, followUpDate, medicines, complete } = req.body || {};
+  try {
+    const patient = await Patient.findOne(scoped(req, req.params.id));
+    if (!patient) return res.status(404).json({ message: 'Patient not found.' });
+
+    if (req.user.role === 'DOCTOR') {
+      const me = await Staff.findOne({ hospitalId: req.hospitalId, email: req.user.email }).lean();
+      if (!me || normName(me.name) !== normName(patient.doctorName)) {
+        return res.status(403).json({ message: 'This patient is in another doctor\'s queue.' });
+      }
+    }
+    if (patient.paymentStatus === 'Unpaid' || patient.paymentStatus === 'Pending') {
+      return res.status(409).json({ code: 'FEE_PENDING', message: `${patient.name} has not paid the consultation fee yet.` });
+    }
+    if (followUpDate && !/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) {
+      return res.status(400).json({ message: 'Follow-up date must be a valid date.' });
+    }
+
+    const items = Array.isArray(medicines) ? medicines.filter(m => m && String(m.name || '').trim()) : [];
+    let prescription = null;
+
+    if (items.length > 0) {
+      // Price each line from this hospital's pharmacy stock when the medicine exists there
+      const priced = await Promise.all(items.map(async (m) => {
+        const name = String(m.name).trim();
+        const stock = await Medicine.findOne({ hospitalId: req.hospitalId, name: { $regex: new RegExp(`^${escapeRegex(name)}$`, 'i') } }).lean();
+        return {
+          name: stock ? stock.name : name,
+          qty: roundQty(m.qty),
+          price: stock ? stock.price : 0,
+          dosage: String(m.dosage || '').slice(0, 60),
+          duration: String(m.duration || '').slice(0, 40),
+          timing: String(m.timing || '').slice(0, 40)
+        };
+      }));
+
+      // Re-saving replaces a still-pending prescription for this visit instead of duplicating it
+      const existing = patient.rxCode ? await Prescription.findOne({ hospitalId: req.hospitalId, code: patient.rxCode }) : null;
+      if (existing && existing.status === 'PENDING') {
+        Object.assign(existing, { items: priced, diagnosis: diagnosis || '', advice: advice || '', followUpDate: followUpDate || '' });
+        prescription = await existing.save();
+      } else if (!existing) {
+        let code;
+        do {
+          code = `RX-${Date.now().toString(36).slice(-4).toUpperCase()}${Math.floor(100 + Math.random() * 900)}`;
+        } while (await Prescription.exists({ code }));
+        prescription = await Prescription.create({
+          code,
+          patientNo: patient.patientNo,
+          patientId: patient._id.toString(),
+          patientName: patient.name,
+          patientPhone: patient.phone,
+          doctorName: patient.doctorName,
+          date: new Date().toISOString().split('T')[0],
+          items: priced,
+          diagnosis: diagnosis || '',
+          advice: advice || '',
+          followUpDate: followUpDate || '',
+          status: 'PENDING',
+          hospitalId: req.hospitalId
+        });
+      } else {
+        return res.status(409).json({ message: 'This prescription has already been dispensed by the pharmacy and cannot be changed.' });
+      }
+      patient.rxCode = prescription.code;
+    }
+
+    patient.complaints = String(complaints || '').slice(0, 2000);
+    patient.diagnosis = String(diagnosis || '').slice(0, 500);
+    patient.advice = String(advice || '').slice(0, 2000);
+    patient.followUpDate = followUpDate || '';
+    if (complete !== false) {
+      patient.status = 'Completed';
+      patient.consultedAt = new Date();
+    }
+    await patient.save();
+
+    res.json({ patient, prescription });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// All visits of one person (by patient number), with their prescriptions and pharmacy bills
+hospitalRouter.get('/patient-history', async (req, res) => {
+  const { patientNo, phone, name } = req.query;
+  try {
+    let filter;
+    if (patientNo) filter = { hospitalId: req.hospitalId, patientNo: String(patientNo) };
+    else if (phone && name) filter = { hospitalId: req.hospitalId, phone: String(phone), name: { $regex: new RegExp(`^\\s*${escapeRegex(String(name).trim())}\\s*$`, 'i') } };
+    else return res.status(400).json({ message: 'patientNo, or phone and name, is required.' });
+
+    const visits = await Patient.find(filter).sort({ createdAt: -1 }).lean();
+    const visitIds = visits.map(v => v._id.toString());
+    const rxFilter = patientNo
+      ? { hospitalId: req.hospitalId, $or: [{ patientNo: String(patientNo) }, { patientId: { $in: visitIds } }] }
+      : { hospitalId: req.hospitalId, patientId: { $in: visitIds } };
+    const [prescriptions, bills] = await Promise.all([
+      Prescription.find(rxFilter).sort({ createdAt: -1 }).lean(),
+      PharmacyBill.find(patientNo ? { hospitalId: req.hospitalId, patientNo: String(patientNo) } : { hospitalId: req.hospitalId, _id: null }).sort({ createdAt: -1 }).lean()
+    ]);
+    res.json({
+      visits: visits.map(v => ({ ...v, id: v._id.toString() })),
+      prescriptions: prescriptions.map(p => ({ ...p, id: p._id.toString() })),
+      bills: bills.map(b => ({ ...b, id: b._id.toString() }))
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ----------------------------------------------------
 // 6. STANDARD FEES CONFIG OPERATIONS
 // ----------------------------------------------------
 
@@ -824,15 +974,28 @@ hospitalRouter.put('/staff/profile/details', async (req, res) => {
       return res.status(404).json({ message: 'Staff member profile not found.' });
     }
 
+    const previousName = staff.name;
     staff.name = name || staff.name;
     staff.department = department !== undefined ? department : staff.department;
     staff.contact = contact || staff.contact;
     staff.consultationFee = consultationFee !== undefined ? Number(consultationFee) : staff.consultationFee;
     staff.licenseNo = licenseNo !== undefined ? licenseNo : staff.licenseNo;
     staff.signature = signature !== undefined ? signature : staff.signature;
-    if (status !== undefined) staff.status = status;
+    if (status !== undefined) {
+      // Staff may only toggle their own availability; deactivation stays an admin decision
+      if (req.user.role !== 'HOSPITAL_ADMIN') {
+        if (!['Active', 'On Leave'].includes(status)) {
+          return res.status(400).json({ message: 'You can only set yourself Available or On break.' });
+        }
+        if (staff.status === 'Inactive') {
+          return res.status(403).json({ message: 'Your account was deactivated by the hospital admin.' });
+        }
+      }
+      staff.status = status;
+    }
 
     await staff.save();
+    if (staff.role === 'Doctor') await cascadeDoctorRename(staff.hospitalId, previousName, staff.name);
 
     // Sync user collection name
     const userAcc = await User.findOne({ email, hospitalId });

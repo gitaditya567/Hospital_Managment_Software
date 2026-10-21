@@ -76,6 +76,52 @@ export interface PatientRecord {
   paymentStatus?: 'Paid' | 'Unpaid' | 'Pending';
   appointmentTime?: string;
   appointmentDate?: string;
+  complaints?: string;
+  diagnosis?: string;
+  advice?: string;
+  followUpDate?: string;
+  consultedAt?: string | null;
+  rxCode?: string;
+}
+
+export interface RxItem {
+  name: string;
+  dosage: string;
+  timing?: string;
+  duration: string;
+  qty: number;
+  price?: number;
+}
+
+export interface PrescriptionRecord {
+  id: string;
+  code: string;
+  patientNo?: string;
+  patientId?: string | null;
+  patientName: string;
+  doctorName: string;
+  date: string;
+  status: 'PENDING' | 'DISPENSED';
+  items: RxItem[];
+  diagnosis?: string;
+  advice?: string;
+  followUpDate?: string;
+  createdAt?: string;
+}
+
+export interface ConsultationInput {
+  complaints: string;
+  diagnosis: string;
+  advice: string;
+  followUpDate: string;
+  medicines: RxItem[];
+  complete?: boolean;
+}
+
+export interface PatientHistory {
+  visits: Array<PatientRecord & { _id: string }>;
+  prescriptions: PrescriptionRecord[];
+  bills: Array<{ id: string; rxCode: string; date: string; total: number; paymentMode: string; items: Array<{ name: string; qty: number; price: number }> }>;
 }
 
 export interface PatientInvoice {
@@ -222,6 +268,8 @@ interface HospitalState {
   collectPatientFeeDirectly: (patientId: string, amount?: number, feeType?: string, paymentMode?: PaymentMode) => Promise<PatientInvoice | null>;
   cancelPatient: (patientId: string) => Promise<void>;
   renewSubscription: (hospitalId: string, licenseCode: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  saveConsultation: (patientId: string, input: ConsultationInput) => Promise<{ patient: PatientRecord; prescription: PrescriptionRecord | null }>;
+  fetchPatientHistory: (patientNo: string) => Promise<PatientHistory>;
   appointments: Appointment[];
   fetchAppointments: (from?: string, to?: string) => Promise<void>;
   bookAppointment: (appt: Omit<Appointment, 'id' | 'status' | 'patientId' | 'notes'> & { notes?: string }) => Promise<Appointment>;
@@ -373,7 +421,13 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
               vitals: p.vitals || [],
               pastDiagnoses: p.pastDiagnoses || '',
               paymentStatus: p.paymentStatus || 'Paid',
-              appointmentTime: p.appointmentTime || ''
+              appointmentTime: p.appointmentTime || '',
+              complaints: p.complaints || '',
+              diagnosis: p.diagnosis || '',
+              advice: p.advice || '',
+              followUpDate: p.followUpDate || '',
+              consultedAt: p.consultedAt || null,
+              rxCode: p.rxCode || ''
             };
           });
         })(),
@@ -619,16 +673,13 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
 
   updatePatientStatus: async (patientId, status) => {
     const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
-    try {
-      await fetch(`/api/hospital/patients/${patientId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      await get().fetchHospitalData(hospitalId);
-    } catch (err) {
-      console.error('Failed to update patient status', err);
-    }
+    const res = await fetch(`/api/hospital/patients/${patientId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Could not update the patient status.'));
+    await get().fetchHospitalData(hospitalId);
   },
 
   addPatientInvoice: async (invoice) => {
@@ -684,6 +735,33 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
     } catch (err) {
       console.error('Failed to cancel patient appointment', err);
     }
+  },
+
+  saveConsultation: async (patientId, input) => {
+    const hospitalId = useAuthStore.getState().user?.hospitalId || '';
+    const res = await fetch(`/api/hospital/patients/${patientId}/consultation`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Could not save the consultation.'));
+    const data = await res.json();
+    await get().fetchHospitalData(hospitalId);
+    return {
+      patient: { ...data.patient, id: data.patient._id },
+      prescription: data.prescription ? { ...data.prescription, id: data.prescription._id } : null
+    };
+  },
+
+  fetchPatientHistory: async (patientNo) => {
+    const res = await fetch(`/api/hospital/patient-history?patientNo=${encodeURIComponent(patientNo)}`);
+    if (!res.ok) throw new Error(await readError(res, 'Could not load patient history.'));
+    const data = await res.json();
+    return {
+      visits: asArray(data.visits).map((v: any) => ({ ...v, id: v._id })),
+      prescriptions: asArray(data.prescriptions),
+      bills: asArray(data.bills)
+    };
   },
 
   appointments: [],

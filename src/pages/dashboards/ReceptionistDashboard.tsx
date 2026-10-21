@@ -78,13 +78,6 @@ export function ReceptionistDashboard() {
     else if (selectedFee) setAmount(String(selectedFee.amount));
   }, [feeKey, feeOptions, selectedFee]);
 
-  // Phone lookup: pre-select the most recent person on this number
-  useEffect(() => {
-    if (knownPeople.length > 0) choosePerson(knownPeople[0].key);
-    else choosePerson('new');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone.length === 10 ? phone : '']);
-
   const choosePerson = (key: string) => {
     setPersonKey(key);
     const person = knownPeople.find(p => p.key === key);
@@ -98,6 +91,14 @@ export function ReceptionistDashboard() {
       setGender('Male');
     }
   };
+
+  // Phone lookup: pre-select the most recent person on this number
+  useEffect(() => {
+    if (knownPeople.length > 0) choosePerson(knownPeople[0].key);
+    else choosePerson('new');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone.length === 10 ? phone : '']);
+
 
   const resetForm = () => {
     setPhone('');
@@ -317,8 +318,12 @@ export function ReceptionistDashboard() {
       push('error', `${p.name} has not paid yet. Collect the fee first.`);
       return;
     }
-    await updatePatientStatus(p.id, status);
-    push('success', `${p.name} → ${status}`);
+    try {
+      await updatePatientStatus(p.id, status);
+      push('success', `${p.name} → ${status}`);
+    } catch (err: any) {
+      push('error', err?.message || 'Could not update the status.');
+    }
   };
 
   // ───────── Today's appointments ─────────
@@ -387,7 +392,7 @@ export function ReceptionistDashboard() {
         ].map(k => (
           <div key={k.label} className="bg-white p-4 rounded-2xl border border-[#D8D8D8] flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">{k.label}</p>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">{k.label}</p>
               <p className="text-2xl font-extrabold text-[#060606] tracking-tight">{k.value}</p>
             </div>
             <div className={`h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 ${k.tone}`}><k.icon size={19} /></div>
@@ -458,7 +463,7 @@ export function ReceptionistDashboard() {
               <div className="col-span-3 grid grid-cols-3 gap-1">
                 {['Male', 'Female', 'Other'].map(g => (
                   <button key={g} type="button" onClick={() => setGender(g)} className={`h-10 rounded-xl border text-[11px] font-bold ${gender === g ? 'bg-[#060606] text-white border-[#060606]' : 'bg-white border-[#D8D8D8] text-slate-600'}`}>
-                    {g === 'Other' ? 'Other' : g[0] + g.slice(1, 4)}
+                    {g}
                   </button>
                 ))}
               </div>
@@ -651,7 +656,7 @@ export function ReceptionistDashboard() {
                     return (
                       <tr key={p.id} onClick={() => setDetail(p)} className="cursor-pointer hover:bg-[#EBF3FE]/30">
                         <td className="px-4 py-3">
-                          <span className="px-2 py-1 rounded-lg bg-[#060606] text-white font-mono font-bold text-[11px]">{p.tokenNumber}</span>
+                          <span className="px-2 py-1 rounded-lg bg-[#060606] text-white font-mono font-bold text-[11px] whitespace-nowrap">{p.tokenNumber}</span>
                           {pos > 0 && <span className="block text-[10px] font-bold text-slate-400 mt-1">{pos === 1 ? 'Next in line' : `#${pos} in line`}</span>}
                         </td>
                         <td className="px-4 py-3">
@@ -660,12 +665,12 @@ export function ReceptionistDashboard() {
                         </td>
                         <td className="px-4 py-3 font-bold text-slate-700">{doctorTitle(p.doctorName)}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${statusStyle[p.status]}`}>{p.status === 'In Consultation' ? 'With doctor' : p.status}</span>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-extrabold whitespace-nowrap ${statusStyle[p.status]}`}>{p.status === 'In Consultation' ? 'With doctor' : p.status}</span>
                         </td>
                         <td className="px-4 py-3">
                           {unpaid
-                            ? <span className="font-extrabold text-rose-600">₹{(inv?.amount ?? 0).toLocaleString('en-IN')} due</span>
-                            : <span className="font-bold text-emerald-700">{(inv?.amount ?? 0) > 0 ? `₹${inv!.amount.toLocaleString('en-IN')}` : 'Free'}{inv?.paymentMode ? ` · ${inv.paymentMode}` : ''}</span>}
+                            ? <span className="font-extrabold text-rose-600 whitespace-nowrap">₹{(inv?.amount ?? 0).toLocaleString('en-IN')} due</span>
+                            : <span className="font-bold text-emerald-700 whitespace-nowrap">{(inv?.amount ?? 0) > 0 ? `₹${inv!.amount.toLocaleString('en-IN')}` : 'Free'}{inv?.paymentMode ? ` · ${inv.paymentMode}` : ''}</span>}
                         </td>
                         <td className="px-4 py-3 text-slate-500 font-semibold whitespace-nowrap">{p.status === 'Completed' ? '—' : formatWait(p.createdAt, now)}</td>
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>

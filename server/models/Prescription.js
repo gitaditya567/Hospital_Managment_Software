@@ -5,12 +5,17 @@ const prescriptionItemSchema = new mongoose.Schema({
   qty: { type: Number, required: true },
   price: { type: Number, required: true },
   dosage: { type: String, default: '' },
-  duration: { type: String, default: '' }
+  duration: { type: String, default: '' },
+  timing: { type: String, default: '' }
 });
 
 const prescriptionSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true },
   patientNo: { type: String },
+  patientId: { type: String, default: null },
+  diagnosis: { type: String, default: '' },
+  advice: { type: String, default: '' },
+  followUpDate: { type: String, default: '' },
   patientName: { type: String, required: true },
   patientPhone: { type: String, required: true },
   doctorName: { type: String, required: true },

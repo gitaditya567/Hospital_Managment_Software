@@ -372,7 +372,7 @@ export function ReceptionistAppointments() {
                 <input type="number" min={0} max={120} placeholder="Age" value={form.age} onChange={e => set({ age: e.target.value })} className="col-span-2 sm:col-span-1 h-10 px-3 rounded-xl border border-[#D8D8D8] text-sm font-semibold focus:outline-none focus:border-[#3683F8]" />
                 <div className="col-span-4 sm:col-span-2 grid grid-cols-3 gap-1">
                   {['Male', 'Female', 'Other'].map(g => (
-                    <button key={g} type="button" onClick={() => set({ gender: g })} className={`h-10 rounded-xl border text-[11px] font-bold ${form.gender === g ? 'bg-[#060606] text-white border-[#060606]' : 'border-[#D8D8D8] text-slate-600'}`}>{g}</button>
+                    <button key={g} type="button" onClick={() => set({ gender: g })} className={`h-10 rounded-xl border text-[11px] font-bold ${form.gender === g ? 'bg-[#060606] text-white border-[#060606]' : 'border-[#D8D8D8] text-slate-600'}`}>{g === 'Other' ? 'Other' : g.slice(0, 4)}</button>
                   ))}
                 </div>
               </div>

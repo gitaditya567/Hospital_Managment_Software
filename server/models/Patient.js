@@ -29,6 +29,13 @@ const patientSchema = new mongoose.Schema({
   },
   appointmentTime: { type: String, default: '' },
   appointmentDate: { type: String, default: '' },
+  // Filled by the doctor when the consultation is completed
+  complaints: { type: String, default: '' },
+  diagnosis: { type: String, default: '' },
+  advice: { type: String, default: '' },
+  followUpDate: { type: String, default: '' },
+  consultedAt: { type: Date, default: null },
+  rxCode: { type: String, default: '' },
   hospitalId: { type: String, required: true }
 }, { timestamps: true });
 

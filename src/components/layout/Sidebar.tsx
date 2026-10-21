@@ -61,7 +61,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       case 'DOCTOR':
         return [
           { to: '/doctor', icon: LayoutDashboard, label: 'My Consultations' },
-          { to: '/doctor/search', icon: Users, label: 'E-Prescription Gateway' },
+          { to: '/doctor/search', icon: Users, label: 'Patient Records' },
+          { to: '/doctor/profile', icon: Settings, label: 'My Profile' },
         ];
       case 'PHARMACY':
         return [

@@ -384,6 +384,77 @@ test('pharmacy flow: inventory, prescription, transactional checkout', async () 
   assert.notEqual(String(regexAttack.data._id), String(ctx.medicineId), 'regex input must not match existing medicine');
 });
 
+test('doctor: fee gate, one patient in cabin, consultation notes, priced Rx, history, rename, availability', async () => {
+  const mk = (name, phone, payNow) => api('POST', '/api/hospital/patients', {
+    token: ctx.reception, body: { name, phone, age: 33, doctorName: 'Dr. One', payNow, fee: { amount: 300, paymentMode: 'Cash' } }
+  });
+  const unpaid = (await mk('Unpaid Person', '8300000001', false)).data;
+  const gate = await api('PUT', `/api/hospital/patients/${unpaid._id}`, { token: ctx.doctor, body: { status: 'In Consultation' } });
+  assert.equal(gate.status, 409, 'unpaid patients cannot be called in');
+
+  const a = (await mk('Asha Patel', '8300000002', true)).data;
+  const b = (await mk('Bina Shah', '8300000003', true)).data;
+  await api('PUT', `/api/hospital/patients/${a._id}`, { token: ctx.doctor, body: { status: 'In Consultation' } });
+  await api('PUT', `/api/hospital/patients/${b._id}`, { token: ctx.doctor, body: { status: 'In Consultation' } });
+  const list = (await api('GET', '/api/hospital/patients', { token: ctx.doctor })).data;
+  assert.equal(list.find(p => p._id === a._id).status, 'Waiting', 'previous patient goes back to waiting');
+  assert.equal(list.find(p => p._id === b._id).status, 'In Consultation');
+
+  const doc2 = await login('doc2@alpha.test', 'DocPass#2', 'DOCTOR');
+  const foreign = await api('PUT', `/api/hospital/patients/${b._id}/consultation`, { token: doc2, body: { diagnosis: 'x' } });
+  assert.equal(foreign.status, 403, 'another doctor cannot write this consultation');
+
+  const consult = await api('PUT', `/api/hospital/patients/${b._id}/consultation`, {
+    token: ctx.doctor,
+    body: {
+      complaints: 'Fever for 3 days', diagnosis: 'Viral fever', advice: 'Plenty of fluids', followUpDate: '2030-01-10',
+      medicines: [
+        { name: 'paracetamol 500mg', dosage: '1-0-1', timing: 'After food', duration: '5 days', qty: 10 },
+        { name: 'ORS Sachet (not stocked)', dosage: '1 sachet', duration: '3 days', qty: 3 }
+      ]
+    }
+  });
+  assert.equal(consult.status, 200, JSON.stringify(consult.data));
+  assert.equal(consult.data.patient.status, 'Completed');
+  assert.equal(consult.data.patient.diagnosis, 'Viral fever');
+  assert.equal(consult.data.prescription.items[0].name, 'Paracetamol 500mg', 'matched to the stocked medicine name');
+  assert.equal(consult.data.prescription.items[0].price, 2, 'priced from pharmacy stock');
+  assert.equal(consult.data.prescription.items[0].qty, 10);
+  assert.equal(consult.data.prescription.items[1].price, 0, 'unstocked medicine has no price');
+  assert.equal(consult.data.prescription.patientId, b._id);
+  const rxCode = consult.data.prescription.code;
+
+  const again = await api('PUT', `/api/hospital/patients/${b._id}/consultation`, {
+    token: ctx.doctor, body: { diagnosis: 'Viral fever', medicines: [{ name: 'Paracetamol 500mg', dosage: '1-1-1', duration: '3 days', qty: 9 }] }
+  });
+  assert.equal(again.data.prescription.code, rxCode, 'editing reuses the same pending prescription');
+  const rxs = (await api('GET', '/api/pharmacy/prescriptions', { token: ctx.pharmacy })).data.filter(r => r.patientId === b._id);
+  assert.equal(rxs.length, 1);
+  assert.equal(rxs[0].items[0].qty, 9);
+
+  const badDate = await api('PUT', `/api/hospital/patients/${a._id}/consultation`, { token: ctx.doctor, body: { followUpDate: 'next week' } });
+  assert.equal(badDate.status, 400);
+
+  const hist = await api('GET', `/api/hospital/patient-history?patientNo=${b.patientNo}`, { token: ctx.doctor });
+  assert.equal(hist.status, 200);
+  assert.equal(hist.data.visits[0].diagnosis, 'Viral fever');
+  assert.ok(hist.data.prescriptions.some(p => p.code === rxCode));
+
+  // Rename keeps the queue attached
+  const renamed = await api('PUT', '/api/hospital/staff/profile/details', { token: ctx.doctor, body: { email: 'doc1@alpha.test', name: 'Dr. One Renamed' } });
+  assert.equal(renamed.status, 200);
+  const after = (await api('GET', '/api/hospital/patients', { token: ctx.doctor })).data.find(p => p._id === a._id);
+  assert.equal(after.doctorName, 'Dr. One Renamed');
+  await api('PUT', '/api/hospital/staff/profile/details', { token: ctx.doctor, body: { email: 'doc1@alpha.test', name: 'Dr. One' } });
+
+  // Availability: doctors may only toggle Active / On Leave
+  assert.equal((await api('PUT', '/api/hospital/staff/profile/details', { token: ctx.doctor, body: { email: 'doc1@alpha.test', status: 'Inactive' } })).status, 400);
+  assert.equal((await api('PUT', '/api/hospital/staff/profile/details', { token: ctx.doctor, body: { email: 'doc1@alpha.test', status: 'On Leave' } })).status, 200);
+  await api('PUT', `/api/hospital/staff/${ctx.alphaDoctorStaffId}`, { token: ctx.alphaAdmin, body: { status: 'Inactive' } });
+  assert.equal((await api('PUT', '/api/hospital/staff/profile/details', { token: ctx.doctor, body: { email: 'doc1@alpha.test', status: 'Active' } })).status, 403);
+  await api('PUT', `/api/hospital/staff/${ctx.alphaDoctorStaffId}`, { token: ctx.alphaAdmin, body: { status: 'Active' } });
+});
+
 test('tenant isolation: one hospital cannot see or change another', async () => {
   const r = await api('POST', '/api/public/register', {
     body: { hospitalName: 'Beta Clinic', adminName: 'Beta Admin', email: 'admin@beta.test', password: 'BetaPass#1', phone: '9123456780', address: '5 Civil Lines', acceptTerms: true }

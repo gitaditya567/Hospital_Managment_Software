@@ -16,6 +16,7 @@ export function DoctorProfile() {
   const [licenseNo, setLicenseNo] = useState('');
   const [contact, setContact] = useState('');
   const [signature, setSignature] = useState('');
+  const [consultationFee, setConsultationFee] = useState('');
 
   useEffect(() => {
     if (!user?.email || !user?.hospitalId) return;
@@ -32,9 +33,10 @@ export function DoctorProfile() {
         setLicenseNo(data.licenseNo || '');
         setContact(data.contact || '');
         setSignature(data.signature || '');
+        setConsultationFee(typeof data.consultationFee === 'number' ? String(data.consultationFee) : '');
       } catch (err: any) {
         console.error(err);
-        setErrorMsg('Error loading profile from active clinical nodes.');
+        setErrorMsg('Could not load your profile. Please refresh the page.');
       } finally {
         setLoading(false);
       }
@@ -62,7 +64,8 @@ export function DoctorProfile() {
           department: specialization,
           licenseNo,
           contact,
-          signature
+          signature,
+          ...(consultationFee !== '' ? { consultationFee: Math.max(0, Number(consultationFee) || 0) } : {})
         })
       });
 
@@ -70,7 +73,7 @@ export function DoctorProfile() {
         throw new Error('Failed to save profile changes');
       }
 
-      setSuccessMsg('Operational profile parameters updated successfully!');
+      setSuccessMsg('Profile saved. Your prescriptions will use these details.');
 
       // Update global user name if it changed
       if (user) {
@@ -106,7 +109,7 @@ export function DoctorProfile() {
             <Loader2 className="h-10 w-10 text-blue-600 animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-blue-600">✚</div>
           </div>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono">Syncing Doctor Node...</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono">Loading profile…</p>
         </div>
       </div>
     );
@@ -237,24 +240,38 @@ export function DoctorProfile() {
                   />
                 </div>
               </div>
+
+              {/* Consultation Fee */}
+              <div className="space-y-1.5">
+                <label htmlFor="doctor-fee" className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">My Consultation Fee (₹)</label>
+                <input
+                  id="doctor-fee"
+                  type="number"
+                  min={0}
+                  value={consultationFee}
+                  onChange={e => setConsultationFee(e.target.value)}
+                  placeholder="e.g. 500"
+                  className="block w-full px-3 h-11 rounded-xl text-sm border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-400">Reception sees this as a fee option when booking you, next to the hospital's standard OPD fee.</p>
+              </div>
             </div>
 
             <h2 className="text-base font-extrabold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3 pt-2">
-              <FileText size={18} className="text-violet-500" /> Digital Prescription Signature
+              <FileText size={18} className="text-violet-500" /> Qualifications on prescriptions
             </h2>
 
             {/* Signature Area */}
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Signature Format (Text Block)</label>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Qualifications (one per line)</label>
               <textarea
-                required
                 value={signature}
                 onChange={e => setSignature(e.target.value)}
-                placeholder="e.g. Dr. Sarah Smith, MD Cardiology&#10;City General Hospital"
+                placeholder="e.g. MBBS, MD (Medicine)&#10;Consultant Physician"
                 className="w-full h-24 p-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none resize-none text-sm font-sans placeholder-slate-400 text-slate-700 leading-relaxed transition-all"
               />
               <p className="text-[10px] text-slate-400 leading-normal">
-                This digital signature block will be automatically formatted and stamped onto all outgoing PDF prescription sheets generated under your consult.
+                Printed under your name at the top of every prescription, together with your registration number. Sign the printed copy by hand.
               </p>
             </div>
 

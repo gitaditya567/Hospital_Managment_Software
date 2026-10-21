@@ -318,8 +318,12 @@ export function ReceptionistDashboard() {
       push('error', `${p.name} has not paid yet. Collect the fee first.`);
       return;
     }
-    await updatePatientStatus(p.id, status);
-    push('success', `${p.name} → ${status}`);
+    try {
+      await updatePatientStatus(p.id, status);
+      push('success', `${p.name} → ${status}`);
+    } catch (err: any) {
+      push('error', err?.message || 'Could not update the status.');
+    }
   };
 
   // ───────── Today's appointments ─────────
