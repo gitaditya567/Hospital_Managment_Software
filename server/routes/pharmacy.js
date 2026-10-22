@@ -1,5 +1,4 @@
 import express from 'express';
-import mongoose from 'mongoose';
 import { Medicine } from '../models/Medicine.js';
 import { Prescription } from '../models/Prescription.js';
 import { PharmacyBill } from '../models/PharmacyBill.js';
@@ -97,19 +96,42 @@ pharmacyRouter.get('/bills', async (req, res) => {
 });
 
 // 2. POST Add Medicine
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+const todayYMD = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const findByExactName = (hospitalId, name) =>
+  Medicine.findOne({ hospitalId, name: { $regex: new RegExp(`^\\s*${escapeRegex(String(name).trim())}\\s*$`, 'i') } });
+
+const nextMedicineCode = async (hospitalId) => {
+  const count = await Medicine.countDocuments({ hospitalId });
+  let n = 1001 + count;
+  while (await Medicine.exists({ hospitalId, code: `MED-${n}` })) n += 1;
+  return `MED-${n}`;
+};
+
 pharmacyRouter.post('/inventory', pharmacyStaff, async (req, res) => {
-  const { code, name, category, batchNo, location, stock, minThreshold, expiryDate, price, hospitalId } = req.body;
+  const { name, category, batchNo, location, stock, minThreshold, expiryDate, price, hospitalId } = req.body;
   try {
+    if (!name || !String(name).trim()) return res.status(400).json({ message: 'Medicine name is required.' });
+    if (!(Number(price) >= 0)) return res.status(400).json({ message: 'Enter a valid price.' });
+    if (!(Number(stock) >= 0)) return res.status(400).json({ message: 'Enter a valid opening stock.' });
+    if (!YMD_RE.test(expiryDate || '')) return res.status(400).json({ message: 'Expiry date is required.' });
+    if (await findByExactName(hospitalId, name)) {
+      return res.status(409).json({ message: `"${String(name).trim()}" is already in the catalogue. Use "Receive stock" to add more.` });
+    }
     const newMed = new Medicine({
-      code,
-      name,
-      category,
-      batchNo,
-      location,
+      code: req.body.code && !/^RX-/i.test(req.body.code) ? req.body.code : await nextMedicineCode(hospitalId),
+      name: String(name).trim(),
+      category: category || 'General',
+      batchNo: batchNo || 'OPENING',
+      location: location || 'Main store',
       stock: Number(stock),
-      minThreshold: Number(minThreshold),
+      minThreshold: Number(minThreshold) >= 0 ? Number(minThreshold) : 20,
       expiryDate,
       price: Number(price),
+      batches: Number(stock) > 0 ? [{ batchNo: batchNo || 'OPENING', expiryDate, qty: Number(stock), supplier: 'Opening stock' }] : [],
       hospitalId
     });
     await newMed.save();
@@ -119,38 +141,29 @@ pharmacyRouter.post('/inventory', pharmacyStaff, async (req, res) => {
   }
 });
 
-// 3. POST Restock Batch
+// 3. POST Receive a stock batch for a catalogued medicine
 pharmacyRouter.post('/restock', pharmacyStaff, async (req, res) => {
-  const { medicineName, supplier, batchNo, expiryDate, qty, hospitalId } = req.body;
+  const { medicineId, medicineName, supplier, batchNo, expiryDate, qty, price, hospitalId } = req.body;
   try {
-    if (!medicineName || !(Number(qty) > 0)) {
-      return res.status(400).json({ message: 'Medicine name and a positive quantity are required.' });
-    }
-    let med = await Medicine.findOne({ 
-      name: { $regex: new RegExp(`^${escapeRegex(medicineName)}$`, 'i') }, 
-      hospitalId 
-    });
+    const amount = Number(qty);
+    if (!(amount > 0) || !Number.isInteger(amount)) return res.status(400).json({ message: 'Quantity received must be a whole number above zero.' });
+    if (!YMD_RE.test(expiryDate || '')) return res.status(400).json({ message: 'Batch expiry date is required.' });
+    if (expiryDate <= todayYMD()) return res.status(400).json({ message: 'This batch is already expired. Do not add it to stock.' });
 
-    if (med) {
-      med.stock += Number(qty);
-      med.batchNo = batchNo;
-      med.expiryDate = expiryDate;
-      await med.save();
-    } else {
-      med = new Medicine({
-        code: `RX-${Math.floor(1000 + Math.random() * 9000)}`,
-        name: medicineName,
-        category: 'General',
-        batchNo,
-        location: 'Unassigned',
-        stock: Number(qty),
-        minThreshold: 20,
-        expiryDate,
-        price: 20.00,
-        hospitalId
-      });
-      await med.save();
+    const med = (medicineId && isObjectId(medicineId) ? await Medicine.findOne({ _id: medicineId, hospitalId }) : null)
+      || (medicineName ? await findByExactName(hospitalId, medicineName) : null);
+    if (!med) {
+      return res.status(404).json({ message: `"${medicineName || 'This medicine'}" is not in the catalogue. Add it as a new medicine first.` });
     }
+
+    // While older stock remains, the medicine keeps the earliest expiry so alerts stay correct
+    const hadStock = med.stock > 0;
+    med.expiryDate = hadStock && med.expiryDate && med.expiryDate < expiryDate ? med.expiryDate : expiryDate;
+    med.stock += amount;
+    med.batchNo = batchNo || med.batchNo;
+    if (Number(price) > 0) med.price = Number(price);
+    med.batches.push({ batchNo: batchNo || '', expiryDate, qty: amount, supplier: supplier || '' });
+    await med.save();
     res.json(med);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -160,7 +173,7 @@ pharmacyRouter.post('/restock', pharmacyStaff, async (req, res) => {
 // 4. GET Prescription Reference
 pharmacyRouter.get('/prescription/:query', async (req, res) => {
   const { query } = req.params;
-  const hospitalId = req.query.hospitalId || 'HOSP-123';
+  const hospitalId = req.query.hospitalId;
   try {
     const rx = await Prescription.findOne({
       $or: [
@@ -170,7 +183,7 @@ pharmacyRouter.get('/prescription/:query', async (req, res) => {
       ],
       hospitalId,
       status: 'PENDING'
-    });
+    }).sort({ createdAt: -1 });
     if (!rx) {
       return res.status(404).json({ message: 'No active prescription found.' });
     }
@@ -180,200 +193,93 @@ pharmacyRouter.get('/prescription/:query', async (req, res) => {
   }
 });
 
-// 5. POST POS Checkout - Bulletproof ACID Mongoose Transactions with standalone local MongoDB fallback
+const PAYMENT_MODES = ['Cash', 'Card', 'UPI'];
+
+const nextBillNo = async (hospitalId) => {
+  let n = 1001 + await PharmacyBill.countDocuments({ hospitalId });
+  while (await PharmacyBill.exists({ hospitalId, billNo: `PB-${n}` })) n += 1;
+  return `PB-${n}`;
+};
+
+// 5. POST Checkout — prescription or counter sale.
+// The prescription is locked first (no double dispensing), each stock line is decremented atomically
+// only if enough stock remains, and everything is undone if any step fails.
 pharmacyRouter.post('/checkout', pharmacyStaff, async (req, res) => {
-  const { rxCode, patientNo, patientName, patientPhone, doctorName, date, items, total, paymentMode, hospitalId } = req.body;
+  const { rxCode, patientNo, patientName, patientPhone, doctorName, items, paymentMode, discount, hospitalId } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ success: false, message: 'Checkout requires at least one medicine item.' });
+    return res.status(400).json({ success: false, message: 'Add at least one medicine to the bill.' });
   }
-  if (items.some(item => !(Number(item.qty) > 0))) {
-    return res.status(400).json({ success: false, message: 'Every item must have a positive quantity.' });
+  if (items.some(item => !Number.isInteger(Number(item.qty)) || !(Number(item.qty) > 0))) {
+    return res.status(400).json({ success: false, message: 'Every item must have a whole-number quantity above zero.' });
   }
-  const billDate = date || new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (!PAYMENT_MODES.includes(paymentMode)) {
+    return res.status(400).json({ success: false, message: 'Choose Cash, Card or UPI.' });
+  }
 
-  // 1. Try with session transaction first
-  let session;
-  let useTransaction = true;
+  const isCounterSale = !rxCode || /^OTC/i.test(rxCode);
+  const decremented = [];
+  let lockedRx = null;
+
+  const undo = async () => {
+    await Promise.all(decremented.map(d => Medicine.updateOne({ _id: d.id }, { $inc: { stock: d.qty } })));
+    if (lockedRx) await Prescription.updateOne({ _id: lockedRx._id }, { status: 'PENDING' });
+  };
+
   try {
-    session = await mongoose.startSession();
-    session.startTransaction();
-  } catch (sessErr) {
-    console.warn("[Mongoose Session Error] Replica sets not configured. Falling back to standard non-transactional checkout.", sessErr.message);
-    useTransaction = false;
-  }
-
-// Helper function to safely find medicine by ObjectId or Name
-async function findMedicineHelper(item, hospitalId, session = null) {
-  let med = null;
-  if (item.medicineId && mongoose.Types.ObjectId.isValid(item.medicineId)) {
-    const query = Medicine.findOne({ _id: item.medicineId, hospitalId });
-    med = session ? await query.session(session) : await query;
-  }
-  if (!med && item.name) {
-    const safeName = item.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const query = Medicine.findOne({ name: { $regex: new RegExp(`^${safeName}$`, 'i') }, hospitalId });
-    med = session ? await query.session(session) : await query;
-  }
-  return med;
-}
-
-  if (useTransaction && session) {
-    try {
-      console.log(`[ACID Transaction Start] Settle prescriptions: ${rxCode}`);
-
-      // Step 1: Create Pharmacy Bill in session
-      const newBill = await PharmacyBill.create([{
-        rxCode,
-        patientNo,
-        patientName,
-        patientPhone,
-        doctorName,
-        date: billDate,
-        items,
-        total: Number(total),
-        paymentMode,
-        hospitalId
-      }], { session });
-
-      // Step 2: Loop through items, verify quantities, and decrement stock
-      for (const item of items) {
-        let med = await findMedicineHelper(item, hospitalId, session);
-
-        if (!med) {
-          // If medicine isn't in catalog yet, auto-provision it with current requested quantity
-          const newMedDocs = await Medicine.create([{
-            code: `MED-${Math.floor(1000 + Math.random() * 9000)}`,
-            name: item.name || 'Prescribed Medicine',
-            category: 'General',
-            batchNo: 'BATCH-AUTO',
-            location: 'Main Pharmacy',
-            stock: Number(item.qty) || 10,
-            minThreshold: 5,
-            expiryDate: '2027-12-31',
-            price: Number(item.price) || 15.00,
-            hospitalId
-          }], { session });
-          med = newMedDocs[0];
-        }
-        
-        if (med.stock < item.qty) {
-          throw new Error(`Insufficient Stock: "${item.name}" has only ${med.stock} units, but ${item.qty} were requested.`);
-        }
-
-        // Decrement stock count
-        med.stock -= item.qty;
-        await med.save({ session });
-        console.log(`[ACID Step] Decremented ${item.qty} units from "${item.name}". New Stock: ${med.stock}`);
-      }
-
-      // Step 3: Mark original doctor prescription as DISPENSED
-      const rx = await Prescription.findOne({ code: rxCode, hospitalId }).session(session);
-      if (rx) {
-        rx.status = 'DISPENSED';
-        await rx.save({ session });
-        console.log(`[ACID Step] Prescription ${rxCode} flagged as DISPENSED.`);
-      }
-
-      // Commit all changes to database
-      await session.commitTransaction();
-      session.endSession();
-      console.log(`[ACID Transaction Success] POS Bill clearing committed successfully! ID: ${newBill[0]._id}`);
-
-      return res.status(201).json({
-        success: true,
-        message: 'Checkout completed successfully. Inventory state synchronized.',
-        bill: newBill[0]
-      });
-
-    } catch (error) {
-      // Rollback everything if any error occurs
-      await session.abortTransaction();
-      session.endSession();
-      console.error(`[ACID Transaction Aborted & Rolled Back] Error: ${error.message}`);
-      
-      // If the error was explicitly about transaction numbers/replica set, let's fallback to standard checkout!
-      if (error.message.includes('replica set') || error.message.includes('Transaction numbers') || error.message.includes('member')) {
-        console.warn("[ACID Fallback] Re-attempting checkout without Mongoose sessions for standalone instance compatibility.");
-        useTransaction = false;
-      } else {
-        return res.status(400).json({
+    if (!isCounterSale) {
+      lockedRx = await Prescription.findOneAndUpdate({ code: rxCode, hospitalId, status: 'PENDING' }, { status: 'DISPENSED' }, { new: true });
+      if (!lockedRx) {
+        const exists = await Prescription.exists({ code: rxCode, hospitalId });
+        return res.status(exists ? 409 : 404).json({
           success: false,
-          message: `Checkout failed, database state rolled back. Error: ${error.message}`
+          message: exists ? `Prescription ${rxCode} has already been dispensed.` : `Prescription ${rxCode} was not found.`
         });
       }
     }
-  }
 
-  // 2. Standalone local MongoDB checkout fallback (no transaction session)
-  if (!useTransaction) {
-    try {
-      console.log(`[Standalone POS Checkout Start] Processing transaction-less checkouts: ${rxCode}`);
-      
-      // Step 1 & Step 2: Pre-validate and deduct stock availability for all items
-      for (const item of items) {
-        let med = await findMedicineHelper(item, hospitalId);
-        if (!med) {
-          med = new Medicine({
-            code: `MED-${Math.floor(1000 + Math.random() * 9000)}`,
-            name: item.name || 'Prescribed Medicine',
-            category: 'General',
-            batchNo: 'BATCH-AUTO',
-            location: 'Main Pharmacy',
-            stock: Number(item.qty) || 10,
-            minThreshold: 5,
-            expiryDate: '2027-12-31',
-            price: Number(item.price) || 15.00,
-            hospitalId
-          });
-          await med.save();
-        }
-
-        if (med.stock < item.qty) {
-          return res.status(400).json({ success: false, message: `Insufficient Stock: "${item.name}" has only ${med.stock} units left.` });
-        }
-
-        med.stock -= item.qty;
-        await med.save();
-        console.log(`[Standalone Step] Decremented ${item.qty} units from "${item.name}". New Stock: ${med.stock}`);
+    const today = todayYMD();
+    const lines = [];
+    for (const item of items) {
+      const med = (item.medicineId && isObjectId(item.medicineId) ? await Medicine.findOne({ _id: item.medicineId, hospitalId }) : null)
+        || (item.name ? await findByExactName(hospitalId, item.name) : null);
+      if (!med) throw Object.assign(new Error(`"${item.name}" is not in pharmacy stock. Remove it from the bill.`), { status: 400 });
+      if (med.expiryDate && med.expiryDate < today) {
+        throw Object.assign(new Error(`${med.name} (batch ${med.batchNo}) expired on ${med.expiryDate}. Do not dispense it.`), { status: 400 });
       }
-
-      // Step 3: Mark original doctor prescription as DISPENSED
-      const rx = await Prescription.findOneAndUpdate(
-        { code: rxCode, hospitalId },
-        { status: 'DISPENSED' }
+      const qty = Number(item.qty);
+      const updated = await Medicine.findOneAndUpdate(
+        { _id: med._id, hospitalId, stock: { $gte: qty } },
+        { $inc: { stock: -qty } },
+        { new: true }
       );
-      if (rx) {
-        console.log(`[Standalone Step] Prescription ${rxCode} flagged as DISPENSED.`);
-      }
-
-      // Step 4: Create Pharmacy Bill
-      const newBill = await PharmacyBill.create({
-        rxCode,
-        patientNo,
-        patientName,
-        patientPhone,
-        doctorName,
-        date: billDate,
-        items,
-        total: Number(total),
-        paymentMode,
-        hospitalId
-      });
-
-      console.log(`[Standalone POS Checkout Success] Committed successfully! ID: ${newBill._id}`);
-      return res.status(201).json({
-        success: true,
-        message: 'Checkout completed successfully. Inventory state synchronized (Standalone Fallback).',
-        bill: newBill
-      });
-
-    } catch (error) {
-      console.error(`[Standalone POS Checkout Failed] Error: ${error.message}`);
-      return res.status(400).json({
-        success: false,
-        message: `Standalone checkout failed. Error: ${error.message}`
-      });
+      if (!updated) throw Object.assign(new Error(`Insufficient stock: "${med.name}" has only ${med.stock} units left.`), { status: 400 });
+      decremented.push({ id: med._id, qty });
+      lines.push({ medicineId: med._id.toString(), name: med.name, qty, price: med.price });
     }
+
+    const subtotal = Math.round(lines.reduce((s, l) => s + l.qty * l.price, 0) * 100) / 100;
+    const off = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
+    const bill = await PharmacyBill.create({
+      billNo: await nextBillNo(hospitalId),
+      saleType: isCounterSale ? 'Counter' : 'Prescription',
+      rxCode: isCounterSale ? '' : rxCode,
+      patientNo: lockedRx ? lockedRx.patientNo : patientNo,
+      patientName: (lockedRx ? lockedRx.patientName : patientName) || 'Walk-in customer',
+      patientPhone: (lockedRx ? lockedRx.patientPhone : patientPhone) || '',
+      doctorName: (lockedRx ? lockedRx.doctorName : doctorName) || '',
+      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      items: lines,
+      subtotal,
+      discount: off,
+      total: Math.round((subtotal - off) * 100) / 100,
+      paymentMode,
+      hospitalId
+    });
+
+    res.status(201).json({ success: true, message: 'Bill saved and stock updated.', bill });
+  } catch (error) {
+    await undo().catch(() => {});
+    res.status(error.status || 400).json({ success: false, message: error.message });
   }
 });
 
@@ -382,16 +288,27 @@ pharmacyRouter.put('/inventory/:id', pharmacyStaff, async (req, res) => {
   const { id } = req.params;
   const { name, category, batchNo, location, stock, minThreshold, expiryDate, price } = req.body;
   try {
-    const updated = await Medicine.findOneAndUpdate({ _id: isObjectId(id) ? id : null, hospitalId: req.hospitalId }, {
-      name,
-      category,
-      batchNo,
-      location,
-      stock: Number(stock),
-      minThreshold: Number(minThreshold),
-      expiryDate,
-      price: Number(price)
-    }, { new: true });
+    // Only the fields that were sent are changed
+    const update = {};
+    if (name !== undefined) {
+      if (!String(name).trim()) return res.status(400).json({ message: 'Medicine name cannot be empty.' });
+      const clash = await findByExactName(req.hospitalId, name);
+      if (clash && clash._id.toString() !== id) return res.status(409).json({ message: `"${String(name).trim()}" is already in the catalogue.` });
+      update.name = String(name).trim();
+    }
+    if (category !== undefined) update.category = category;
+    if (batchNo !== undefined) update.batchNo = batchNo;
+    if (location !== undefined) update.location = location;
+    for (const [key, value] of [['stock', stock], ['minThreshold', minThreshold], ['price', price]]) {
+      if (value === undefined) continue;
+      if (!(Number(value) >= 0)) return res.status(400).json({ message: `Enter a valid ${key === 'minThreshold' ? 'minimum stock' : key}.` });
+      update[key] = Number(value);
+    }
+    if (expiryDate !== undefined) {
+      if (!YMD_RE.test(expiryDate)) return res.status(400).json({ message: 'Enter a valid expiry date.' });
+      update.expiryDate = expiryDate;
+    }
+    const updated = await Medicine.findOneAndUpdate({ _id: isObjectId(id) ? id : null, hospitalId: req.hospitalId }, update, { new: true });
     if (!updated) return res.status(404).json({ message: 'Medicine not found.' });
     res.json(updated);
   } catch (error) {

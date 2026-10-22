@@ -15,7 +15,8 @@ import {
   LineChart,
   Calendar,
   Wallet,
-  PanelLeftClose
+  PanelLeftClose,
+  AlertTriangle
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -66,9 +67,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         ];
       case 'PHARMACY':
         return [
-          { to: '/pharmacy', icon: LayoutDashboard, label: 'Dispense Prescriptions' },
-          { to: '/pharmacy/inventory', icon: Pill, label: 'Stock & Medicine Batches' },
-          { to: '/pharmacy/orders', icon: ShoppingCart, label: 'Billing & POS Orders' },
+          { to: '/pharmacy', icon: LayoutDashboard, label: 'Pharmacy Counter' },
+          { to: '/pharmacy/inventory', icon: Pill, label: 'Medicine Stock' },
+          { to: '/pharmacy/alerts', icon: AlertTriangle, label: 'Stock Alerts' },
+          { to: '/pharmacy/orders', icon: ShoppingCart, label: 'Sales History' },
         ];
       default:
         return [];

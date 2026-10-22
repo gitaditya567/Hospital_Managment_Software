@@ -8,13 +8,17 @@ const pharmacyBillItemSchema = new mongoose.Schema({
 });
 
 const pharmacyBillSchema = new mongoose.Schema({
-  rxCode: { type: String, required: true },
+  billNo: { type: String, default: '' },
+  saleType: { type: String, enum: ['Prescription', 'Counter'], default: 'Prescription' },
+  rxCode: { type: String, default: '' },
   patientNo: { type: String },
-  patientName: { type: String, required: true },
-  patientPhone: { type: String, required: true },
-  doctorName: { type: String, required: true },
+  patientName: { type: String, default: 'Walk-in customer' },
+  patientPhone: { type: String, default: '' },
+  doctorName: { type: String, default: '' },
   date: { type: String, required: true },
   items: [pharmacyBillItemSchema],
+  subtotal: { type: Number, default: 0 },
+  discount: { type: Number, default: 0 },
   total: { type: Number, required: true },
   paymentMode: { 
     type: String, 

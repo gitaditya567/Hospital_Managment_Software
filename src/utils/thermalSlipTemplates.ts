@@ -393,14 +393,15 @@ export function buildPharmacyBillSlipHtml(data: {
   paymentMode: string;
   footerText?: string;
   gstin?: string;
+  discount?: number;
 }): string {
   const metaRows: SlipMetaRow[] = [
-    { label: 'Bill ID',  value: data.billId,  bold: true },
-    { label: 'Rx Code',  value: data.rxCode },
+    { label: 'Bill No',  value: data.billId,  bold: true },
+    ...(data.rxCode ? [{ label: 'Rx Code', value: data.rxCode }] : [{ label: 'Sale', value: 'Counter sale' }]),
     ...(data.patientNo ? [{ label: 'Patient No', value: data.patientNo }] : []),
     { label: 'Patient',  value: data.patientName, bold: true },
-    { label: 'Phone',    value: data.patientPhone },
-    { label: 'Doctor',   value: `${doctorTitle(data.doctorName)}` },
+    ...(data.patientPhone ? [{ label: 'Phone', value: data.patientPhone }] : []),
+    ...(data.doctorName ? [{ label: 'Doctor', value: `${doctorTitle(data.doctorName)}` }] : []),
   ];
   return buildThermalSlipHtml({
     slipTypeLabel:       'Pharmacy Bill Receipt',
@@ -410,7 +411,7 @@ export function buildPharmacyBillSlipHtml(data: {
     metaRows,
     lineItems:           data.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
     showItemTableHeader: true,
-    taxRows:             [],
+    taxRows:             data.discount ? [{ label: 'Discount', amount: -data.discount }] : [],
     total:               data.total,
     paymentMode:         data.paymentMode,
     footerText:          data.footerText ?? 'Keep medicines out of reach of children.',

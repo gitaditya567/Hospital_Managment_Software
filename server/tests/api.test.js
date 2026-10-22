@@ -384,6 +384,67 @@ test('pharmacy flow: inventory, prescription, transactional checkout', async () 
   assert.notEqual(String(regexAttack.data._id), String(ctx.medicineId), 'regex input must not match existing medicine');
 });
 
+test('pharmacy: no double dispense, expiry & catalogue checks, server prices, counter sale, batches', async () => {
+  const add = (body) => api('POST', '/api/pharmacy/inventory', { token: ctx.pharmacy, body });
+  const dup = await add({ name: 'PARACETAMOL 500mg', category: 'x', stock: 1, price: 1, expiryDate: '2030-01-01' });
+  assert.equal(dup.status, 409, 'duplicate medicine name rejected');
+  const noExpiry = await add({ name: 'No Expiry Tab', category: 'x', stock: 1, price: 1 });
+  assert.equal(noExpiry.status, 400);
+  const cough = await add({ name: 'Cough Syrup 100ml', category: 'Cough', stock: 10, price: 85, expiryDate: '2030-06-30', batchNo: 'CS1' });
+  assert.equal(cough.status, 201);
+  assert.match(cough.data.code, /^MED-\d+$/, 'medicine codes do not look like Rx codes');
+  const expired = await models.Medicine.create({ code: 'MED-X', name: 'Old Tonic', category: 'x', batchNo: 'OLD', stock: 20, expiryDate: '2020-01-01', price: 50, hospitalId: ctx.alphaId });
+
+  // Restock keeps the earliest expiry while old stock remains, and records the batch
+  const restock = await api('POST', '/api/pharmacy/restock', { token: ctx.pharmacy, body: { medicineId: cough.data._id, batchNo: 'CS2', expiryDate: '2031-12-31', qty: 5, supplier: 'ABC Pharma' } });
+  assert.equal(restock.data.stock, 15);
+  assert.equal(restock.data.expiryDate, '2030-06-30');
+  assert.equal(restock.data.batches.length, 2);
+  const unknown = await api('POST', '/api/pharmacy/restock', { token: ctx.pharmacy, body: { medicineName: 'Ghost Drug', batchNo: 'G', expiryDate: '2031-01-01', qty: 5 } });
+  assert.equal(unknown.status, 404, 'restock of an uncatalogued medicine is refused');
+  const pastBatch = await api('POST', '/api/pharmacy/restock', { token: ctx.pharmacy, body: { medicineId: cough.data._id, batchNo: 'P', expiryDate: '2021-01-01', qty: 5 } });
+  assert.equal(pastBatch.status, 400, 'expired batch cannot be received');
+
+  // Prescription dispensing
+  const rx = await api('POST', '/api/pharmacy/prescriptions', { token: ctx.doctor, body: { patientNo: 'PAT-9', patientName: 'Rx Person', patientPhone: '8400000001', doctorName: 'Dr. One', items: [{ name: 'Cough Syrup 100ml', qty: 1, price: 0 }] } });
+  const body = { rxCode: rx.data.code, items: [{ medicineId: cough.data._id, name: 'Cough Syrup 100ml', qty: 1, price: 1 }], total: 1, paymentMode: 'UPI' };
+  const [first, second] = await Promise.all([
+    api('POST', '/api/pharmacy/checkout', { token: ctx.pharmacy, body }),
+    api('POST', '/api/pharmacy/checkout', { token: ctx.pharmacy, body })
+  ]);
+  const statuses = [first.status, second.status].sort();
+  assert.deepEqual(statuses, [201, 409], 'the same prescription can be dispensed only once');
+  const okBill = first.status === 201 ? first.data.bill : second.data.bill;
+  assert.equal(okBill.items[0].price, 85, 'price comes from the catalogue, not the browser');
+  assert.equal(okBill.total, 85);
+  assert.match(okBill.billNo, /^PB-\d+$/);
+  assert.equal((await models.Medicine.findById(cough.data._id)).stock, 14, 'stock deducted once');
+
+  // Expired and uncatalogued items are refused and nothing is deducted
+  const rx2 = await api('POST', '/api/pharmacy/prescriptions', { token: ctx.doctor, body: { patientNo: 'PAT-9', patientName: 'Rx Person', patientPhone: '8400000001', doctorName: 'Dr. One', items: [] } });
+  const bad = await api('POST', '/api/pharmacy/checkout', { token: ctx.pharmacy, body: { rxCode: rx2.data.code, items: [{ medicineId: cough.data._id, qty: 2 }, { medicineId: expired._id.toString(), qty: 1 }], paymentMode: 'Cash' } });
+  assert.equal(bad.status, 400);
+  assert.match(bad.data.message, /expired/);
+  assert.equal((await models.Medicine.findById(cough.data._id)).stock, 14, 'partial deduction rolled back');
+  const rx2After = (await api('GET', '/api/pharmacy/prescriptions', { token: ctx.pharmacy })).data.find(r => r.code === rx2.data.code);
+  assert.equal(rx2After.status, 'PENDING', 'failed bill leaves the prescription pending');
+  const ghost = await api('POST', '/api/pharmacy/checkout', { token: ctx.pharmacy, body: { items: [{ name: 'Ghost Drug', qty: 1 }], paymentMode: 'Cash' } });
+  assert.equal(ghost.status, 400);
+  assert.equal(await models.Medicine.exists({ name: 'Ghost Drug' }), null, 'no phantom stock is created');
+
+  // Counter sale with discount
+  const otc = await api('POST', '/api/pharmacy/checkout', { token: ctx.pharmacy, body: { patientName: 'Walk-in', items: [{ medicineId: cough.data._id, qty: 2 }], paymentMode: 'Cash', discount: 20 } });
+  assert.equal(otc.status, 201, JSON.stringify(otc.data));
+  assert.equal(otc.data.bill.saleType, 'Counter');
+  assert.equal(otc.data.bill.subtotal, 170);
+  assert.equal(otc.data.bill.discount, 20);
+  assert.equal(otc.data.bill.total, 150);
+  const tooMuchOff = await api('POST', '/api/pharmacy/checkout', { token: ctx.pharmacy, body: { items: [{ medicineId: cough.data._id, qty: 1 }], paymentMode: 'Cash', discount: 9999 } });
+  assert.equal(tooMuchOff.data.bill.total, 0, 'discount cannot exceed the bill');
+  const fractional = await api('POST', '/api/pharmacy/checkout', { token: ctx.pharmacy, body: { items: [{ medicineId: cough.data._id, qty: 1.5 }], paymentMode: 'Cash' } });
+  assert.equal(fractional.status, 400);
+});
+
 test('doctor: fee gate, one patient in cabin, consultation notes, priced Rx, history, rename, availability', async () => {
   const mk = (name, phone, payNow) => api('POST', '/api/hospital/patients', {
     token: ctx.reception, body: { name, phone, age: 33, doctorName: 'Dr. One', payNow, fee: { amount: 300, paymentMode: 'Cash' } }

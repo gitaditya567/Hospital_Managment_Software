@@ -40,10 +40,13 @@ export function PharmacyInventory() {
   const [category, setCategory] = useState('Analgesic');
   const [batchNo, setBatchNo] = useState('');
   const [location, setLocation] = useState('');
-  const [stock, setStock] = useState('100');
+  const [stock, setStock] = useState('');
   const [minThreshold, setMinThreshold] = useState('20');
-  const [expiryDate, setExpiryDate] = useState('2027-12-31');
-  const [price, setPrice] = useState('15.00');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [price, setPrice] = useState('');
+  const [formError, setFormError] = useState('');
+  const [savingForm, setSavingForm] = useState(false);
+  const [receivePrice, setReceivePrice] = useState('');
 
   // Receive Batch Form fields
   const [rxMedName, setRxMedName] = useState('');
@@ -69,6 +72,7 @@ export function PharmacyInventory() {
 
   // Open Edit Modal & Populate Form
   const handleOpenEditModal = (med: Medicine) => {
+    setFormError('');
     setEditingMedId(med.id);
     setName(med.name);
     setCategory(med.category);
@@ -83,14 +87,15 @@ export function PharmacyInventory() {
 
   // Open Add Modal & Reset Form
   const handleOpenAddModal = () => {
+    setFormError('');
     setName('');
     setCategory('Analgesic');
     setBatchNo('');
     setLocation('');
-    setStock('100');
+    setStock('');
     setMinThreshold('20');
-    setExpiryDate('2027-12-31');
-    setPrice('15.00');
+    setExpiryDate('');
+    setPrice('');
     setIsAddModalOpen(true);
   };
 
@@ -111,10 +116,12 @@ export function PharmacyInventory() {
       key: 'expiryDate',
       header: 'Expiry Date',
       render: (item: Medicine) => {
-        const expiry = new Date(item.expiryDate);
-        const daysLeft = Math.ceil((expiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        const isExpiringSoon = daysLeft > 0 && daysLeft <= 30;
-        const isExpired = daysLeft <= 0;
+        // Whole days to expiry; stock is sellable through the expiry date itself
+        const [ey, em, ed] = (item.expiryDate || '').split('-').map(Number);
+        const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+        const daysLeft = ey ? Math.round((new Date(ey, em - 1, ed).getTime() - startOfToday.getTime()) / 86400000) : Infinity;
+        const isExpiringSoon = daysLeft >= 0 && daysLeft <= 30;
+        const isExpired = daysLeft < 0;
 
         return (
           <span className={`font-mono text-xs font-semibold ${
@@ -184,12 +191,14 @@ export function PharmacyInventory() {
   ];
 
   // Submit Add Medicine Form
-  const handleAddMedicineSubmit = (e: React.FormEvent) => {
+  const handleAddMedicineSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !batchNo || !location || !stock || !price) return;
+    setFormError('');
+    if (!name.trim() || !expiryDate || stock === '' || price === '') { setFormError('Name, opening stock, price and expiry date are required.'); return; }
+    if (expiryDate <= new Date().toISOString().slice(0, 10)) { setFormError('Expiry date must be in the future.'); return; }
 
-    addMedicine({
-      code: `RX-${Math.floor(1000 + Math.random() * 9000)}`,
+    setSavingForm(true);
+    const result = await addMedicine({
       name,
       category,
       batchNo,
@@ -199,24 +208,28 @@ export function PharmacyInventory() {
       expiryDate,
       price: Number(price)
     });
+    setSavingForm(false);
+    if (!result.success) { setFormError(result.error || 'Could not add the medicine.'); return; }
 
     // Reset Form
     setName('');
     setBatchNo('');
     setLocation('');
-    setStock('100');
+    setStock('');
     setMinThreshold('20');
-    setExpiryDate('2027-12-31');
-    setPrice('15.00');
+    setExpiryDate('');
+    setPrice('');
     setIsAddModalOpen(false);
   };
 
   // Submit Edit Medicine Form
-  const handleEditMedicineSubmit = (e: React.FormEvent) => {
+  const handleEditMedicineSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingMedId || !name || !batchNo || !location || !stock || !price) return;
+    setFormError('');
+    if (!editingMedId || !name.trim() || stock === '' || price === '' || !expiryDate) { setFormError('Name, stock, price and expiry date are required.'); return; }
 
-    updateMedicine(editingMedId, {
+    setSavingForm(true);
+    const result = await updateMedicine(editingMedId, {
       name,
       category,
       batchNo,
@@ -226,31 +239,42 @@ export function PharmacyInventory() {
       expiryDate,
       price: Number(price)
     });
+    setSavingForm(false);
+    if (!result.success) { setFormError(result.error || 'Could not save the changes.'); return; }
 
     // Reset Form & Close Modal
     setName('');
     setBatchNo('');
     setLocation('');
-    setStock('100');
+    setStock('');
     setMinThreshold('20');
-    setExpiryDate('2027-12-31');
-    setPrice('15.00');
+    setExpiryDate('');
+    setPrice('');
     setIsEditModalOpen(false);
     setEditingMedId(null);
   };
 
   // Submit Receive Batch Form
-  const handleReceiveBatchSubmit = (e: React.FormEvent) => {
+  const handleReceiveBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rxMedName || !supplier || !batchNoRx || !expiryRx || !qtyRx) return;
+    setFormError('');
+    const med = inventory.find(m => m.name.trim().toLowerCase() === rxMedName.trim().toLowerCase());
+    if (!med) { setFormError(`"${rxMedName}" is not in the catalogue. Pick a medicine from the list, or add it as a new medicine first.`); return; }
+    if (!batchNoRx || !expiryRx || !(Number(qtyRx) > 0)) { setFormError('Batch number, expiry date and quantity are required.'); return; }
 
-    receiveStockBatch({
-      medicineName: rxMedName,
+    setSavingForm(true);
+    const result = await receiveStockBatch({
+      medicineId: med.id,
+      medicineName: med.name,
       supplier,
       batchNo: batchNoRx,
       expiryDate: expiryRx,
-      qty: Number(qtyRx)
+      qty: Number(qtyRx),
+      ...(Number(receivePrice) > 0 ? { price: Number(receivePrice) } : {})
     });
+    setSavingForm(false);
+    if (!result.success) { setFormError(result.error || 'Could not receive this batch.'); return; }
+    setReceivePrice('');
 
     // Reset Form
     setRxMedName('');
@@ -265,7 +289,8 @@ export function PharmacyInventory() {
   const filteredData = inventory.filter(med =>
     med.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     med.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    med.id.toLowerCase().includes(searchQuery.toLowerCase())
+    (med.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (med.location || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -282,7 +307,7 @@ export function PharmacyInventory() {
         </div>
         <div className="flex gap-2.5 shrink-0 z-10">
           <Button
-            onClick={() => setIsReceiveModalOpen(true)}
+            onClick={() => { setFormError(''); setIsReceiveModalOpen(true); }}
             variant="outline"
             className="bg-transparent border-white/40 text-white hover:bg-white/10 text-xs font-extrabold h-11 px-5 rounded-full"
           >
@@ -370,7 +395,7 @@ export function PharmacyInventory() {
             </div>
             <input
               type="text"
-              placeholder="Search catalog by name, code or ID..."
+              placeholder="Search by name, code, category or rack"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-teal-100/60 rounded-xl text-xs bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all shadow-sm"
@@ -385,6 +410,10 @@ export function PharmacyInventory() {
       {isAddModalOpen && (
         <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add New Medicine Catalog Entry">
           <form onSubmit={handleAddMedicineSubmit} className="space-y-4 p-4">
+            {formError && (
+              <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">{formError}</div>
+            )}
+
             <Input
               label="Medicine Name"
               placeholder="e.g. Paracetamol 650mg"
@@ -473,17 +502,21 @@ export function PharmacyInventory() {
       {isReceiveModalOpen && (
         <Modal isOpen={isReceiveModalOpen} onClose={() => setIsReceiveModalOpen(false)} title="Receive Supplier Stock Batch">
           <form onSubmit={handleReceiveBatchSubmit} className="space-y-4 p-4">
+            {formError && (
+              <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">{formError}</div>
+            )}
+
 
             <div className="p-3.5 bg-teal-50 border border-teal-100 rounded-xl text-teal-850 text-[11px] font-semibold leading-relaxed flex gap-2">
               <HardDrive size={18} className="text-teal-600 shrink-0 mt-0.5 animate-bounce" />
-              <p>Receiving stock automatically updates the catalog items. If the medicine name is recognized, quantities increment in-place under the new batch details.</p>
+              <p>Pick a medicine from the catalogue. The quantity is added to its stock and the batch is recorded. While older stock remains, the earlier expiry date is kept so expiry alerts stay correct.</p>
             </div>
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select or Enter Medicine Name</label>
               <input
                 type="text"
-                placeholder="Type medicine name exactly (e.g. Paracetamol 500mg)..."
+                placeholder="Start typing and pick from the list"
                 required
                 value={rxMedName}
                 onChange={e => setRxMedName(e.target.value)}
@@ -496,9 +529,8 @@ export function PharmacyInventory() {
             </div>
 
             <Input
-              label="Supplier Company"
+              label="Supplier (optional)"
               placeholder="e.g. PharmaCorp Supplies India"
-              required
               value={supplier}
               onChange={e => setSupplier(e.target.value)}
             />
@@ -527,10 +559,18 @@ export function PharmacyInventory() {
               />
             </div>
 
+            <Input
+              label="New selling price per unit (optional)"
+              type="number"
+              placeholder="Leave empty to keep the current price"
+              value={receivePrice}
+              onChange={e => setReceivePrice(e.target.value)}
+            />
+
             <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => setIsReceiveModalOpen(false)}>Cancel</Button>
               <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md shadow-emerald-600/10">
-                ⬇️ Receive & Restock
+                {savingForm ? 'Saving…' : 'Receive & add to stock'}
               </Button>
             </div>
           </form>
@@ -541,6 +581,10 @@ export function PharmacyInventory() {
       {isEditModalOpen && (
         <Modal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingMedId(null); }} title="Edit Medicine Catalog Entry">
           <form onSubmit={handleEditMedicineSubmit} className="space-y-4 p-4">
+            {formError && (
+              <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">{formError}</div>
+            )}
+
             <Input
               label="Medicine Name"
               placeholder="e.g. Paracetamol 650mg"

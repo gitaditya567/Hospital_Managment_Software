@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { useAuthStore } from './useAuthStore';
 
+export interface MedicineBatch {
+  batchNo: string;
+  expiryDate: string;
+  qty: number;
+  supplier: string;
+  receivedAt?: string;
+}
+
 export interface Medicine {
   id: string;
   code: string;
@@ -10,8 +18,9 @@ export interface Medicine {
   location: string;
   stock: number;
   minThreshold: number;
-  expiryDate: string; // YYYY-MM-DD
+  expiryDate: string; // YYYY-MM-DD (earliest batch still in stock)
   price: number;
+  batches?: MedicineBatch[];
 }
 
 export interface PharmacyBillItem {
@@ -21,8 +30,12 @@ export interface PharmacyBillItem {
   price: number;
 }
 
+export type PaymentMode = 'Cash' | 'Card' | 'UPI';
+
 export interface PharmacyBill {
   id: string;
+  billNo: string;
+  saleType: 'Prescription' | 'Counter';
   rxCode: string;
   patientNo?: string;
   patientName: string;
@@ -30,25 +43,46 @@ export interface PharmacyBill {
   doctorName: string;
   date: string;
   items: PharmacyBillItem[];
+  subtotal: number;
+  discount: number;
   total: number;
-  paymentMode: 'Cash' | 'Card' | 'UPI';
+  paymentMode: PaymentMode;
+  createdAt?: string;
 }
 
 export interface PrescriptionItem {
   name: string;
   qty: number;
   price: number;
+  dosage?: string;
+  timing?: string;
+  duration?: string;
 }
 
 export interface Prescription {
-  id: string; // e.g. "RX-9042"
+  id: string; // the Rx code, e.g. "RX-K3P2123"
   patientNo?: string;
+  patientId?: string | null;
   patientName: string;
   patientPhone: string;
   doctorName: string;
   date: string;
   status: 'PENDING' | 'DISPENSED';
   items: PrescriptionItem[];
+  diagnosis?: string;
+  advice?: string;
+  createdAt?: string;
+}
+
+export interface CheckoutInput {
+  rxCode?: string; // omit for a counter (OTC) sale
+  patientNo?: string;
+  patientName?: string;
+  patientPhone?: string;
+  doctorName?: string;
+  items: Array<{ medicineId?: string; name: string; qty: number }>;
+  paymentMode: PaymentMode;
+  discount?: number;
 }
 
 interface PharmacyState {
@@ -56,93 +90,105 @@ interface PharmacyState {
   prescriptions: Prescription[];
   bills: PharmacyBill[];
   loading: boolean;
+  lastSync: number;
+  /** Kept for older admin pages; no longer filled with simulated messages */
   transactionLogs: string[];
 
-  // Actions
-  fetchPharmacyData: (hospitalId: string) => Promise<void>;
-  addMedicine: (med: Omit<Medicine, 'id'>) => Promise<{ success: boolean; error?: string }>;
+  fetchPharmacyData: (hospitalId?: string) => Promise<void>;
+  addMedicine: (med: Omit<Medicine, 'id' | 'code'> & { code?: string }) => Promise<{ success: boolean; error?: string }>;
   receiveStockBatch: (data: {
+    medicineId?: string;
     medicineName: string;
     supplier: string;
     batchNo: string;
     expiryDate: string;
     qty: number;
+    price?: number;
   }) => Promise<{ success: boolean; error?: string }>;
-
-  dispensePrescription: (data: {
-    rxCode: string;
-    patientNo?: string;
-    patientName: string;
-    patientPhone: string;
-    doctorName: string;
-    date?: string;
-    items: PharmacyBillItem[];
-    total: number;
-    paymentMode: 'Cash' | 'Card' | 'UPI';
-  }) => Promise<{ success: boolean; error?: string; bill?: PharmacyBill }>;
-
+  dispensePrescription: (data: CheckoutInput) => Promise<{ success: boolean; error?: string; bill?: PharmacyBill }>;
   updateMedicine: (id: string, updates: Partial<Medicine>) => Promise<{ success: boolean; error?: string }>;
   deleteMedicine: (id: string) => Promise<void>;
-
   clearLogs: () => void;
 }
+
+const asArray = (v: any): any[] => (Array.isArray(v) ? v : []);
+
+const toMedicine = (m: any): Medicine => ({
+  id: m._id || m.id,
+  code: m.code,
+  name: m.name,
+  category: m.category,
+  batchNo: m.batchNo,
+  location: m.location,
+  stock: m.stock,
+  minThreshold: m.minThreshold,
+  expiryDate: m.expiryDate,
+  price: m.price,
+  batches: asArray(m.batches)
+});
+
+const toBill = (b: any): PharmacyBill => ({
+  id: b._id || b.id,
+  billNo: b.billNo || '',
+  saleType: b.saleType || (b.rxCode ? 'Prescription' : 'Counter'),
+  rxCode: b.rxCode || '',
+  patientNo: b.patientNo,
+  patientName: b.patientName,
+  patientPhone: b.patientPhone || '',
+  doctorName: b.doctorName || '',
+  date: b.date,
+  items: asArray(b.items),
+  subtotal: typeof b.subtotal === 'number' && b.subtotal > 0 ? b.subtotal : b.total,
+  discount: b.discount || 0,
+  total: b.total,
+  paymentMode: b.paymentMode,
+  createdAt: b.createdAt
+});
+
+const toPrescription = (p: any): Prescription => ({
+  id: p.code || p.id,
+  patientNo: p.patientNo,
+  patientId: p.patientId || null,
+  patientName: p.patientName,
+  patientPhone: p.patientPhone,
+  doctorName: p.doctorName,
+  date: p.date,
+  status: p.status,
+  items: asArray(p.items),
+  diagnosis: p.diagnosis || '',
+  advice: p.advice || '',
+  createdAt: p.createdAt
+});
+
+const message = async (res: Response, fallback: string) => {
+  const data = await res.json().catch(() => ({}));
+  return (data && data.message) || fallback;
+};
 
 export const usePharmacyStore = create<PharmacyState>((set, get) => ({
   inventory: [],
   prescriptions: [],
   bills: [],
   loading: false,
-  transactionLogs: ['Mongoose session initialized. Ready for transactions.'],
+  lastSync: 0,
+  transactionLogs: [],
 
-  fetchPharmacyData: async (hospitalId) => {
+  fetchPharmacyData: async () => {
+    if (!useAuthStore.getState().user?.hospitalId) return;
     set({ loading: true });
     try {
       const [invRes, rxRes, billRes] = await Promise.all([
-        fetch(`/api/pharmacy/inventory?hospitalId=${hospitalId}`),
-        fetch(`/api/pharmacy/prescriptions?hospitalId=${hospitalId}`),
-        fetch(`/api/pharmacy/bills?hospitalId=${hospitalId}`)
+        fetch('/api/pharmacy/inventory'),
+        fetch('/api/pharmacy/prescriptions'),
+        fetch('/api/pharmacy/bills')
       ]);
-
-      const inventoryData = await invRes.json();
-      const prescriptionsData = await rxRes.json();
-      const billsData = await billRes.json();
-
+      const [inv, rx, bills] = await Promise.all([invRes.json(), rxRes.json(), billRes.json()]);
       set({
-        inventory: inventoryData.map((m: any) => ({
-          id: m._id || m.id,
-          code: m.code,
-          name: m.name,
-          category: m.category,
-          batchNo: m.batchNo,
-          location: m.location,
-          stock: m.stock,
-          minThreshold: m.minThreshold,
-          expiryDate: m.expiryDate,
-          price: m.price
-        })),
-        prescriptions: prescriptionsData.map((p: any) => ({
-          id: p.code || p.id,
-          patientNo: p.patientNo,
-          patientName: p.patientName,
-          patientPhone: p.patientPhone,
-          doctorName: p.doctorName,
-          date: p.date,
-          status: p.status,
-          items: p.items
-        })),
-        bills: billsData.map((b: any) => ({
-          id: b._id || b.id,
-          rxCode: b.rxCode,
-          patientNo: b.patientNo,
-          patientName: b.patientName,
-          patientPhone: b.patientPhone,
-          doctorName: b.doctorName,
-          date: b.date,
-          items: b.items,
-          total: b.total,
-          paymentMode: b.paymentMode
-        })),
-        loading: false
+        inventory: asArray(inv).map(toMedicine),
+        prescriptions: asArray(rx).map(toPrescription),
+        bills: asArray(bills).map(toBill),
+        loading: false,
+        lastSync: Date.now()
       });
     } catch (error) {
       console.error('Failed to load pharmacy data', error);
@@ -151,34 +197,14 @@ export const usePharmacyStore = create<PharmacyState>((set, get) => ({
   },
 
   addMedicine: async (med) => {
-    const hospitalId = useAuthStore.getState().user?.hospitalId || 'HOSP-123';
     try {
-      const response = await fetch('/api/pharmacy/inventory', {
+      const res = await fetch('/api/pharmacy/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...med, hospitalId })
+        body: JSON.stringify(med)
       });
-
-      const data = await response.json();
-      if (!response.ok) return { success: false, error: data.message || 'Failed to add medicine' };
-
-      const newMed: Medicine = {
-        id: data._id || data.id,
-        code: data.code,
-        name: data.name,
-        category: data.category,
-        batchNo: data.batchNo,
-        location: data.location,
-        stock: data.stock,
-        minThreshold: data.minThreshold,
-        expiryDate: data.expiryDate,
-        price: data.price
-      };
-
-      set((state) => ({
-        inventory: [...state.inventory, newMed]
-      }));
-
+      if (!res.ok) return { success: false, error: await message(res, 'Could not add the medicine.') };
+      await get().fetchPharmacyData();
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Server connection error.' };
@@ -186,19 +212,14 @@ export const usePharmacyStore = create<PharmacyState>((set, get) => ({
   },
 
   receiveStockBatch: async (data) => {
-    const hospitalId = useAuthStore.getState().user?.hospitalId || 'HOSP-123';
     try {
-      const response = await fetch('/api/pharmacy/restock', {
+      const res = await fetch('/api/pharmacy/restock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, hospitalId })
+        body: JSON.stringify(data)
       });
-
-      const resData = await response.json();
-      if (!response.ok) return { success: false, error: resData.message || 'Restocking failed.' };
-
-      // Refresh inventory catalog from the backend to get synchronized stocks
-      await get().fetchPharmacyData(hospitalId);
+      if (!res.ok) return { success: false, error: await message(res, 'Could not receive this batch.') };
+      await get().fetchPharmacyData();
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Server connection error.' };
@@ -206,86 +227,34 @@ export const usePharmacyStore = create<PharmacyState>((set, get) => ({
   },
 
   dispensePrescription: async (data) => {
-    const hospitalId = useAuthStore.getState().user?.hospitalId || 'HOSP-123';
-    const store = get();
-    const newLogs: string[] = [];
-
-    // Stream telemetry ACID logs to show step-by-step MERN transaction
-    const txId = `tx_${Math.random().toString(36).substr(2, 9)}`;
-    newLogs.push(`[SESSION] mongoose.startSession() - Transaction ID: ${txId}`);
-    newLogs.push('[STAGE 1] session.startTransaction() - ACID Lock Enabled.');
-    newLogs.push('[STAGE 2] Submitting atomic transaction payload to local MongoDB Compass...');
-
-    set({ transactionLogs: [...newLogs, ...store.transactionLogs] });
-
     try {
-      const payload = {
-        ...data,
-        date: data.date || new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-        hospitalId
-      };
-      const response = await fetch('/api/pharmacy/checkout', {
+      const res = await fetch('/api/pharmacy/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(data)
       });
-
-      const resData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(resData.message || 'Checkout failed.');
+      if (!res.ok) {
+        const error = await message(res, 'Billing failed. Nothing was charged.');
+        await get().fetchPharmacyData();
+        return { success: false, error };
       }
-
-      newLogs.push('[STAGE 3] Inventory check passed. Deducting stock batches atomic lock.');
-      newLogs.push(`[STAGE 4] Bill registered successfully: ${resData.bill._id || resData.bill.id} [COMMITTING].`);
-      newLogs.push(`[STAGE 5] Prescription ${data.rxCode} marked as DISPENSED.`);
-      newLogs.push('[COMMIT] session.commitTransaction() - ACID State Saved Flawlessly.');
-
-      // Refresh all pharmacy records to sync UI
-      await store.fetchPharmacyData(hospitalId);
-
-      set((state) => ({
-        transactionLogs: [...newLogs, ...state.transactionLogs]
-      }));
-
-      const newBill: PharmacyBill = {
-        id: resData.bill._id || resData.bill.id,
-        rxCode: resData.bill.rxCode,
-        patientNo: resData.bill.patientNo,
-        patientName: resData.bill.patientName,
-        patientPhone: resData.bill.patientPhone,
-        doctorName: resData.bill.doctorName,
-        date: resData.bill.date,
-        items: resData.bill.items,
-        total: resData.bill.total,
-        paymentMode: resData.bill.paymentMode
-      };
-
-      return { success: true, bill: newBill };
-
+      const resData = await res.json();
+      await get().fetchPharmacyData();
+      return { success: true, bill: toBill(resData.bill) };
     } catch (err: any) {
-      newLogs.push(`[ERROR] Transaction aborted: ${err.message}`);
-      newLogs.push('[ROLLBACK] session.abortTransaction() - MongoDB rolled back safely.');
-
-      set((state) => ({
-        transactionLogs: [...newLogs, ...state.transactionLogs]
-      }));
-
-      return { success: false, error: err.message };
+      return { success: false, error: err.message || 'Server connection error.' };
     }
   },
 
   updateMedicine: async (id, updates) => {
-    const hospitalId = useAuthStore.getState().user?.hospitalId || 'HOSP-123';
     try {
-      const response = await fetch(`/api/pharmacy/inventory/${id}`, {
+      const res = await fetch(`/api/pharmacy/inventory/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       });
-      const data = await response.json();
-      if (!response.ok) return { success: false, error: data.message || 'Failed to update medicine record.' };
-      await get().fetchPharmacyData(hospitalId);
+      if (!res.ok) return { success: false, error: await message(res, 'Could not update the medicine.') };
+      await get().fetchPharmacyData();
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Server connection error.' };
@@ -293,10 +262,9 @@ export const usePharmacyStore = create<PharmacyState>((set, get) => ({
   },
 
   deleteMedicine: async (id) => {
-    const hospitalId = useAuthStore.getState().user?.hospitalId || 'HOSP-123';
     try {
       await fetch(`/api/pharmacy/inventory/${id}`, { method: 'DELETE' });
-      await get().fetchPharmacyData(hospitalId);
+      await get().fetchPharmacyData();
     } catch (err) {
       console.error('Failed to delete medicine', err);
     }
