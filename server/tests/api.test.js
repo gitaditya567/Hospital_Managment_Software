@@ -637,6 +637,27 @@ test('super admin: tenants, licenses, renewal and suspension', async () => {
   assert.ok(backup.data.tenants.length >= 2);
 });
 
+test('super admin: safe tenant edits, admin email sync, plan delete guard', async () => {
+  const bad = await api('PUT', `/api/superadmin/tenants/${ctx.alphaId}`, { token: ctx.root, body: { planId: 'plan-ghost' } });
+  assert.equal(bad.status, 400);
+  const sneaky = await api('PUT', `/api/superadmin/tenants/${ctx.alphaId}`, { token: ctx.root, body: { licenseCodeUsed: 'HACKED', status: 'Suspended' } });
+  assert.equal(sneaky.status, 200);
+  const t = await models.Tenant.findById(ctx.alphaId);
+  assert.notEqual(t.licenseCodeUsed, 'HACKED', 'license code is not editable here');
+  assert.equal(t.status, 'Active', 'status changes need the suspend action');
+
+  const moved = await api('PUT', `/api/superadmin/tenants/${ctx.alphaId}`, { token: ctx.root, body: { adminEmail: 'boss@alpha.test', isTrial: false } });
+  assert.equal(moved.status, 200);
+  assert.ok(await models.User.exists({ email: 'boss@alpha.test', role: 'HOSPITAL_ADMIN' }), 'admin login email follows the tenant');
+  await login('boss@alpha.test', 'AlphaPass#1', 'HOSPITAL_ADMIN');
+  await api('PUT', `/api/superadmin/tenants/${ctx.alphaId}`, { token: ctx.root, body: { adminEmail: 'admin@alpha.test' } });
+  const clash = await api('PUT', `/api/superadmin/tenants/${ctx.alphaId}`, { token: ctx.root, body: { adminEmail: 'admin@beta.test' } });
+  assert.equal(clash.status, 409);
+
+  const del = await api('DELETE', '/api/superadmin/plans/plan-pro', { token: ctx.root });
+  assert.equal(del.status, 409, 'a plan in use cannot be deleted');
+});
+
 test('registration with a paid license code activates that plan', async () => {
   const lic = await api('POST', '/api/superadmin/licenses', { token: ctx.root, body: { planId: 'plan-pro', validityMonths: 6 } });
   const r = await api('POST', '/api/public/register', {

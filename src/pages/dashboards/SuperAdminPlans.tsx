@@ -76,8 +76,8 @@ export function SuperAdminPlans() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this subscription plan tier? This will not affect already activated hospitals immediately, but new licenses cannot be generated with this plan.')) {
-      deletePlan(id);
+    if (confirm('Delete this plan? Plans that hospitals are using cannot be deleted.')) {
+      deletePlan(id).catch((err: any) => alert(err?.message || 'Could not delete the plan.'));
     }
   };
 

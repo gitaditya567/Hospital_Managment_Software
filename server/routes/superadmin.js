@@ -167,8 +167,36 @@ superadminRouter.post('/tenants', async (req, res) => {
 superadminRouter.put('/tenants/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const updated = await Tenant.findByIdAndUpdate(id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ message: 'Tenant Node not found.' });
+    const tenant = await Tenant.findById(id);
+    if (!tenant) return res.status(404).json({ message: 'Tenant Node not found.' });
+
+    // Only these fields can be edited here; status and license changes have their own actions
+    const { hospitalName, address, adminPhone, adminEmail, subscriptionExpiryDate, planId, isTrial } = req.body || {};
+    if (hospitalName !== undefined) {
+      if (!String(hospitalName).trim()) return res.status(400).json({ message: 'Hospital name cannot be empty.' });
+      tenant.hospitalName = String(hospitalName).trim();
+    }
+    if (address !== undefined) tenant.address = address;
+    if (adminPhone !== undefined) tenant.adminPhone = adminPhone;
+    if (subscriptionExpiryDate !== undefined) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(subscriptionExpiryDate)) return res.status(400).json({ message: 'Expiry date must be a valid date.' });
+      tenant.subscriptionExpiryDate = subscriptionExpiryDate;
+    }
+    if (planId !== undefined) {
+      if (!(await Plan.exists({ id: planId }))) return res.status(400).json({ message: 'Choose an existing plan.' });
+      tenant.planId = planId;
+    }
+    if (isTrial !== undefined) tenant.isTrial = !!isTrial;
+
+    // Changing the admin email also changes the admin's login, so they never drift apart
+    if (adminEmail !== undefined && String(adminEmail).trim().toLowerCase() !== tenant.adminEmail.toLowerCase()) {
+      const newEmail = String(adminEmail).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return res.status(400).json({ message: 'Enter a valid admin email.' });
+      if (await User.exists({ email: newEmail })) return res.status(409).json({ message: `${newEmail} is already used by another account.` });
+      await User.updateOne({ hospitalId: tenant._id.toString(), role: 'HOSPITAL_ADMIN', email: tenant.adminEmail }, { email: newEmail });
+      tenant.adminEmail = newEmail;
+    }
+    const updated = await tenant.save();
 
     // Log the activity
     const activity = new PlatformActivity({
@@ -431,6 +459,10 @@ superadminRouter.delete('/plans/:id', async (req, res) => {
     const plan = await Plan.findOne({ id });
     if (!plan) return res.status(404).json({ message: 'Pricing plan not found.' });
 
+    const inUse = await Tenant.countDocuments({ planId: id });
+    if (inUse > 0) {
+      return res.status(409).json({ message: `${inUse} hospital${inUse === 1 ? ' is' : 's are'} on "${plan.name}". Move them to another plan before deleting it.` });
+    }
     await Plan.findOneAndDelete({ id });
 
     // Log activity

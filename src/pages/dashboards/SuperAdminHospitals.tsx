@@ -49,6 +49,8 @@ export function SuperAdminHospitals() {
   const [editAddress, setEditAddress] = useState('');
   const [editSubscriptionExpiryDate, setEditSubscriptionExpiryDate] = useState('');
   const [editPlanId, setEditPlanId] = useState('');
+  const [editIsTrial, setEditIsTrial] = useState(false);
+  const [editError, setEditError] = useState('');
 
   // 1. Filter tenants by search query
   const filteredTenants = tenants.filter(t => {
@@ -115,20 +117,24 @@ export function SuperAdminHospitals() {
     }
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTenant) return;
-
-    updateTenant(selectedTenant.id, {
-      hospitalName: editHospitalName,
-      adminEmail: editAdminEmail,
-      address: editAddress,
-      subscriptionExpiryDate: editSubscriptionExpiryDate,
-      planId: editPlanId
-    });
-
-    setIsEditModalOpen(false);
-    setSelectedTenant(null);
+    setEditError('');
+    try {
+      await updateTenant(selectedTenant.id, {
+        hospitalName: editHospitalName,
+        adminEmail: editAdminEmail,
+        address: editAddress,
+        subscriptionExpiryDate: editSubscriptionExpiryDate,
+        planId: editPlanId,
+        isTrial: editIsTrial
+      });
+      setIsEditModalOpen(false);
+      setSelectedTenant(null);
+    } catch (err: any) {
+      setEditError(err?.message || 'Could not save the changes.');
+    }
   };
 
   const handleToggleStatus = (tenantId: string) => {
@@ -153,6 +159,8 @@ export function SuperAdminHospitals() {
     setEditAddress(tenant.address);
     setEditSubscriptionExpiryDate(tenant.subscriptionExpiryDate);
     setEditPlanId(tenant.planId);
+    setEditIsTrial(!!tenant.isTrial);
+    setEditError('');
     setSelectedTenant(tenant);
     setIsEditModalOpen(true);
   };
@@ -868,6 +876,12 @@ export function SuperAdminHospitals() {
               </select>
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+            <input type="checkbox" checked={editIsTrial} onChange={(e) => setEditIsTrial(e.target.checked)} className="rounded border-[#D8D8D8] text-[#3683F8]" />
+            Still on free trial (untick after the hospital pays)
+          </label>
+          {editError && <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">{editError}</div>}
 
           <div className="flex justify-end gap-3 pt-3">
             <Button

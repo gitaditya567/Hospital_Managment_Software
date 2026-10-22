@@ -62,7 +62,7 @@ export function SuperAdminSettings() {
     try {
       await exportBackup();
       await addActivity('Manual raw encrypted MongoDB database backup successfully downloaded by Super Admin.', 'system');
-      alert('Database backup completed successfully! Excluded HIPAA-sensitive records.');
+      alert('Backup downloaded: hospitals, plans, licenses, subscription invoices, activity log and settings. Patient records are not included.');
     } catch (error) {
       alert('Failed to generate database backup. Please check backend connection.');
     } finally {
@@ -194,42 +194,10 @@ export function SuperAdminSettings() {
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Automated Stripe/Razorpay Webhooks Simulation</p>
-            
-            <div className="flex items-center justify-between p-3.5 bg-[#EBF3FE]/30 rounded-xl border border-[#D8D8D8]">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">S</div>
-                <div>
-                  <p className="text-sm font-medium text-[#060606]">Stripe Webhook Integration</p>
-                  <p className="text-[10px] text-slate-400">Pipes transaction successes directly from Stripe webhook endpoints</p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setStripeEnabled(!stripeEnabled)}
-                className="focus:outline-none"
-              >
-                {stripeEnabled ? <ToggleRight size={40} className="text-[#3683F8]" /> : <ToggleLeft size={40} className="text-slate-300" />}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between p-3.5 bg-[#EBF3FE]/30 rounded-xl border border-[#D8D8D8]">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 bg-blue-50 text-[#3683F8] rounded-lg flex items-center justify-center font-bold text-xs shrink-0">R</div>
-                <div>
-                  <p className="text-sm font-medium text-[#060606]">Razorpay API Integration (India)</p>
-                  <p className="text-[10px] text-slate-400">Pipes transactions in real-time utilizing Razorpay payment routes</p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setRazorpayEnabled(!razorpayEnabled)}
-                className="focus:outline-none"
-              >
-                {razorpayEnabled ? <ToggleRight size={40} className="text-[#3683F8]" /> : <ToggleLeft size={40} className="text-slate-300" />}
-              </button>
-            </div>
+          <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-900 leading-relaxed space-y-1">
+            <p className="font-bold">Online payment gateway: not connected</p>
+            <p>Hospitals currently pay you directly (bank transfer, UPI or cheque). After payment, generate a license key in <strong>License Management</strong> and send it to them — they apply it under <strong>Plan &amp; Billing</strong> and their subscription is extended automatically, with a receipt recorded in Financials.</p>
+            <p>Automatic online payments (Razorpay / Stripe) need a merchant account and are not enabled in this version.</p>
           </div>
         </div>
 

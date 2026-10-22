@@ -56,7 +56,7 @@ export function SuperAdminLicenses() {
     if (!plan) return;
 
     if (confirm(`Are you sure you want to delete the plan tier "${plan.name}"?`)) {
-      deletePlan(selectedPlanId);
+      deletePlan(selectedPlanId).catch((err: any) => alert(err?.message || 'Could not delete the plan.'));
       const remaining = plans.filter(p => p.id !== selectedPlanId);
       if (remaining.length > 0) {
         setSelectedPlanId(remaining[0].id);

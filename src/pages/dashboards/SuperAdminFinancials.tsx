@@ -10,8 +10,10 @@ export function SuperAdminFinancials() {
 
 
   // 1. Calculate Live financial totals
+  // Paying hospitals only: free trials and expired plans bring in no recurring revenue
+  const todayYMD = new Date().toISOString().slice(0, 10);
   const liveMRR = tenants.reduce((acc, tenant) => {
-    if (tenant.status !== 'Active') return acc;
+    if (tenant.status !== 'Active' || tenant.isTrial || (tenant.subscriptionExpiryDate || '') < todayYMD) return acc;
     const plan = plans.find(p => p.id === tenant.planId);
     if (!plan) return acc;
     return acc + (plan.price / plan.durationMonths);
@@ -142,7 +144,25 @@ export function SuperAdminFinancials() {
       <div className="glass-card rounded-2xl border border-[#D8D8D8] shadow-xs overflow-hidden bg-white">
         {/* Table header with tabs */}
         <div className="px-6 py-4 border-b border-[#D8D8D8] bg-[#EBF3FE]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-base font-bold text-[#060606]">SaaS Transaction History</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-bold text-[#060606]">Subscription invoices</h2>
+            <button
+              type="button"
+              onClick={() => {
+                const rows = [['Invoice', 'Date', 'Hospital', 'Plan', 'Amount', 'Method', 'Status'], ...filteredInvoices.map(i => [i.id, i.date, i.hospitalName, i.planName, i.amount, i.method, i.status])];
+                const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+                const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `subscription-invoices-${todayYMD}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="h-8 px-3 rounded-lg border border-[#D8D8D8] bg-white text-[11px] font-bold text-[#3683F8]"
+            >
+              Export CSV
+            </button>
+          </div>
 
           <div className="flex bg-[#EBF3FE] p-1 rounded-xl border border-[#D8D8D8] w-fit text-xs font-bold">
             <button

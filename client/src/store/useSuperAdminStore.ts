@@ -267,16 +267,16 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
   },
 
   updateTenant: async (id, updated) => {
-    try {
-      await fetch(`/api/superadmin/tenants/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-      await get().fetchSuperAdminData();
-    } catch (err) {
-      console.error('Failed to update tenant details', err);
+    const res = await fetch(`/api/superadmin/tenants/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Could not update the hospital.');
     }
+    await get().fetchSuperAdminData();
   },
 
   deleteTenant: async (id) => {
@@ -324,14 +324,12 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
   },
 
   deletePlan: async (id) => {
-    try {
-      await fetch(`/api/superadmin/plans/${id}`, {
-        method: 'DELETE'
-      });
-      await get().fetchSuperAdminData();
-    } catch (err) {
-      console.error('Failed to delete plan', err);
+    const res = await fetch(`/api/superadmin/plans/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Could not delete the plan.');
     }
+    await get().fetchSuperAdminData();
   },
 
   updateSettings: async (newSettings) => {
