@@ -24,6 +24,16 @@ Copyright © twinsCloud. All rights reserved.
 - **Roles**: Super Admin (platform operator), Hospital Admin, Receptionist, Doctor, Pharmacist. Settings, staff, fees,
   departments and schedules can only be changed by the Hospital Admin.
 
+## What each role does
+
+| Role | Main screens |
+|------|--------------|
+| **Super Admin** (platform operator) | Platform overview (paying vs trial hospitals, MRR, revenue, follow-ups), hospitals, license keys, plans, financials, settings |
+| **Hospital Admin** | Setup checklist, OPD register, staff, OPD setup (fees, doctor rooms/hours/days), departments, reports, accounts (ledger, dues, patient-wise), plan & billing, profile |
+| **Receptionist** | Front desk check-in (family-aware phone lookup, fee & payment mode, token slip), live queue, appointments (slots by doctor hours), patient directory, fee collection |
+| **Doctor** | Waiting room, call next / hold, vitals & history, complaints/diagnosis/advice/follow-up, prescription builder (pharmacy stock, voice dictation incl. Hinglish), printable Rx, patient records |
+| **Pharmacist** | Live prescription queue, dispensing with stock/expiry checks, counter sales, discounts, inventory & batches, stock alerts with reorder CSV, sales history |
+
 ## Environment (`server/.env`)
 
 ```
@@ -51,7 +61,7 @@ cd client && npm install && npm run dev      # UI on :5173 (proxies /api to :500
 
 ```bash
 cd server
-npm test          # 18 end-to-end API tests on a throwaway in-memory MongoDB (never touches real data)
+npm test          # 24 end-to-end API tests on a throwaway in-memory MongoDB (never touches real data)
 npm run sandbox   # serves client/dist + API on :5055 with an empty in-memory DB for manual testing
                   # super admin: root@sandbox.test / RootPass#123
 ```
