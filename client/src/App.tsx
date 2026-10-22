@@ -24,6 +24,7 @@ import { HospitalAdminAnalytics } from './pages/dashboards/HospitalAdminAnalytic
 import { HospitalAdminBilling } from './pages/dashboards/HospitalAdminBilling';
 import { HospitalAdminAccounts } from './pages/dashboards/HospitalAdminAccounts';
 import { HospitalAdminSettings } from './pages/dashboards/HospitalAdminSettings';
+import { HospitalAdminOpdSetup } from './pages/dashboards/HospitalAdminOpdSetup';
 
 import { ReceptionistDashboard } from './pages/dashboards/ReceptionistDashboard';
 import { ReceptionistAppointments } from './pages/dashboards/ReceptionistAppointments';
@@ -89,6 +90,7 @@ function App() {
           <Route path="billing" element={<HospitalAdminBilling />} />
           <Route path="accounts" element={<HospitalAdminAccounts />} />
           <Route path="settings" element={<HospitalAdminSettings />} />
+          <Route path="opd-setup" element={<HospitalAdminOpdSetup />} />
         </Route>
 
         {/* Receptionist Routes */}

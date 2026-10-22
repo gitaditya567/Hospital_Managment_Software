@@ -378,6 +378,44 @@ hospitalRouter.delete('/schedules/:id', adminOnly, async (req, res) => {
 });
 
 
+const TIME_RE = /^(0?[1-9]|1[0-2]):[0-5]\d\s?(AM|PM)$/i;
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+hospitalRouter.put('/schedules/doctor/:doctorId', adminOnly, async (req, res) => {
+  const { roomNumber, startTime, endTime, days } = req.body || {};
+  try {
+    const doctor = await Staff.findOne({ ...scoped(req, req.params.doctorId), role: 'Doctor' });
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found.' });
+    if (!TIME_RE.test(String(startTime || '').trim()) || !TIME_RE.test(String(endTime || '').trim())) {
+      return res.status(400).json({ message: 'Enter OPD hours like 09:00 AM and 02:00 PM.' });
+    }
+    const toMin = (t) => {
+      const [, h, m, ap] = /^(\d{1,2}):(\d{2})\s?(AM|PM)$/i.exec(t.trim());
+      return ((parseInt(h, 10) % 12) + (ap.toUpperCase() === 'PM' ? 12 : 0)) * 60 + parseInt(m, 10);
+    };
+    if (toMin(endTime) <= toMin(startTime)) return res.status(400).json({ message: 'OPD end time must be after the start time.' });
+    const dayList = Array.isArray(days) ? DAY_NAMES.filter(d => days.includes(d)) : [];
+    if (!dayList.length) return res.status(400).json({ message: 'Choose at least one OPD day.' });
+
+    const fields = {
+      doctorId: doctor._id.toString(),
+      doctorName: doctor.name,
+      roomNumber: String(roomNumber || '').trim() || '—',
+      availability: `${startTime.trim().toUpperCase()} - ${endTime.trim().toUpperCase()}`,
+      days: dayList.length === 7 ? 'Mon - Sun' : dayList.join(', '),
+      hospitalId: req.hospitalId
+    };
+    const schedule = await DoctorSchedule.findOneAndUpdate(
+      { hospitalId: req.hospitalId, $or: [{ doctorId: fields.doctorId }, { doctorName: doctor.name }] },
+      fields,
+      { new: true, upsert: true }
+    );
+    res.json(schedule);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
 // ----------------------------------------------------
 // 4. PATIENT LIVE OPD QUEUE OPERATIONS
 // ----------------------------------------------------
@@ -916,9 +954,9 @@ hospitalRouter.get('/fees', async (req, res) => {
     
     // Check if the tenant document already has fee settings, otherwise return default config
     const fees = {
-      opdFee: tenant.opdFee || 500,
-      emergencyFee: tenant.emergencyFee || 1200,
-      bedChargePerDay: tenant.bedChargePerDay || 2500
+      opdFee: tenant.opdFee ?? 500,
+      emergencyFee: tenant.emergencyFee ?? 1200,
+      bedChargePerDay: tenant.bedChargePerDay ?? 2500
     };
     res.json(fees);
   } catch (error) {
@@ -929,17 +967,20 @@ hospitalRouter.get('/fees', async (req, res) => {
 hospitalRouter.put('/fees', adminOnly, async (req, res) => {
   const { hospitalId, opdFee, emergencyFee, bedChargePerDay } = req.body;
   try {
-    const updatedTenant = await Tenant.findByIdAndUpdate(
-      hospitalId, 
-      { opdFee, emergencyFee, bedChargePerDay },
-      { new: true }
-    );
+    const update = {};
+    for (const [key, value] of [['opdFee', opdFee], ['emergencyFee', emergencyFee], ['bedChargePerDay', bedChargePerDay]]) {
+      if (value === undefined) continue;
+      const n = Number(value);
+      if (!Number.isFinite(n) || n < 0 || n > 1000000) return res.status(400).json({ message: 'Fees must be amounts between ₹0 and ₹10,00,000.' });
+      update[key] = Math.round(n);
+    }
+    const updatedTenant = await Tenant.findByIdAndUpdate(hospitalId, update, { new: true });
     if (!updatedTenant) return res.status(404).json({ message: 'Hospital Tenant not found.' });
-    
+
     res.json({
-      opdFee: updatedTenant.opdFee || 500,
-      emergencyFee: updatedTenant.emergencyFee || 1200,
-      bedChargePerDay: updatedTenant.bedChargePerDay || 2500
+      opdFee: updatedTenant.opdFee ?? 500,
+      emergencyFee: updatedTenant.emergencyFee ?? 1200,
+      bedChargePerDay: updatedTenant.bedChargePerDay ?? 2500
     });
   } catch (error) {
     res.status(400).json({ message: error.message });

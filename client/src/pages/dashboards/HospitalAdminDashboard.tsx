@@ -1,6 +1,7 @@
 import { useHospitalStore } from '../../store/useHospitalStore';
 import { usePharmacyStore } from '../../store/usePharmacyStore';
 import { IndianRupee, Users, Activity, CreditCard, Clock, Calendar } from 'lucide-react';
+import { SetupChecklist } from './admin/SetupChecklist';
 
 export function HospitalAdminDashboard() {
   const { staff, patients, hospitalName, invoices } = useHospitalStore();
@@ -73,6 +74,7 @@ export function HospitalAdminDashboard() {
 
   return (
     <div className="space-y-6 font-sans">
+      <SetupChecklist />
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 relative overflow-hidden text-white shadow-blue-500/10">
         <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-white/10 rounded-full blur-3xl -z-10 animate-pulse-fast"></div>

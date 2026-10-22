@@ -16,7 +16,9 @@ import {
   Calendar,
   Wallet,
   PanelLeftClose,
-  AlertTriangle
+  AlertTriangle,
+  ClipboardList,
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -46,10 +48,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       case 'HOSPITAL_ADMIN':
         return [
           { to: '/hospital-admin', icon: LayoutDashboard, label: 'Dashboard' },
-          { to: '/hospital-admin/accounts', icon: Wallet, label: 'Accounts & Master Ledger' },
+          { to: '/hospital-admin/appointments', icon: ClipboardList, label: 'OPD Register' },
           { to: '/hospital-admin/staff', icon: Users, label: 'Staff Management' },
-          // { to: '/hospital-admin/departments', icon: Building2, label: 'Departments & Rooms' },
-          { to: '/hospital-admin/billing', icon: CreditCard, label: 'Hospital Billing' },
+          { to: '/hospital-admin/opd-setup', icon: SlidersHorizontal, label: 'OPD Setup (Fees & Rooms)' },
+          { to: '/hospital-admin/departments', icon: Building2, label: 'Departments' },
+          { to: '/hospital-admin/analytics', icon: LineChart, label: 'Reports' },
+          { to: '/hospital-admin/accounts', icon: Wallet, label: 'Accounts' },
+          { to: '/hospital-admin/billing', icon: CreditCard, label: 'Plan & Billing' },
           { to: '/hospital-admin/settings', icon: Settings, label: 'Hospital Profile' },
         ];
       case 'RECEPTIONIST':

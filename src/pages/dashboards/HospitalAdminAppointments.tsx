@@ -1,276 +1,135 @@
+import { useEffect, useMemo, useState } from 'react';
+import { ClipboardList, Search, Download, Users, CheckCircle2, Clock, IndianRupee, AlertTriangle, CalendarClock } from 'lucide-react';
 import { useHospitalStore } from '../../store/useHospitalStore';
-import { Users, CheckCircle, Clock, IndianRupee, CalendarDays, Search } from 'lucide-react';
-import { useState } from 'react';
+import type { PatientRecord } from '../../store/useHospitalStore';
+import { doctorTitle } from '../../lib/utils';
+import { downloadCsv, money } from './admin/adminReports';
+
+const toYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export function HospitalAdminAppointments() {
-  const { patients, invoices, staff } = useHospitalStore();
+  const { patients, invoices, staff, appointments, fetchAppointments } = useHospitalStore();
+  const [date, setDate] = useState(toYMD(new Date()));
+  const [status, setStatus] = useState<'All' | PatientRecord['status'] | 'Unpaid'>('All');
+  const [doctor, setDoctor] = useState('All');
+  const [query, setQuery] = useState('');
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Waiting' | 'In Consultation' | 'Completed'>('All');
+  useEffect(() => { fetchAppointments(date, date); }, [date, fetchAppointments]);
 
-  // Stats
-  const totalPatients = patients.length;
-  const completed = patients.filter(p => p.status === 'Completed').length;
-  const pending = patients.filter(p => p.status === 'Waiting' || p.status === 'In Consultation').length;
+  const doctors = staff.filter(s => s.role === 'Doctor');
+  const dayVisits = useMemo(() => patients
+    .filter(p => p.createdAt && toYMD(new Date(p.createdAt)) === date)
+    .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()), [patients, date]);
 
-  // Payment lookup from invoices by patient name
-  const getPayment = (patientName: string) => {
-    const inv = invoices.find(i => i.patientName === patientName);
-    if (!inv) return { amount: 0, status: 'N/A' };
-    return { amount: inv.amount, status: inv.status };
-  };
+  const invoiceFor = (p: PatientRecord) => invoices.find(i => i.patientId === p.id) || invoices.find(i => !i.patientId && i.patientPhone === p.phone && i.patientName === p.name);
+  const unpaid = (p: PatientRecord) => p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Pending';
 
-  // Department lookup from staff
-  const getDepartment = (doctorName: string) => {
-    const doc = staff.find(s => s.name === doctorName);
-    return doc?.department || '—';
-  };
+  const q = query.trim().toLowerCase();
+  const rows = dayVisits.filter(p =>
+    (doctor === 'All' || p.doctorName === doctor) &&
+    (status === 'All' || (status === 'Unpaid' ? unpaid(p) : p.status === status)) &&
+    (!q || [p.name, p.phone, p.patientNo, p.tokenNumber, p.diagnosis].some(v => (v || '').toLowerCase().includes(q)))
+  );
 
-  // Filtered list
-  const filtered = patients.filter(p => {
-    const matchSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.tokenNumber.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchStatus = statusFilter === 'All' || p.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const collected = dayVisits.reduce((s, p) => { const i = invoiceFor(p); return s + (i && i.status === 'Paid' ? i.amount : 0); }, 0);
+  const due = dayVisits.reduce((s, p) => { const i = invoiceFor(p); return s + (i && i.status === 'Pending' ? i.amount : 0); }, 0);
+  const booked = appointments.filter(a => a.date === date);
 
-  const totalRevenue = invoices
-    .filter(i => i.status === 'Paid')
-    .reduce((acc, i) => acc + i.amount, 0);
+  const exportCsv = () => downloadCsv(`opd-register-${date}.csv`,
+    ['Token', 'Time', 'Patient', 'Patient no', 'Age', 'Gender', 'Phone', 'Doctor', 'Status', 'Fee', 'Payment', 'Diagnosis', 'Rx'],
+    rows.map(p => {
+      const i = invoiceFor(p);
+      return [p.tokenNumber, p.createdAt ? new Date(p.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '', p.name, p.patientNo || '', p.age, p.gender || '', p.phone, p.doctorName, p.status,
+        i?.amount ?? '', i ? (i.status === 'Paid' ? `Paid ${i.paymentMode || ''}`.trim() : 'Due') : '', p.diagnosis || '', p.rxCode || ''];
+    }));
 
   return (
-    <div className="space-y-6 pb-20 font-sans">
-
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#3683F8] p-6 rounded-2xl shadow-lg border border-blue-400/30 relative overflow-hidden text-white shadow-blue-500/10">
-        <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-white/10 rounded-full blur-3xl -z-10"></div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 animate-pulse"></span>
-            <span className="text-xs font-semibold text-blue-100 uppercase tracking-widest">Live OPD Registry</span>
-          </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <CalendarDays size={22} className="text-blue-100" /> Appointments Overview
-          </h1>
-          <p className="text-blue-50 text-xs">Real-time patient appointment tracking and payment status.</p>
+    <div className="space-y-5 font-sans pb-16">
+      <div className="bg-[#3683F8] rounded-2xl p-5 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2"><ClipboardList size={22} /> OPD register</h1>
+          <p className="text-blue-50 text-xs font-semibold mt-1">Every OPD visit of the day with fee, status, diagnosis and prescription.</p>
         </div>
-        <div className="text-xs bg-white/15 px-4 py-2.5 rounded-xl border border-white/20 text-white font-semibold backdrop-blur-xs">
-          {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        <div className="flex items-center gap-2">
+          <input type="date" aria-label="Register date" value={date} max={toYMD(new Date())} onChange={e => e.target.value && setDate(e.target.value)} className="h-11 px-3 rounded-xl text-sm font-bold text-[#060606]" />
+          <button type="button" onClick={exportCsv} disabled={!rows.length} className="h-11 px-4 rounded-xl bg-white text-[#3683F8] font-bold text-sm inline-flex items-center gap-2 disabled:opacity-60"><Download size={16} /> CSV</button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {/* Total Patients */}
-        <div className="bg-white rounded-2xl border border-[#D8D8D8] shadow-xs p-5 flex items-center justify-between hover:shadow-md transition-all">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-bold text-[#3683F8] uppercase tracking-widest">Total Patients</p>
-            <h2 className="text-3xl font-extrabold text-[#060606] tracking-tight">{totalPatients}</h2>
-            <p className="text-[10px] text-slate-400 font-semibold">Registered today in queue</p>
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        {[
+          { label: 'Visits', value: dayVisits.length, icon: Users },
+          { label: 'Completed', value: dayVisits.filter(p => p.status === 'Completed').length, icon: CheckCircle2 },
+          { label: 'Waiting / with doctor', value: dayVisits.filter(p => p.status !== 'Completed').length, icon: Clock },
+          { label: 'Collected', value: money(collected), icon: IndianRupee },
+          { label: 'Fees due', value: money(due), icon: AlertTriangle },
+          { label: 'Appointments booked', value: booked.filter(a => a.status !== 'Cancelled').length, icon: CalendarClock }
+        ].map(k => (
+          <div key={k.label} className="bg-white p-4 rounded-2xl border border-[#D8D8D8] flex items-center justify-between gap-2">
+            <div className="min-w-0"><p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">{k.label}</p><p className="text-xl font-extrabold">{k.value}</p></div>
+            <k.icon size={18} className="text-[#3683F8] shrink-0" />
           </div>
-          <div className="h-14 w-14 rounded-2xl bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center">
-            <Users size={24} />
-          </div>
-        </div>
-
-        {/* Completed */}
-        <div className="bg-white rounded-2xl border border-[#D8D8D8] shadow-xs p-5 flex items-center justify-between hover:shadow-md transition-all">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest">Completed</p>
-            <h2 className="text-3xl font-extrabold text-[#060606] tracking-tight">{completed}</h2>
-            <p className="text-[10px] text-slate-400 font-semibold">Consultations finished</p>
-          </div>
-          <div className="h-14 w-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
-            <CheckCircle size={24} />
-          </div>
-        </div>
-
-        {/* Pending */}
-        <div className="bg-white rounded-2xl border border-[#D8D8D8] shadow-xs p-5 flex items-center justify-between hover:shadow-md transition-all">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-bold text-amber-600 uppercase tracking-widest">Pending / In Progress</p>
-            <h2 className="text-3xl font-extrabold text-[#060606] tracking-tight">{pending}</h2>
-            <p className="text-[10px] text-slate-400 font-semibold">Waiting + In Consultation</p>
-          </div>
-          <div className="h-14 w-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
-            <Clock size={24} />
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-2xl shadow-xs border border-[#D8D8D8] overflow-hidden">
-
-        {/* Table Toolbar */}
-        <div className="px-6 py-4 border-b border-[#D8D8D8] bg-[#EBF3FE]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <h2 className="text-base font-bold text-[#060606]">Patient Appointments</h2>
-            <p className="text-xs text-slate-400 font-medium">All registered patients with consultation &amp; payment details</p>
+      <div className="bg-white rounded-2xl border border-[#D8D8D8] overflow-hidden">
+        <div className="p-4 border-b border-[#D8D8D8] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {(['All', 'Waiting', 'In Consultation', 'Completed', 'Unpaid'] as const).map(s => (
+              <button key={s} type="button" onClick={() => setStatus(s)} className={`h-8 px-3 rounded-lg text-xs font-bold border ${status === s ? 'bg-[#060606] border-[#060606] text-white' : 'bg-white border-[#D8D8D8] text-slate-600'}`}>{s === 'In Consultation' ? 'With doctor' : s === 'Unpaid' ? 'Fee due' : s}</button>
+            ))}
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Search */}
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search patient, doctor, token..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-8 pr-3 h-9 text-xs border border-[#D8D8D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] w-52 font-medium bg-white text-[#060606]"
-              />
-            </div>
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as any)}
-              className="h-9 text-xs border border-[#D8D8D8] rounded-xl px-3 focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] font-semibold text-[#060606] bg-white"
-            >
-              <option value="All">All Status</option>
-              <option value="Waiting">Waiting</option>
-              <option value="In Consultation">In Consultation</option>
-              <option value="Completed">Completed</option>
+          <div className="flex flex-wrap gap-2">
+            <select aria-label="Doctor" value={doctor} onChange={e => setDoctor(e.target.value)} className="h-9 px-2 rounded-lg border border-[#D8D8D8] text-xs font-bold bg-white">
+              <option value="All">All doctors</option>
+              {doctors.map(d => <option key={d.id} value={d.name}>{doctorTitle(d.name)}</option>)}
             </select>
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Name, phone, token, diagnosis" className="h-9 w-56 pl-8 pr-3 rounded-xl border border-[#D8D8D8] text-xs font-semibold focus:outline-none focus:border-[#3683F8]" />
+            </div>
           </div>
         </div>
-
-        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#EBF3FE]/50 border-b border-[#D8D8D8] text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">Token</th>
-                <th className="px-6 py-4">Patient</th>
-                <th className="px-6 py-4">Doctor</th>
-                <th className="px-6 py-4">Department</th>
-                <th className="px-6 py-4">Time</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Payment</th>
-                <th className="px-6 py-4">Amount</th>
-              </tr>
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#EBF3FE]/60 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
+              <tr><th className="px-4 py-3">Token</th><th className="px-4 py-3">Patient</th><th className="px-4 py-3">Doctor</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Fee</th><th className="px-4 py-3">Diagnosis</th><th className="px-4 py-3">Rx</th></tr>
             </thead>
-            <tbody className="divide-y divide-[#D8D8D8]/60 text-xs">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="text-center py-16 text-slate-400 font-semibold">
-                    <div className="flex flex-col items-center gap-2">
-                      <CalendarDays size={28} className="text-slate-300" />
-                      No appointments found{searchQuery ? ` for "${searchQuery}"` : ''}.
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {filtered.map((patient) => {
-                const isWaiting = patient.status === 'Waiting';
-                const isConsulting = patient.status === 'In Consultation';
-                const payment = getPayment(patient.name);
-                const dept = getDepartment(patient.doctorName);
-
+            <tbody className="divide-y divide-[#D8D8D8]/60">
+              {rows.map(p => {
+                const inv = invoiceFor(p);
                 return (
-                  <tr key={patient.id} className="hover:bg-[#EBF3FE]/20 transition-colors group">
-                    {/* Token */}
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 bg-[#EBF3FE] text-[#3683F8] border border-blue-200 rounded-lg font-mono font-bold text-[10px]">
-                        {patient.tokenNumber}
-                      </span>
-                    </td>
-
-                    {/* Patient */}
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-[#060606] group-hover:text-[#3683F8] transition-colors">{patient.name}</div>
-                      <div className="text-[10px] text-slate-400 font-semibold mt-0.5">{patient.age} Yrs • {patient.gender || 'N/A'}</div>
-                    </td>
-
-                    {/* Doctor */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-full bg-[#EBF3FE] border border-blue-200 text-[#3683F8] flex items-center justify-center font-bold text-[10px] shrink-0">
-                          {patient.doctorName.replace('Dr. ', '').charAt(0)}
-                        </div>
-                        <span className="font-semibold text-[#060606]">{patient.doctorName}</span>
-                      </div>
-                    </td>
-
-                    {/* Department */}
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 bg-[#EBF3FE] text-[#3683F8] border border-blue-200 rounded-md font-semibold text-[10px]">
-                        {dept}
-                      </span>
-                    </td>
-
-                    {/* Time */}
-                    <td className="px-6 py-4 text-slate-500 font-mono font-semibold">
-                      {patient.timeRegistered}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                        isWaiting
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : isConsulting
-                          ? 'bg-[#EBF3FE] text-[#3683F8] border-blue-200'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          isWaiting ? 'bg-amber-500' : isConsulting ? 'bg-[#3683F8] animate-pulse' : 'bg-emerald-500'
-                        }`}></span>
-                        {patient.status}
-                      </span>
-                    </td>
-
-                    {/* Payment Status */}
-                    <td className="px-6 py-4">
-                      {payment.status === 'N/A' ? (
-                        <span className="text-slate-400 font-semibold text-[10px]">Not Billed</span>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                          payment.status === 'Paid'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${payment.status === 'Paid' ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></span>
-                          {payment.status}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Amount collected */}
-                    <td className="px-6 py-4">
-                      {payment.amount > 0 ? (
-                        <span className="inline-flex items-center gap-1 font-bold text-[#060606]">
-                          <IndianRupee size={11} className="text-[#3683F8]" />
-                          {payment.amount.toLocaleString('en-IN')}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 font-semibold text-[10px]">—</span>
-                      )}
-                    </td>
+                  <tr key={p.id}>
+                    <td className="px-4 py-3"><span className="px-2 py-1 rounded-lg bg-[#060606] text-white font-mono font-bold text-[11px] whitespace-nowrap">{p.tokenNumber}</span><div className="text-[10px] text-slate-400 mt-1">{p.createdAt ? new Date(p.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}</div></td>
+                    <td className="px-4 py-3"><div className="font-extrabold text-sm">{p.name}</div><div className="text-[11px] text-slate-500">{p.patientNo} · {p.age}{(p.gender || 'M')[0]} · {p.phone}</div></td>
+                    <td className="px-4 py-3 font-semibold">{doctorTitle(p.doctorName)}</td>
+                    <td className="px-4 py-3"><span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border whitespace-nowrap ${p.status === 'Completed' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : p.status === 'In Consultation' ? 'bg-[#EBF3FE] border-blue-200 text-[#3683F8]' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>{p.status === 'In Consultation' ? 'With doctor' : p.status}</span></td>
+                    <td className="px-4 py-3 whitespace-nowrap">{inv ? <span className={`font-bold ${inv.status === 'Paid' ? 'text-emerald-700' : 'text-rose-600'}`}>{money(inv.amount)} · {inv.status === 'Paid' ? (inv.paymentMode || 'Paid') : 'Due'}</span> : <span className="text-slate-400">—</span>}</td>
+                    <td className="px-4 py-3 font-semibold">{p.diagnosis || <span className="text-slate-400">—</span>}</td>
+                    <td className="px-4 py-3 font-mono font-bold">{p.rxCode || <span className="text-slate-400 font-sans">—</span>}</td>
                   </tr>
                 );
               })}
+              {rows.length === 0 && <tr><td colSpan={7} className="py-12 text-center text-sm font-bold text-slate-400">No visits for this day.</td></tr>}
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Table Footer */}
-        <div className="px-6 py-3 border-t border-[#D8D8D8] bg-[#EBF3FE]/30 flex items-center justify-between flex-wrap gap-2">
-          <p className="text-[11px] text-slate-400 font-semibold">
-            Showing <span className="text-[#060606] font-bold">{filtered.length}</span> of{' '}
-            <span className="text-[#060606] font-bold">{totalPatients}</span> appointments
-          </p>
-          <div className="flex items-center gap-4 text-[11px] font-bold">
-            <span className="text-[#3683F8] flex items-center gap-1">
-              <IndianRupee size={11} /> Total Collected: ₹{totalRevenue.toLocaleString('en-IN')}
-            </span>
-            <span className="text-[10px] text-emerald-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-              Live Sync Active
-            </span>
+      {booked.length > 0 && (
+        <div className="bg-white rounded-2xl border border-[#D8D8D8] p-4">
+          <h2 className="text-sm font-extrabold mb-3 flex items-center gap-2"><CalendarClock size={16} className="text-[#3683F8]" /> Appointments booked for this day ({booked.length})</h2>
+          <div className="flex flex-wrap gap-2">
+            {booked.map(a => (
+              <div key={a.id} className="rounded-xl border border-[#D8D8D8] px-3 py-2 text-xs">
+                <div className="font-black text-[#3683F8]">{a.time}</div>
+                <div className="font-bold">{a.patientName}</div>
+                <div className="text-slate-500">{doctorTitle(a.doctorName)} · {a.status}</div>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

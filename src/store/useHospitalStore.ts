@@ -261,6 +261,7 @@ interface HospitalState {
   updateSchedule: (id: string, updates: Partial<DoctorSchedule>) => Promise<void>;
 
   updateFees: (fees: Partial<StandardFees>) => Promise<void>;
+  saveDoctorSetup: (doctor: StaffMember, setup: { roomNumber: string; startTime: string; endTime: string; days: string[]; consultationFee?: number }) => Promise<void>;
   registerPatient: (patient: Omit<PatientRecord, 'id' | 'tokenNumber' | 'timeRegistered' | 'status'> & { payNow?: boolean; fee?: VisitFee }) => Promise<RegisteredVisit>;
   updatePatientStatus: (patientId: string, status: PatientRecord['status']) => Promise<void>;
   addPatientInvoice: (invoice: Omit<PatientInvoice, 'id' | 'date'>) => Promise<void>;
@@ -602,17 +603,33 @@ export const useHospitalStore = create<HospitalState>((set, get) => ({
   },
 
   updateFees: async (newFees) => {
-    const hospitalId = useAuthStore.getState().user?.hospitalId || '65f3d9b1c92d5a3f124a9001';
-    try {
-      await fetch('/api/hospital/fees', {
+    const hospitalId = useAuthStore.getState().user?.hospitalId || '';
+    const res = await fetch('/api/hospital/fees', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newFees)
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Could not save the fees.'));
+    await get().fetchHospitalData(hospitalId);
+  },
+
+  saveDoctorSetup: async (doctor, setup) => {
+    const hospitalId = useAuthStore.getState().user?.hospitalId || '';
+    const res = await fetch(`/api/hospital/schedules/doctor/${doctor.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(setup)
+    });
+    if (!res.ok) throw new Error(await readError(res, `Could not save the schedule for ${doctor.name}.`));
+    if (setup.consultationFee !== undefined && setup.consultationFee !== doctor.consultationFee) {
+      const feeRes = await fetch('/api/hospital/staff/profile/details', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newFees, hospitalId })
+        body: JSON.stringify({ email: doctor.email, consultationFee: setup.consultationFee })
       });
-      await get().fetchHospitalData(hospitalId);
-    } catch (err) {
-      console.error('Failed to update fees', err);
+      if (!feeRes.ok) throw new Error(await readError(feeRes, `Could not save the fee for ${doctor.name}.`));
     }
+    await get().fetchHospitalData(hospitalId);
   },
 
   registerPatient: async (patient) => {

@@ -516,6 +516,31 @@ test('doctor: fee gate, one patient in cabin, consultation notes, priced Rx, his
   await api('PUT', `/api/hospital/staff/${ctx.alphaDoctorStaffId}`, { token: ctx.alphaAdmin, body: { status: 'Active' } });
 });
 
+test('admin OPD setup: fees (incl. free OPD) and one schedule per doctor', async () => {
+  const neg = await api('PUT', '/api/hospital/fees', { token: ctx.alphaAdmin, body: { opdFee: -5 } });
+  assert.equal(neg.status, 400);
+  const free = await api('PUT', '/api/hospital/fees', { token: ctx.alphaAdmin, body: { opdFee: 0, emergencyFee: 900 } });
+  assert.equal(free.status, 200);
+  assert.equal(free.data.opdFee, 0, 'a free OPD stays ₹0');
+  assert.equal((await api('GET', '/api/hospital/fees', { token: ctx.reception })).data.opdFee, 0);
+  await api('PUT', '/api/hospital/fees', { token: ctx.alphaAdmin, body: { opdFee: 500 } });
+  assert.equal((await api('PUT', '/api/hospital/fees', { token: ctx.reception, body: { opdFee: 1 } })).status, 403);
+
+  const path = `/api/hospital/schedules/doctor/${ctx.alphaDoctorStaffId}`;
+  assert.equal((await api('PUT', path, { token: ctx.alphaAdmin, body: { roomNumber: '101', startTime: '2 PM', endTime: '5 PM', days: ['Mon'] } })).status, 400, 'bad time format');
+  assert.equal((await api('PUT', path, { token: ctx.alphaAdmin, body: { roomNumber: '101', startTime: '05:00 PM', endTime: '02:00 PM', days: ['Mon'] } })).status, 400, 'end before start');
+  assert.equal((await api('PUT', path, { token: ctx.alphaAdmin, body: { roomNumber: '101', startTime: '09:00 AM', endTime: '02:00 PM', days: [] } })).status, 400, 'needs a day');
+  const first = await api('PUT', path, { token: ctx.alphaAdmin, body: { roomNumber: '101', startTime: '09:00 AM', endTime: '02:00 PM', days: ['Mon', 'Wed', 'Fri'] } });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  assert.equal(first.data.availability, '09:00 AM - 02:00 PM');
+  assert.equal(first.data.days, 'Mon, Wed, Fri');
+  const second = await api('PUT', path, { token: ctx.alphaAdmin, body: { roomNumber: '102', startTime: '10:00 AM', endTime: '06:00 PM', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] } });
+  assert.equal(second.data.days, 'Mon - Sun');
+  const all = (await api('GET', '/api/hospital/schedules', { token: ctx.reception })).data.filter(x => x.doctorId === ctx.alphaDoctorStaffId);
+  assert.equal(all.length, 1, 'saving again updates the same schedule');
+  assert.equal(all[0].roomNumber, '102');
+});
+
 test('tenant isolation: one hospital cannot see or change another', async () => {
   const r = await api('POST', '/api/public/register', {
     body: { hospitalName: 'Beta Clinic', adminName: 'Beta Admin', email: 'admin@beta.test', password: 'BetaPass#1', phone: '9123456780', address: '5 Civil Lines', acceptTerms: true }

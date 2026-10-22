@@ -5,6 +5,24 @@ import { CreditCard, CheckCircle, AlertTriangle, ShieldCheck, Download, Calendar
 import { Button } from '../../components/ui/Button';
 import { getPrintSettings, savePrintSettings } from '../../utils/printSettings';
 import type { PrintSettings } from '../../utils/printSettings';
+import { printDocument } from './doctor/doctorShared';
+
+const escapeHtml = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+
+// Printable receipt for one subscription payment
+const printSubscriptionReceipt = (inv: { id: string; date: string; planName: string; amount: number; method: string; status: string }, hospital: { name: string; address?: string }) => {
+  printDocument(`<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${escapeHtml(inv.id)}</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;margin:40px;font-size:14px}h1{margin:0;font-size:22px}.muted{color:#64748b}
+  table{width:100%;border-collapse:collapse;margin-top:24px}td{padding:10px;border-bottom:1px solid #e2e8f0}td:last-child{text-align:right;font-weight:700}
+  .total{font-size:18px}.badge{display:inline-block;padding:2px 10px;border-radius:999px;background:${inv.status === 'Paid' ? '#ecfdf5;color:#047857' : '#fff1f2;color:#be123c'};font-weight:700}</style></head>
+  <body><h1>Subscription receipt</h1><div class="muted">Smart Hospital Management Software · twinsCloud</div>
+  <p style="margin-top:24px"><b>Billed to:</b> ${escapeHtml(hospital.name)}<br><span class="muted">${escapeHtml(hospital.address || '')}</span></p>
+  <table><tr><td>Receipt no.</td><td>${escapeHtml(inv.id)}</td></tr><tr><td>Date</td><td>${escapeHtml(inv.date)}</td></tr>
+  <tr><td>Plan</td><td>${escapeHtml(inv.planName)}</td></tr><tr><td>Payment method</td><td>${escapeHtml(inv.method)}</td></tr>
+  <tr><td>Status</td><td><span class="badge">${escapeHtml(inv.status)}</span></td></tr>
+  <tr class="total"><td>Amount</td><td>₹${Number(inv.amount).toLocaleString('en-IN')}</td></tr></table>
+  <p class="muted" style="margin-top:32px;font-size:12px">Computer-generated receipt. Applicable taxes as per invoice.</p></body></html>`);
+};
 
 export function HospitalAdminBilling() {
   const { staff, fees, renewSubscription, subscriptionTenant, subscriptionPlans: plans, subscriptionInvoices: invoices, fetchSubscription, hospitalName: storeHospitalName } = useHospitalStore();
@@ -585,7 +603,7 @@ export function HospitalAdminBilling() {
                 <div className="text-center py-2 border rounded-xl my-2 bg-[#EBF3FE]/50 space-y-0.5" style={{ borderColor: `${printSettings.accentColor}30` }}>
                   <p className="text-[0.68em] font-extrabold text-slate-400 uppercase tracking-wider">Queue Token</p>
                   <h2 className="text-[1.8em] font-black leading-none" style={{ color: printSettings.accentColor }}>A-104</h2>
-                  <p className="text-[0.72em] font-extrabold text-slate-600">Dr. Sarah Rahman</p>
+                  <p className="text-[0.72em] font-extrabold text-slate-600">Dr. Sample Doctor</p>
                 </div>
 
                 {/* Patient details */}
@@ -679,10 +697,10 @@ export function HospitalAdminBilling() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button
-                      onClick={() => alert(`Downloading receipt for invoice ${inv.id}...`)}
+                      onClick={() => printSubscriptionReceipt(inv, { name: hospitalName, address: currentHospital?.address })}
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-[#3683F8] hover:text-blue-600"
                     >
-                      <Download size={12} /> Receipt
+                      <Printer size={12} /> Receipt
                     </button>
                   </td>
                 </tr>

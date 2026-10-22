@@ -6,7 +6,7 @@ import { PasswordStrengthMeter } from '../../components/ui/PasswordStrengthMeter
 import { Users, UserPlus, X, Stethoscope, ShieldCheck, Trash2, ShieldAlert, Edit, History, ArrowRight, Clock } from 'lucide-react';
 
 export function HospitalAdminStaff() {
-  const { staff, addStaff, toggleStaffStatus, deleteStaff, updateStaff, subscriptionTenant, subscriptionPlans: plans, fetchSubscription } = useHospitalStore();
+  const { staff, departments, addStaff, toggleStaffStatus, deleteStaff, updateStaff, subscriptionTenant, subscriptionPlans: plans, fetchSubscription } = useHospitalStore();
   const tenants = subscriptionTenant ? [subscriptionTenant] : [];
   const { user } = useAuthStore();
 
@@ -398,14 +398,16 @@ export function HospitalAdminStaff() {
                             onChange={(e) => setSpecialization(e.target.value)}
                             className="w-full h-10 border border-[#D8D8D8] bg-white text-[#060606] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3683F8]/20 focus:border-[#3683F8] transition-all mt-1.5"
                           >
-                            <option value="General Medicine">General Medicine</option>
-                            <option value="Cardiology">Cardiology</option>
-                            <option value="Pediatrics">Pediatrics</option>
-                            <option value="Orthopedics">Orthopedics</option>
-                            <option value="Neurology">Neurology</option>
-                            <option value="Gynecology">Gynecology</option>
+                            {(() => {
+                              // The hospital's own departments; common specialties until any are created
+                              const names = departments.length
+                                ? departments.map(d => d.name)
+                                : ['General Medicine', 'Cardiology', 'Pediatrics', 'Orthopedics', 'Neurology', 'Gynecology', 'ENT', 'Dermatology'];
+                              if (specialization && !names.includes(specialization)) names.unshift(specialization);
+                              return names.map(n => <option key={n} value={n}>{n}</option>);
+                            })()}
                           </select>
-                          <p className="text-[10px] text-[#3683F8]/70 font-semibold mt-1">This slot binds this doctor to associated OPD configurations.</p>
+                          <p className="text-[10px] text-[#3683F8]/70 font-semibold mt-1">{departments.length ? 'Departments come from the Departments page.' : 'Tip: create your own departments on the Departments page.'}</p>
                         </div>
                       )}
 
